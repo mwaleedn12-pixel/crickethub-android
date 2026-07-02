@@ -12,11 +12,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.crickethub.ui.auth.LoginScreen
 import com.crickethub.ui.auth.SignupScreen
+import com.crickethub.ui.team.PlayersScreen
+import com.crickethub.ui.team.TeamsScreen
 import com.crickethub.ui.theme.CricketHubTheme
 
 class MainActivity : ComponentActivity() {
@@ -61,21 +65,20 @@ fun CricketHubApp() {
             )
         }
         composable("home") {
-            HomePlaceholder()
+            TeamsScreen(
+                onTeamClick = { teamId ->
+                    navController.navigate("players/$teamId")
+                }
+            )
         }
-    }
-}
-
-@Composable
-fun HomePlaceholder() {
-    Surface(color = Color(0xFF030712)) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Welcome to CricketHub!",
-                color = Color(0xFF10B981)
+        composable(
+            route = "players/{teamId}",
+            arguments = listOf(navArgument("teamId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
+            PlayersScreen(
+                teamId = teamId,
+                onBack = { navController.popBackStack() }
             )
         }
     }
