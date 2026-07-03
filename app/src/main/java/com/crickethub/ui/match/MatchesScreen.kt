@@ -25,6 +25,7 @@ private val SurfaceCard = Color(0xFF111827)
 private val BorderColor = Color(0xFF1F2937)
 private val NeonGreen = Color(0xFF10B981)
 private val NeonBlue = Color(0xFF3B82F6)
+private val PurpleColor = Color(0xFF8B5CF6)
 private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val AmberColor = Color(0xFFF59E0B)
@@ -34,6 +35,7 @@ fun MatchesScreen(
     onCreateMatch: () -> Unit,
     onMatchClick: (String) -> Unit,
     onViewScorecard: (String) -> Unit,
+    onViewAnalytics: (String) -> Unit,
     viewModel: MatchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -52,26 +54,16 @@ fun MatchesScreen(
                     color = TextPrimary
                 )
                 IconButton(onClick = onCreateMatch) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Create match",
-                        tint = NeonGreen
-                    )
+                    Icon(Icons.Default.Add, contentDescription = "Create match", tint = NeonGreen)
                 }
             }
 
             if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = NeonGreen)
                 }
             } else if (uiState.matches.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No matches yet. Tap + to create one.", color = TextSecondary)
                 }
             } else {
@@ -82,7 +74,8 @@ fun MatchesScreen(
                             team1Name = uiState.teams.find { it.id == match.team1Id }?.name ?: "Team 1",
                             team2Name = uiState.teams.find { it.id == match.team2Id }?.name ?: "Team 2",
                             onClick = { onMatchClick(match.id) },
-                            onViewScorecard = { onViewScorecard(match.id) }
+                            onViewScorecard = { onViewScorecard(match.id) },
+                            onViewAnalytics = { onViewAnalytics(match.id) }
                         )
                     }
                 }
@@ -97,7 +90,8 @@ fun MatchCard(
     team1Name: String,
     team2Name: String,
     onClick: () -> Unit,
-    onViewScorecard: () -> Unit
+    onViewScorecard: () -> Unit,
+    onViewAnalytics: () -> Unit
 ) {
     val statusColor = when (match.status) {
         "live" -> NeonGreen
@@ -141,12 +135,8 @@ fun MatchCard(
                 fontSize = 16.sp,
                 modifier = Modifier.weight(1f)
             )
-            Text(
-                "vs",
-                color = TextSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
+            Text("vs", color = TextSecondary, fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 8.dp))
             Text(
                 team2Name,
                 color = TextPrimary,
@@ -165,24 +155,28 @@ fun MatchCard(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             OutlinedButton(
                 onClick = onClick,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
                 shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Score / Setup", fontSize = 12.sp)
-            }
+            ) { Text("Score", fontSize = 11.sp) }
+
             OutlinedButton(
                 onClick = onViewScorecard,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonBlue),
                 shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Live Scorecard", fontSize = 12.sp)
-            }
+            ) { Text("Live", fontSize = 11.sp) }
+
+            OutlinedButton(
+                onClick = onViewAnalytics,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor),
+                shape = RoundedCornerShape(8.dp)
+            ) { Text("Analytics", fontSize = 11.sp) }
         }
     }
 }
