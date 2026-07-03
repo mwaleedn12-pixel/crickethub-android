@@ -30,8 +30,10 @@ class ScoringViewModel : ViewModel() {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val match = matchRepository.getMatchById(matchId) ?: return@launch
-                val innings = scoringRepository.getInningsByMatch(matchId)
-                val currentInnings = innings.find { it.status == "live" }
+                val allInnings = scoringRepository.getInningsByMatch(matchId)
+
+                // Sirf live innings dhundo — agar exist karti hai
+                val currentInnings = allInnings.find { it.status == "live" }
 
                 val battingTeamId = match.battingFirstId ?: match.team1Id
                 val bowlingTeamId = if (battingTeamId == match.team1Id) match.team2Id else match.team1Id
@@ -39,7 +41,8 @@ class ScoringViewModel : ViewModel() {
                 val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, battingTeamId)
                 val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, bowlingTeamId)
 
-                if (currentInnings == null) {
+                if (currentInnings == null && allInnings.isEmpty()) {
+                    // Pehli baar — innings create karo
                     val newInnings = scoringRepository.createInnings(
                         InningsInsert(
                             matchId = matchId,
@@ -58,13 +61,15 @@ class ScoringViewModel : ViewModel() {
                         )
                     }
                 } else {
-                    val balls = scoringRepository.getBallsByInnings(currentInnings.id)
+                    // Existing innings use karo
+                    val innings = currentInnings ?: allInnings.last()
+                    val balls = scoringRepository.getBallsByInnings(innings.id)
                     val batsmanStats = computeBatsmanStats(balls, battingPlayers)
                     val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
                     _uiState.update {
                         it.copy(
                             match = match,
-                            innings = currentInnings,
+                            innings = innings,
                             balls = balls,
                             battingTeamPlayers = battingPlayers,
                             bowlingTeamPlayers = bowlingPlayers,
@@ -86,6 +91,29 @@ class ScoringViewModel : ViewModel() {
     fun setBowler(player: Player) { _uiState.update { it.copy(currentBowler = player) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
 
+    // Bowler max overs limit
+    fun getMaxOversPerBowler(totalOvers: Int): Int {
+        return when (totalOvers) {
+            5 -> 1
+            10 -> 2
+            20 -> 4
+            50 -> 10
+            else -> totalOvers / 5
+        }
+    }
+
+    fun canBowlerBowl(bowlerId: String, totalOvers: Int): Boolean {
+        val state = _uiState.value
+        val legalBallsBowled = state.balls.count {
+            it.bowlerId == bowlerId &&
+                    it.extrasType != "wide" &&
+                    it.extrasType != "no_ball"
+        }
+        val oversBowled = legalBallsBowled / 6
+        val maxOvers = getMaxOversPerBowler(totalOvers)
+        return oversBowled < maxOvers
+    }
+
     fun recordBall(
         runsOffBat: Int,
         extrasType: String? = null,
@@ -106,10 +134,8 @@ class ScoringViewModel : ViewModel() {
                 val isBye    = extrasType == "bye"
                 val isLegBye = extrasType == "leg_bye"
 
-                // Wide aur No Ball over count nahi karti
                 val isLegalBall = !isWide && !isNoBall
 
-                // Over/ball number sirf legal balls se
                 val legalBallsSoFar = innings.totalBalls
                 val overNo = legalBallsSoFar / 6
                 val ballNo = legalBallsSoFar % 6 + 1
@@ -121,14 +147,12 @@ class ScoringViewModel : ViewModel() {
                     else -> "death"
                 }
 
-                // Total runs scoreboard ke liye
                 val totalRunsThisBall = when {
                     isWide   -> (extrasRuns ?: 1) + runsOffBat
                     isNoBall -> 1 + runsOffBat + (extrasRuns ?: 0)
                     else     -> runsOffBat + (extrasRuns ?: 0)
                 }
 
-                // Extras DB ke liye
                 val extrasToSave = when {
                     isWide            -> (extrasRuns ?: 1) + runsOffBat
                     isNoBall          -> (extrasRuns ?: 0) + 1
@@ -142,7 +166,6 @@ class ScoringViewModel : ViewModel() {
                     striker.fullName, bowler.fullName
                 )
 
-                // Ball insert karo — delivery_no null (DB khud manage kare ga)
                 val insertedBall = scoringRepository.insertBall(
                     BallInsert(
                         inningsId    = innings.id,
@@ -164,7 +187,6 @@ class ScoringViewModel : ViewModel() {
                     )
                 )
 
-                // Innings totals update
                 val newTotalBalls   = if (isLegalBall) innings.totalBalls + 1 else innings.totalBalls
                 val newTotalRuns    = innings.totalRuns + totalRunsThisBall
                 val newTotalWickets = if (isWicket) innings.totalWickets + 1 else innings.totalWickets
@@ -198,10 +220,6 @@ class ScoringViewModel : ViewModel() {
                 if (!isWicket) {
                     when {
                         isWide -> {
-                            // Wide total = (extrasRuns ?: 1) + runsOffBat
-                            // Wide+0 = 1 → odd → no change
-                            // Wide+1 = 2 → even → change
-                            // Wide+3 = 4 → even → change
                             val wideTotal = (extrasRuns ?: 1) + runsOffBat
                             if (wideTotal % 2 == 0) {
                                 newStriker    = state.nonStriker
@@ -209,17 +227,12 @@ class ScoringViewModel : ViewModel() {
                             }
                         }
                         isNoBall -> {
-                            // No ball: sirf runsOffBat se strike
-                            // 0 bat → even → change
-                            // 1 bat → odd → no change
-                            // 2 bat → even → change
                             if (runsOffBat % 2 == 0) {
                                 newStriker    = state.nonStriker
                                 newNonStriker = state.striker
                             }
                         }
                         isBye || isLegBye -> {
-                            // Bye/LegBye: ODD par change
                             val byeRuns = extrasRuns ?: 0
                             if (byeRuns % 2 == 1) {
                                 newStriker    = state.nonStriker
@@ -227,7 +240,6 @@ class ScoringViewModel : ViewModel() {
                             }
                         }
                         else -> {
-                            // Normal: ODD par change
                             if (runsOffBat % 2 == 1) {
                                 newStriker    = state.nonStriker
                                 newNonStriker = state.striker
@@ -235,22 +247,20 @@ class ScoringViewModel : ViewModel() {
                         }
                     }
                 } else {
-                    // Wicket par striker null — naya batsman select hoga
                     newStriker = null
                 }
 
-                // Over end check (sirf legal balls)
                 val isOverEnd = newTotalBalls % 6 == 0 &&
                         newTotalBalls > 0 && isLegalBall
 
-                // Over end par automatic strike rotate
                 if (isOverEnd && !isWicket && newStriker != null) {
                     val temp      = newStriker
                     newStriker    = newNonStriker
                     newNonStriker = temp
                 }
 
-                val isInningsComplete = newTotalWickets >= 10 ||
+                val maxWickets = match.playersPerSide - 1
+                val isInningsComplete = newTotalWickets >= maxWickets ||
                         newTotalBalls >= match.totalOvers * 6
 
                 _uiState.update {
@@ -294,13 +304,10 @@ class ScoringViewModel : ViewModel() {
         players.forEach { player ->
             val playerBalls = balls.filter { it.batsmanId == player.id }
             val runs = playerBalls.sumOf { it.runsOffBat }
-            // Wide count nahi hoti balls faced mein
             val ballsFaced = playerBalls.count { it.extrasType != "wide" }
             val fours = playerBalls.count { it.isBoundary && !it.isSix }
             val sixes = playerBalls.count { it.isSix }
-            val isOut = playerBalls.any {
-                it.isWicket && it.wicketType != "run_out"
-            }
+            val isOut = playerBalls.any { it.isWicket && it.wicketType != "run_out" }
             val dismissalType = playerBalls.firstOrNull { it.isWicket }?.wicketType
             statsMap[player.id] = BatsmanStats(
                 player        = player,
@@ -323,36 +330,27 @@ class ScoringViewModel : ViewModel() {
         players.forEach { player ->
             val playerBalls = balls.filter { it.bowlerId == player.id }
             if (playerBalls.isEmpty()) return@forEach
-
-            // Overs: wide aur no ball count nahi
             val legalBalls = playerBalls.count {
                 it.extrasType != "wide" && it.extrasType != "no_ball"
             }
-
-            // Bowler ke runs:
-            // Bye aur LegBye bowler ke runs mein nahi
             val runs = playerBalls.sumOf { ball ->
                 when (ball.extrasType) {
                     "bye", "leg_bye" -> 0
                     else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
                 }
             }
-
             val wickets = playerBalls.count {
                 it.isWicket && it.wicketType !in listOf(
                     "run_out", "obstructing", "handled_ball", "timed_out"
                 )
             }
-            val wides   = playerBalls.count { it.extrasType == "wide" }
-            val noBalls = playerBalls.count { it.extrasType == "no_ball" }
-
             statsMap[player.id] = BowlerStats(
                 player  = player,
                 balls   = legalBalls,
                 runs    = runs,
                 wickets = wickets,
-                wides   = wides,
-                noBalls = noBalls
+                wides   = playerBalls.count { it.extrasType == "wide" },
+                noBalls = playerBalls.count { it.extrasType == "no_ball" }
             )
         }
         return statsMap

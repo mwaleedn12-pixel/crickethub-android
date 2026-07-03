@@ -12,6 +12,7 @@ data class Match(
     val venue: String? = null,
     @SerialName("match_date") val matchDate: String? = null,
     @SerialName("total_overs") val totalOvers: Int = 20,
+    @SerialName("players_per_side") val playersPerSide: Int = 11,
     @SerialName("toss_winner_id") val tossWinnerId: String? = null,
     @SerialName("toss_decision") val tossDecision: String? = null,
     @SerialName("batting_first_id") val battingFirstId: String? = null,
@@ -28,6 +29,7 @@ data class MatchInsert(
     @SerialName("team2_id") val team2Id: String,
     val venue: String? = null,
     @SerialName("total_overs") val totalOvers: Int = 20,
+    @SerialName("players_per_side") val playersPerSide: Int = 11,
     @SerialName("created_by") val createdBy: String,
     val status: String = "scheduled"
 )

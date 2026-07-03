@@ -2,7 +2,6 @@ package com.crickethub.ui.match
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +33,7 @@ private val AmberColor = Color(0xFFF59E0B)
 fun MatchesScreen(
     onCreateMatch: () -> Unit,
     onMatchClick: (String) -> Unit,
+    onViewScorecard: (String) -> Unit,
     viewModel: MatchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -45,18 +45,33 @@ fun MatchesScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Matches", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(
+                    "Matches",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
                 IconButton(onClick = onCreateMatch) {
-                    Icon(Icons.Default.Add, contentDescription = "Create match", tint = NeonGreen)
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Create match",
+                        tint = NeonGreen
+                    )
                 }
             }
 
             if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator(color = NeonGreen)
                 }
             } else if (uiState.matches.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("No matches yet. Tap + to create one.", color = TextSecondary)
                 }
             } else {
@@ -66,7 +81,8 @@ fun MatchesScreen(
                             match = match,
                             team1Name = uiState.teams.find { it.id == match.team1Id }?.name ?: "Team 1",
                             team2Name = uiState.teams.find { it.id == match.team2Id }?.name ?: "Team 2",
-                            onClick = { onMatchClick(match.id) }
+                            onClick = { onMatchClick(match.id) },
+                            onViewScorecard = { onViewScorecard(match.id) }
                         )
                     }
                 }
@@ -80,7 +96,8 @@ fun MatchCard(
     match: Match,
     team1Name: String,
     team2Name: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onViewScorecard: () -> Unit
 ) {
     val statusColor = when (match.status) {
         "live" -> NeonGreen
@@ -94,7 +111,6 @@ fun MatchCard(
             .clip(RoundedCornerShape(12.dp))
             .background(SurfaceCard)
             .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-            .clickable { onClick() }
             .padding(16.dp)
     ) {
         Row(
@@ -118,17 +134,55 @@ fun MatchCard(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(team1Name, color = TextPrimary, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, modifier = Modifier.weight(1f))
-            Text("vs", color = TextSecondary, fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 8.dp))
-            Text(team2Name, color = TextPrimary, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text(
+                team1Name,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "vs",
+                color = TextSecondary,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+            Text(
+                team2Name,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         match.venue?.let {
             Spacer(modifier = Modifier.height(8.dp))
             Text("📍 $it", color = TextSecondary, fontSize = 12.sp)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onClick,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Score / Setup", fontSize = 12.sp)
+            }
+            OutlinedButton(
+                onClick = onViewScorecard,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonBlue),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Live Scorecard", fontSize = 12.sp)
+            }
         }
     }
 }

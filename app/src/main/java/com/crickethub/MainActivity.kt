@@ -43,6 +43,7 @@ import com.crickethub.ui.match.MatchViewModel
 import com.crickethub.ui.match.MatchesScreen
 import com.crickethub.ui.match.PlayingXIScreen
 import com.crickethub.ui.match.TossScreen
+import com.crickethub.ui.match.live.LiveScorecardScreen
 import com.crickethub.ui.match.scoring.ScoringScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
@@ -166,6 +167,9 @@ fun CricketHubApp() {
                     onCreateMatch = { navController.navigate("create_match") },
                     onMatchClick = { matchId ->
                         navController.navigate("match_flow/$matchId")
+                    },
+                    onViewScorecard = { matchId ->
+                        navController.navigate("live_scorecard/$matchId")
                     }
                 )
             }
@@ -266,6 +270,16 @@ fun CricketHubApp() {
                     }
                 )
             }
+            composable(
+                route = "live_scorecard/{matchId}",
+                arguments = listOf(navArgument("matchId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+                LiveScorecardScreen(
+                    matchId = matchId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
@@ -305,7 +319,6 @@ fun MatchFlowScreen(
     LaunchedEffect(uiState.currentMatch, xiSaved, team1XISaved) {
         val match = uiState.currentMatch
         if (match == null || xiSaved == null || team1XISaved == null) return@LaunchedEffect
-
         when {
             match.tossWinnerId == null -> onGoToToss()
             xiSaved == true -> onGoToScoring()
@@ -343,18 +356,17 @@ fun Team1PlayingXI(
 
     if (uiState.isLoading || match == null || team1 == null) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark),
+            modifier = Modifier.fillMaxSize().background(Color(0xFF030712)),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = NeonGreen)
+            CircularProgressIndicator(color = Color(0xFF10B981))
         }
     } else {
         PlayingXIScreen(
             matchId = matchId,
             teamId = team1.id,
             teamName = team1.name,
+            playersPerSide = match.playersPerSide,
             onBack = onBack,
             onXISaved = onXISaved
         )
@@ -380,18 +392,17 @@ fun Team2PlayingXI(
 
     if (uiState.isLoading || match == null || team2 == null) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark),
+            modifier = Modifier.fillMaxSize().background(Color(0xFF030712)),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = NeonGreen)
+            CircularProgressIndicator(color = Color(0xFF10B981))
         }
     } else {
         PlayingXIScreen(
             matchId = matchId,
             teamId = team2.id,
             teamName = team2.name,
+            playersPerSide = match.playersPerSide,
             onBack = onBack,
             onXISaved = onXISaved
         )

@@ -39,6 +39,7 @@ fun PlayingXIScreen(
     matchId: String,
     teamId: String,
     teamName: String,
+    playersPerSide: Int = 11,
     onBack: () -> Unit,
     onXISaved: () -> Unit,
     viewModel: MatchViewModel = viewModel()
@@ -62,15 +63,12 @@ fun PlayingXIScreen(
         }
     }
 
-    // Jab save successful ho toh navigate karo
     LaunchedEffect(saveSuccess) {
-        if (saveSuccess) {
-            onXISaved()
-        }
+        if (saveSuccess) onXISaved()
     }
 
     val selectedCount = selectedIds.size
-    val canSave = selectedCount == 11
+    val canSave = selectedCount == playersPerSide
 
     Column(
         modifier = Modifier
@@ -94,7 +92,7 @@ fun PlayingXIScreen(
                 }
                 Column {
                     Text(
-                        "Playing XI",
+                        "Playing $playersPerSide",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -103,7 +101,7 @@ fun PlayingXIScreen(
                 }
             }
             Text(
-                "$selectedCount/11",
+                "$selectedCount/$playersPerSide",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (canSave) NeonGreen else NeonBlue
@@ -144,7 +142,7 @@ fun PlayingXIScreen(
             ) {
                 items(players) { player ->
                     val isSelected = player.id in selectedIds
-                    val canSelect = isSelected || selectedCount < 11
+                    val canSelect = isSelected || selectedCount < playersPerSide
 
                     Row(
                         modifier = Modifier
@@ -228,7 +226,6 @@ fun PlayingXIScreen(
 
             Button(
                 onClick = {
-                    android.util.Log.d("CricketHub", "Save button clicked! matchId=$matchId teamId=$teamId selectedIds=$selectedIds")
                     scope.launch {
                         isSaving = true
                         try {
@@ -241,12 +238,9 @@ fun PlayingXIScreen(
                                     battingOrder = index + 1
                                 )
                             }
-                            android.util.Log.d("CricketHub", "Inserting ${playingXI.size} players")
                             repo.insertPlayingXI(playingXI)
-                            android.util.Log.d("CricketHub", "Insert successful!")
                             saveSuccess = true
                         } catch (e: Exception) {
-                            android.util.Log.e("CricketHub", "Insert failed: ${e.message}", e)
                             error = "Save failed: ${e.message}"
                         } finally {
                             isSaving = false
@@ -272,8 +266,8 @@ fun PlayingXIScreen(
                     )
                 } else {
                     Text(
-                        if (canSave) "Save Playing XI"
-                        else "Select ${11 - selectedCount} more",
+                        if (canSave) "Save Playing $playersPerSide"
+                        else "Select ${playersPerSide - selectedCount} more",
                         color = if (canSave) Color.Black else TextSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp

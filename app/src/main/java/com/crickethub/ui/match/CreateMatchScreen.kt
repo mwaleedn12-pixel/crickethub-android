@@ -38,12 +38,23 @@ fun CreateMatchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    var selectedTeam1: Team? by remember { mutableStateOf(null) }
-    var selectedTeam2: Team? by remember { mutableStateOf(null) }
+    var selectedTeam1 by remember { mutableStateOf<Team?>(null) }
+    var selectedTeam2 by remember { mutableStateOf<Team?>(null) }
     var venue by remember { mutableStateOf("") }
     var selectedOvers by remember { mutableStateOf(20) }
+    var selectedPlayers by remember { mutableStateOf(11) }
     var showTeam1Dropdown by remember { mutableStateOf(false) }
     var showTeam2Dropdown by remember { mutableStateOf(false) }
+
+    val oversOptions = listOf(
+        5 to "5 overs (Tape Ball)",
+        10 to "10 overs",
+        20 to "20 overs (T20)",
+        50 to "50 overs (ODI)",
+        90 to "Test Match"
+    )
+
+    val playersOptions = listOf(6, 7, 8, 9, 10, 11)
 
     LaunchedEffect(uiState.matchCreated) {
         if (uiState.matchCreated) {
@@ -66,15 +77,23 @@ fun CreateMatchScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
-            Text("Create match", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Text(
+                "Create match",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
         }
 
         if (uiState.error != null) {
-            Text(uiState.error ?: "", color = ErrorRed, fontSize = 13.sp,
-                modifier = Modifier.padding(bottom = 12.dp))
+            Text(
+                uiState.error ?: "",
+                color = ErrorRed,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
         }
 
-        // Team 1 selector
         SectionLabel("Team 1")
         TeamSelector(
             selectedTeam = selectedTeam1,
@@ -87,7 +106,6 @@ fun CreateMatchScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Team 2 selector
         SectionLabel("Team 2")
         TeamSelector(
             selectedTeam = selectedTeam2,
@@ -100,7 +118,6 @@ fun CreateMatchScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Venue
         SectionLabel("Venue (optional)")
         OutlinedTextField(
             value = venue,
@@ -109,30 +126,77 @@ fun CreateMatchScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                focusedBorderColor = NeonGreen,
+                unfocusedBorderColor = BorderColor,
                 cursorColor = NeonGreen
             )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Overs
-        SectionLabel("Overs format")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(5, 10, 20, 50).forEach { overs ->
+        SectionLabel("Match format")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            oversOptions.forEach { (overs, label) ->
                 val selected = selectedOvers == overs
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (selected) NeonGreen.copy(alpha = 0.15f) else SurfaceCard
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) NeonGreen else BorderColor,
+                            RoundedCornerShape(10.dp)
+                        )
+                        .clickable { selectedOvers = overs }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        label,
+                        color = if (selected) NeonGreen else TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    if (selected) {
+                        Text("✓", color = NeonGreen, fontSize = 16.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SectionLabel("Players per side")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            playersOptions.forEach { count ->
+                val selected = selectedPlayers == count
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (selected) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
-                        .border(1.dp, if (selected) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
-                        .clickable { selectedOvers = overs }
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .background(
+                            if (selected) NeonBlue.copy(alpha = 0.2f) else SurfaceCard
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) NeonBlue else BorderColor,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { selectedPlayers = count }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("$overs", color = if (selected) NeonGreen else TextSecondary,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+                    Text(
+                        "$count",
+                        color = if (selected) NeonBlue else TextSecondary,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 15.sp
+                    )
                 }
             }
         }
@@ -143,18 +207,34 @@ fun CreateMatchScreen(
             onClick = {
                 val t1 = selectedTeam1 ?: return@Button
                 val t2 = selectedTeam2 ?: return@Button
-                viewModel.createMatch(t1.id, t2.id, venue.ifBlank { null }, selectedOvers)
+                viewModel.createMatch(
+                    team1Id = t1.id,
+                    team2Id = t2.id,
+                    venue = venue.ifBlank { null },
+                    totalOvers = selectedOvers,
+                    playersPerSide = selectedPlayers
+                )
             },
             enabled = selectedTeam1 != null && selectedTeam2 != null && !uiState.isLoading,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
             shape = RoundedCornerShape(12.dp)
         ) {
             if (uiState.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp),
-                    color = Color.Black, strokeWidth = 2.dp)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.Black,
+                    strokeWidth = 2.dp
+                )
             } else {
-                Text("Create match", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    "Create match",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
         }
     }
@@ -162,8 +242,12 @@ fun CreateMatchScreen(
 
 @Composable
 fun SectionLabel(text: String) {
-    Text(text, color = TextSecondary, fontSize = 13.sp,
-        modifier = Modifier.padding(bottom = 8.dp))
+    Text(
+        text,
+        color = TextSecondary,
+        fontSize = 13.sp,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
 }
 
 @Composable
@@ -181,7 +265,11 @@ fun TeamSelector(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(SurfaceCard)
-                .border(1.dp, if (selectedTeam != null) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                .border(
+                    1.dp,
+                    if (selectedTeam != null) NeonGreen else BorderColor,
+                    RoundedCornerShape(8.dp)
+                )
                 .clickable { onExpand() }
                 .padding(16.dp)
         ) {

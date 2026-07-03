@@ -80,7 +80,8 @@ class MatchViewModel : ViewModel() {
         team1Id: String,
         team2Id: String,
         venue: String?,
-        totalOvers: Int
+        totalOvers: Int,
+        playersPerSide: Int = 11
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -92,6 +93,7 @@ class MatchViewModel : ViewModel() {
                         team2Id = team2Id,
                         venue = venue,
                         totalOvers = totalOvers,
+                        playersPerSide = playersPerSide,
                         createdBy = userId
                     )
                 )
