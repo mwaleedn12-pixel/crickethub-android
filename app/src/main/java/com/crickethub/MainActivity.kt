@@ -43,6 +43,7 @@ import com.crickethub.ui.match.MatchViewModel
 import com.crickethub.ui.match.MatchesScreen
 import com.crickethub.ui.match.PlayingXIScreen
 import com.crickethub.ui.match.TossScreen
+import com.crickethub.ui.match.scoring.ScoringScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
 import com.crickethub.ui.theme.CricketHubTheme
@@ -178,7 +179,6 @@ fun CricketHubApp() {
                     }
                 )
             }
-            // Smart match flow - check karo kahan se shuru karna hai
             composable(
                 route = "match_flow/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -201,9 +201,9 @@ fun CricketHubApp() {
                             popUpTo("match_flow/$matchId") { inclusive = true }
                         }
                     },
-                    onGoToMatches = {
-                        navController.navigate("matches") {
-                            popUpTo("matches") { inclusive = true }
+                    onGoToScoring = {
+                        navController.navigate("scoring/$matchId") {
+                            popUpTo("match_flow/$matchId") { inclusive = true }
                         }
                     }
                 )
@@ -246,6 +246,20 @@ fun CricketHubApp() {
                     matchId = matchId,
                     onBack = { navController.popBackStack() },
                     onXISaved = {
+                        navController.navigate("scoring/$matchId") {
+                            popUpTo("matches")
+                        }
+                    }
+                )
+            }
+            composable(
+                route = "scoring/{matchId}",
+                arguments = listOf(navArgument("matchId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+                ScoringScreen(
+                    matchId = matchId,
+                    onBack = {
                         navController.navigate("matches") {
                             popUpTo("matches") { inclusive = true }
                         }
@@ -256,14 +270,13 @@ fun CricketHubApp() {
     }
 }
 
-// Smart screen jo check karta hai match ka status
 @Composable
 fun MatchFlowScreen(
     matchId: String,
     onGoToToss: () -> Unit,
     onGoToTeam1XI: () -> Unit,
     onGoToTeam2XI: () -> Unit,
-    onGoToMatches: () -> Unit
+    onGoToScoring: () -> Unit
 ) {
     val viewModel: MatchViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
@@ -273,7 +286,6 @@ fun MatchFlowScreen(
     LaunchedEffect(matchId) {
         viewModel.loadMatchById(matchId)
         viewModel.loadTeams()
-        // Check karo Playing XI saved hai ya nahi
         try {
             val repo = MatchRepository()
             val xi = repo.getPlayingXI(matchId)
@@ -295,18 +307,13 @@ fun MatchFlowScreen(
         if (match == null || xiSaved == null || team1XISaved == null) return@LaunchedEffect
 
         when {
-            // Toss nahi hua
             match.tossWinnerId == null -> onGoToToss()
-            // Toss hua, dono XI save hain → matches par jao
-            xiSaved == true -> onGoToMatches()
-            // Toss hua, team1 XI nahi saved
+            xiSaved == true -> onGoToScoring()
             team1XISaved == false -> onGoToTeam1XI()
-            // Toss hua, team1 XI saved, team2 XI nahi
             else -> onGoToTeam2XI()
         }
     }
 
-    // Loading screen
     Box(
         modifier = Modifier
             .fillMaxSize()
