@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
@@ -48,6 +49,7 @@ import com.crickethub.ui.match.analytics.AnalyticsScreen
 import com.crickethub.ui.match.live.LiveScorecardScreen
 import com.crickethub.ui.match.postmatch.PostMatchScreen
 import com.crickethub.ui.match.scoring.ScoringScreen
+import com.crickethub.ui.player.PlayerCareerScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
 import com.crickethub.ui.theme.CricketHubTheme
@@ -77,7 +79,7 @@ fun CricketHubApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = currentRoute in listOf("teams", "matches", "tournaments")
+    val showBottomBar = currentRoute in listOf("teams", "matches", "tournaments", "career")
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -135,6 +137,23 @@ fun CricketHubApp() {
                             indicatorColor = NeonGreen.copy(alpha = 0.15f)
                         )
                     )
+                    NavigationBarItem(
+                        selected = currentRoute == "career",
+                        onClick = {
+                            navController.navigate("career") {
+                                popUpTo("teams") { inclusive = false }
+                            }
+                        },
+                        icon = { Icon(Icons.Default.AccountCircle, contentDescription = "Career") },
+                        label = { Text("Career") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = NeonGreen,
+                            selectedTextColor = NeonGreen,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = NeonGreen.copy(alpha = 0.15f)
+                        )
+                    )
                 }
             }
         }
@@ -165,7 +184,9 @@ fun CricketHubApp() {
                 )
             }
             composable("teams") {
-                TeamsScreen(onTeamClick = { teamId -> navController.navigate("players/$teamId") })
+                TeamsScreen(
+                    onTeamClick = { teamId -> navController.navigate("players/$teamId") }
+                )
             }
             composable(
                 route = "players/{teamId}",
@@ -335,6 +356,9 @@ fun CricketHubApp() {
                     onBack = { navController.popBackStack() },
                     onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") }
                 )
+            }
+            composable("career") {
+                PlayerCareerScreen(onBack = { navController.popBackStack() })
             }
         }
     }
