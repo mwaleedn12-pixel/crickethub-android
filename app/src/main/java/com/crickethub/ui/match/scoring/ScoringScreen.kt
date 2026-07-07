@@ -40,6 +40,7 @@ private val AmberColor = Color(0xFFF59E0B)
 fun ScoringScreen(
     matchId: String,
     onBack: () -> Unit,
+    onInningsComplete: () -> Unit = {},
     viewModel: ScoringViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -53,6 +54,23 @@ fun ScoringScreen(
 
     LaunchedEffect(matchId) {
         viewModel.loadMatch(matchId)
+    }
+
+    // 1st innings complete — 2nd start karo
+    // 2nd innings complete — post match par jao
+    LaunchedEffect(uiState.inningsComplete) {
+        if (uiState.inningsComplete) {
+            viewModel.checkAndStartNextInnings(matchId) {
+                onInningsComplete()
+            }
+        }
+    }
+
+    // App reopen case — dono innings already complete
+    LaunchedEffect(uiState.matchComplete) {
+        if (uiState.matchComplete) {
+            onInningsComplete()
+        }
     }
 
     val needStriker = uiState.striker == null && !uiState.isLoading && uiState.innings != null
@@ -87,7 +105,6 @@ fun ScoringScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // Top bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -110,12 +127,20 @@ fun ScoringScreen(
                         .background(ErrorRed)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("● LIVE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "● LIVE",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
             if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator(color = NeonGreen)
                 }
             } else {
@@ -153,7 +178,35 @@ fun ScoringScreen(
                     )
                 }
 
-                if (!needStriker && !needBowler && !needNonStriker) {
+                if (uiState.inningsComplete || uiState.matchComplete) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(NeonGreen.copy(alpha = 0.15f))
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                color = NeonGreen,
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                if (uiState.matchComplete) "Match Complete! Loading summary..."
+                                else "Innings Complete! Starting next innings...",
+                                color = NeonGreen,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                if (!needStriker && !needBowler && !needNonStriker &&
+                    !uiState.inningsComplete && !uiState.matchComplete
+                ) {
                     ScoringButtons(
                         isLoading = uiState.isLoading,
                         onRuns = { runs -> viewModel.recordBall(runsOffBat = runs) },
@@ -167,7 +220,6 @@ fun ScoringScreen(
             }
         }
 
-        // Striker select
         if (needStriker || showSelectBatsman) {
             PlayerSelectDialog(
                 title = "Select Striker",
@@ -183,7 +235,6 @@ fun ScoringScreen(
             )
         }
 
-        // Non-striker select
         if (needNonStriker || showSelectNonStriker) {
             PlayerSelectDialog(
                 title = "Select Non-Striker",
@@ -199,7 +250,6 @@ fun ScoringScreen(
             )
         }
 
-        // Bowler select — max overs check + consecutive over check
         if (needBowler || showSelectBowler) {
             val totalOvers = uiState.match?.totalOvers ?: 20
             val lastBowlerId = uiState.balls
@@ -209,9 +259,7 @@ fun ScoringScreen(
             PlayerSelectDialog(
                 title = "Select Bowler (Max ${viewModel.getMaxOversPerBowler(totalOvers)} overs)",
                 players = uiState.bowlingTeamPlayers.filter { player ->
-                    val notConsecutive = player.id != lastBowlerId
-                    val canBowl = viewModel.canBowlerBowl(player.id, totalOvers)
-                    notConsecutive && canBowl
+                    player.id != lastBowlerId && viewModel.canBowlerBowl(player.id, totalOvers)
                 },
                 onPlayerSelected = {
                     viewModel.setBowler(it)
@@ -221,7 +269,6 @@ fun ScoringScreen(
             )
         }
 
-        // Wicket dialog
         if (showWicketDialog) {
             WicketDialog(
                 onDismiss = { showWicketDialog = false },
@@ -232,7 +279,6 @@ fun ScoringScreen(
             )
         }
 
-        // Extras dialog
         if (showExtrasDialog) {
             ExtrasDialog(
                 onDismiss = { showExtrasDialog = false },
@@ -307,12 +353,12 @@ fun Last6BallsRow(balls: List<String>) {
         )
         balls.forEach { ball ->
             val (bgColor, textColor) = when (ball) {
-                "W" -> ErrorRed to Color.White
-                "4" -> NeonBlue to Color.White
-                "6" -> NeonGreen to Color.Black
+                "W"        -> ErrorRed to Color.White
+                "4"        -> NeonBlue to Color.White
+                "6"        -> NeonGreen to Color.Black
                 "Wd", "Nb" -> AmberColor to Color.Black
-                "0" -> SurfaceCard to TextSecondary
-                else -> SurfaceCard to TextPrimary
+                "0"        -> SurfaceCard to TextSecondary
+                else       -> SurfaceCard to TextPrimary
             }
             Box(
                 modifier = Modifier
@@ -458,13 +504,13 @@ fun ScoringButtons(
         ) {
             listOf(0, 1, 2, 3, 4, 6).forEach { runs ->
                 val bgColor = when (runs) {
-                    4 -> NeonBlue.copy(alpha = 0.8f)
-                    6 -> NeonGreen.copy(alpha = 0.8f)
+                    4    -> NeonBlue.copy(alpha = 0.8f)
+                    6    -> NeonGreen.copy(alpha = 0.8f)
                     else -> SurfaceCard
                 }
                 val textColor = when (runs) {
                     4, 6 -> Color.White
-                    0 -> TextSecondary
+                    0    -> TextSecondary
                     else -> TextPrimary
                 }
                 Button(
@@ -594,9 +640,7 @@ fun PlayerSelectDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
         }
     )
 }

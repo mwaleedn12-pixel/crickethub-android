@@ -45,6 +45,7 @@ import com.crickethub.ui.match.PlayingXIScreen
 import com.crickethub.ui.match.TossScreen
 import com.crickethub.ui.match.analytics.AnalyticsScreen
 import com.crickethub.ui.match.live.LiveScorecardScreen
+import com.crickethub.ui.match.postmatch.PostMatchScreen
 import com.crickethub.ui.match.scoring.ScoringScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
@@ -72,17 +73,13 @@ fun CricketHubApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-
     val showBottomBar = currentRoute in listOf("teams", "matches")
 
     Scaffold(
         containerColor = BackgroundDark,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    containerColor = SurfaceCard,
-                    contentColor = NeonGreen
-                ) {
+                NavigationBar(containerColor = SurfaceCard, contentColor = NeonGreen) {
                     NavigationBarItem(
                         selected = currentRoute == "teams",
                         onClick = {
@@ -147,43 +144,28 @@ fun CricketHubApp() {
                 )
             }
             composable("teams") {
-                TeamsScreen(
-                    onTeamClick = { teamId ->
-                        navController.navigate("players/$teamId")
-                    }
-                )
+                TeamsScreen(onTeamClick = { teamId -> navController.navigate("players/$teamId") })
             }
             composable(
                 route = "players/{teamId}",
                 arguments = listOf(navArgument("teamId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
-                PlayersScreen(
-                    teamId = teamId,
-                    onBack = { navController.popBackStack() }
-                )
+                PlayersScreen(teamId = teamId, onBack = { navController.popBackStack() })
             }
             composable("matches") {
                 MatchesScreen(
                     onCreateMatch = { navController.navigate("create_match") },
-                    onMatchClick = { matchId ->
-                        navController.navigate("match_flow/$matchId")
-                    },
-                    onViewScorecard = { matchId ->
-                        navController.navigate("live_scorecard/$matchId")
-                    },
-                    onViewAnalytics = { matchId ->
-                        navController.navigate("analytics/$matchId")
-                    }
+                    onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") },
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
                 )
             }
             composable("create_match") {
                 CreateMatchScreen(
                     onBack = { navController.popBackStack() },
                     onMatchCreated = { matchId ->
-                        navController.navigate("match_flow/$matchId") {
-                            popUpTo("matches")
-                        }
+                        navController.navigate("match_flow/$matchId") { popUpTo("matches") }
                     }
                 )
             }
@@ -271,6 +253,11 @@ fun CricketHubApp() {
                         navController.navigate("matches") {
                             popUpTo("matches") { inclusive = true }
                         }
+                    },
+                    onInningsComplete = {
+                        navController.navigate("post_match/$matchId") {
+                            popUpTo("matches")
+                        }
                     }
                 )
             }
@@ -279,19 +266,28 @@ fun CricketHubApp() {
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                LiveScorecardScreen(
-                    matchId = matchId,
-                    onBack = { navController.popBackStack() }
-                )
+                LiveScorecardScreen(matchId = matchId, onBack = { navController.popBackStack() })
             }
             composable(
                 route = "analytics/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                AnalyticsScreen(
+                AnalyticsScreen(matchId = matchId, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = "post_match/{matchId}",
+                arguments = listOf(navArgument("matchId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+                PostMatchScreen(
                     matchId = matchId,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onGoToMatches = {
+                        navController.navigate("matches") {
+                            popUpTo("matches") { inclusive = true }
+                        }
+                    }
                 )
             }
         }

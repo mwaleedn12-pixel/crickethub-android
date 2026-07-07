@@ -25,6 +25,8 @@ class ScoringViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ScoringUiState())
     val uiState: StateFlow<ScoringUiState> = _uiState.asStateFlow()
 
+    private var isProcessingBall = false
+
     fun loadMatch(matchId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -32,21 +34,72 @@ class ScoringViewModel : ViewModel() {
                 val match = matchRepository.getMatchById(matchId) ?: return@launch
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
 
-                // Sirf live innings dhundo — agar exist karti hai
                 val currentInnings = allInnings.find { it.status == "live" }
+                val completedInnings = allInnings.filter { it.status == "completed" }
 
-                val battingTeamId = match.battingFirstId ?: match.team1Id
-                val bowlingTeamId = if (battingTeamId == match.team1Id) match.team2Id else match.team1Id
+                // Agar dono innings complete hain — match khatam, post match par jao
+                if (completedInnings.size >= 2) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            matchComplete = true
+                        )
+                    }
+                    return@launch
+                }
+
+                val battingTeamId: String
+                val bowlingTeamId: String
+
+                when {
+                    allInnings.isEmpty() -> {
+                        battingTeamId = match.battingFirstId ?: match.team1Id
+                        bowlingTeamId = if (battingTeamId == match.team1Id) match.team2Id else match.team1Id
+                    }
+                    currentInnings != null -> {
+                        battingTeamId = currentInnings.battingTeamId
+                        bowlingTeamId = currentInnings.bowlingTeamId
+                    }
+                    completedInnings.size == 1 -> {
+                        val first = completedInnings.first()
+                        battingTeamId = first.bowlingTeamId
+                        bowlingTeamId = first.battingTeamId
+                    }
+                    else -> {
+                        _uiState.update { it.copy(isLoading = false, inningsComplete = true) }
+                        return@launch
+                    }
+                }
 
                 val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, battingTeamId)
                 val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, bowlingTeamId)
 
-                if (currentInnings == null && allInnings.isEmpty()) {
-                    // Pehli baar — innings create karo
+                if (currentInnings != null) {
+                    // Live innings exist karti hai — sirf load karo
+                    val balls = scoringRepository.getBallsByInnings(currentInnings.id)
+                    val batsmanStats = computeBatsmanStats(balls, battingPlayers)
+                    val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
+                    _uiState.update {
+                        it.copy(
+                            match = match,
+                            innings = currentInnings,
+                            balls = balls,
+                            battingTeamPlayers = battingPlayers,
+                            bowlingTeamPlayers = bowlingPlayers,
+                            batsmanStats = batsmanStats,
+                            bowlerStats = bowlerStats,
+                            inningsComplete = false,
+                            matchComplete = false,
+                            isLoading = false
+                        )
+                    }
+                } else if (allInnings.isEmpty() || completedInnings.size == 1) {
+                    // Innings exist nahi karti — create karo
+                    val inningsNo = if (allInnings.isEmpty()) 1 else 2
                     val newInnings = scoringRepository.createInnings(
                         InningsInsert(
                             matchId = matchId,
-                            inningsNo = 1,
+                            inningsNo = inningsNo,
                             battingTeamId = battingTeamId,
                             bowlingTeamId = bowlingTeamId
                         )
@@ -55,26 +108,16 @@ class ScoringViewModel : ViewModel() {
                         it.copy(
                             match = match,
                             innings = newInnings,
+                            balls = emptyList(),
+                            striker = null,
+                            nonStriker = null,
+                            currentBowler = null,
                             battingTeamPlayers = battingPlayers,
                             bowlingTeamPlayers = bowlingPlayers,
-                            isLoading = false
-                        )
-                    }
-                } else {
-                    // Existing innings use karo
-                    val innings = currentInnings ?: allInnings.last()
-                    val balls = scoringRepository.getBallsByInnings(innings.id)
-                    val batsmanStats = computeBatsmanStats(balls, battingPlayers)
-                    val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
-                    _uiState.update {
-                        it.copy(
-                            match = match,
-                            innings = innings,
-                            balls = balls,
-                            battingTeamPlayers = battingPlayers,
-                            bowlingTeamPlayers = bowlingPlayers,
-                            batsmanStats = batsmanStats,
-                            bowlerStats = bowlerStats,
+                            batsmanStats = emptyMap(),
+                            bowlerStats = emptyMap(),
+                            inningsComplete = false,
+                            matchComplete = false,
                             isLoading = false
                         )
                     }
@@ -86,15 +129,38 @@ class ScoringViewModel : ViewModel() {
         }
     }
 
+    fun checkAndStartNextInnings(matchId: String, onMatchComplete: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val allInnings = scoringRepository.getInningsByMatch(matchId)
+                val completedInnings = allInnings.filter { it.status == "completed" }
+                when {
+                    completedInnings.size >= 2 -> {
+                        onMatchComplete()
+                    }
+                    completedInnings.size == 1 -> {
+                        _uiState.update { it.copy(inningsComplete = false) }
+                        loadMatch(matchId)
+                    }
+                    else -> {
+                        _uiState.update { it.copy(inningsComplete = false) }
+                        loadMatch(matchId)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Next innings error: ${e.message}", e)
+            }
+        }
+    }
+
     fun setStriker(player: Player) { _uiState.update { it.copy(striker = player) } }
     fun setNonStriker(player: Player) { _uiState.update { it.copy(nonStriker = player) } }
     fun setBowler(player: Player) { _uiState.update { it.copy(currentBowler = player) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
 
-    // Bowler max overs limit
     fun getMaxOversPerBowler(totalOvers: Int): Int {
         return when (totalOvers) {
-            5 -> 1
+            5  -> 1
             10 -> 2
             20 -> 4
             50 -> 10
@@ -121,11 +187,15 @@ class ScoringViewModel : ViewModel() {
         isWicket: Boolean = false,
         wicketType: String? = null
     ) {
+        if (isProcessingBall) return
+
         val state = _uiState.value
         val innings = state.innings ?: return
         val striker = state.striker ?: return
         val bowler = state.currentBowler ?: return
         val match = state.match ?: return
+
+        isProcessingBall = true
 
         viewModelScope.launch {
             try {
@@ -208,12 +278,6 @@ class ScoringViewModel : ViewModel() {
                 val batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers)
                 val bowlerStats  = computeBowlerStats(newBalls, state.bowlingTeamPlayers)
 
-                // =============================================
-                // STRIKE CHANGE RULES:
-                // Normal/Bye/LegBye → ODD par change
-                // Wide → EVEN par change
-                // No Ball → EVEN par change
-                // =============================================
                 var newStriker    = state.striker
                 var newNonStriker = state.nonStriker
 
@@ -263,6 +327,10 @@ class ScoringViewModel : ViewModel() {
                 val isInningsComplete = newTotalWickets >= maxWickets ||
                         newTotalBalls >= match.totalOvers * 6
 
+                if (isInningsComplete) {
+                    scoringRepository.completeInnings(innings.id)
+                }
+
                 _uiState.update {
                     it.copy(
                         innings         = updatedInnings,
@@ -280,6 +348,8 @@ class ScoringViewModel : ViewModel() {
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "Record ball error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message) }
+            } finally {
+                isProcessingBall = false
             }
         }
     }
