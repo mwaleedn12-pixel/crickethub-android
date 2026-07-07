@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -50,6 +51,9 @@ import com.crickethub.ui.match.scoring.ScoringScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
 import com.crickethub.ui.theme.CricketHubTheme
+import com.crickethub.ui.tournament.CreateTournamentScreen
+import com.crickethub.ui.tournament.TournamentDetailScreen
+import com.crickethub.ui.tournament.TournamentsScreen
 
 private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
@@ -73,7 +77,7 @@ fun CricketHubApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = currentRoute in listOf("teams", "matches")
+    val showBottomBar = currentRoute in listOf("teams", "matches", "tournaments")
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -106,6 +110,23 @@ fun CricketHubApp() {
                         },
                         icon = { Icon(Icons.Default.List, contentDescription = "Matches") },
                         label = { Text("Matches") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = NeonGreen,
+                            selectedTextColor = NeonGreen,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = NeonGreen.copy(alpha = 0.15f)
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = currentRoute == "tournaments",
+                        onClick = {
+                            navController.navigate("tournaments") {
+                                popUpTo("teams") { inclusive = false }
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Star, contentDescription = "Tournaments") },
+                        label = { Text("Tournaments") },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = NeonGreen,
                             selectedTextColor = NeonGreen,
@@ -236,9 +257,7 @@ fun CricketHubApp() {
                     matchId = matchId,
                     onBack = { navController.popBackStack() },
                     onXISaved = {
-                        navController.navigate("scoring/$matchId") {
-                            popUpTo("matches")
-                        }
+                        navController.navigate("scoring/$matchId") { popUpTo("matches") }
                     }
                 )
             }
@@ -288,6 +307,33 @@ fun CricketHubApp() {
                             popUpTo("matches") { inclusive = true }
                         }
                     }
+                )
+            }
+            composable("tournaments") {
+                TournamentsScreen(
+                    onCreateTournament = { navController.navigate("create_tournament") },
+                    onTournamentClick = { id -> navController.navigate("tournament_detail/$id") }
+                )
+            }
+            composable("create_tournament") {
+                CreateTournamentScreen(
+                    onBack = { navController.popBackStack() },
+                    onTournamentCreated = { id ->
+                        navController.navigate("tournament_detail/$id") {
+                            popUpTo("tournaments")
+                        }
+                    }
+                )
+            }
+            composable(
+                route = "tournament_detail/{tournamentId}",
+                arguments = listOf(navArgument("tournamentId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val tournamentId = backStackEntry.arguments?.getString("tournamentId") ?: ""
+                TournamentDetailScreen(
+                    tournamentId = tournamentId,
+                    onBack = { navController.popBackStack() },
+                    onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") }
                 )
             }
         }
