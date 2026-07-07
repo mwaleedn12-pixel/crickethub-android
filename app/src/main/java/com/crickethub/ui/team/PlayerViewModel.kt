@@ -19,56 +19,60 @@ data class PlayerUiState(
 
 class PlayerViewModel : ViewModel() {
 
-    private val repository = PlayerRepository()
+    private val playerRepository = PlayerRepository()
+    private var currentTeamId: String = ""
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     fun loadPlayers(teamId: String) {
+        currentTeamId = teamId
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val players = repository.getPlayersByTeam(teamId)
+                val players = playerRepository.getPlayersByTeam(teamId)
                 _uiState.update { it.copy(players = players, isLoading = false) }
             } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Error loading players: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
     }
 
-    fun createPlayer(
-        teamId: String,
-        fullName: String,
-        jerseyNo: Int?,
-        role: String?,
-        battingStyle: String?,
-        bowlingStyle: String?
-    ) {
+    fun addPlayer(player: PlayerInsert) {
+        currentTeamId = player.teamId
         viewModelScope.launch {
             try {
-                repository.createPlayer(
-                    PlayerInsert(
-                        teamId = teamId,
-                        fullName = fullName,
-                        jerseyNo = jerseyNo,
-                        role = role,
-                        battingStyle = battingStyle,
-                        bowlingStyle = bowlingStyle
-                    )
-                )
-                loadPlayers(teamId)
+                playerRepository.createPlayer(player)
+                // Player add hone ke baad reload karo
+                val players = playerRepository.getPlayersByTeam(player.teamId)
+                _uiState.update { it.copy(players = players, isLoading = false) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                if (e is kotlinx.coroutines.CancellationException) {
+                    // Dialog close hone par cancel — data save hua hoga, reload karo
+                    android.util.Log.d("CricketHub", "Cancelled — reloading players")
+                    try {
+                        val players = playerRepository.getPlayersByTeam(player.teamId)
+                        _uiState.update { it.copy(players = players, isLoading = false) }
+                    } catch (ex: Exception) {
+                        android.util.Log.e("CricketHub", "Reload error: ${ex.message}", ex)
+                    }
+                } else {
+                    android.util.Log.e("CricketHub", "Error adding player: ${e.message}", e)
+                    _uiState.update { it.copy(error = e.message, isLoading = false) }
+                }
             }
         }
     }
 
-    fun deletePlayer(teamId: String, playerId: String) {
+    fun deletePlayer(playerId: String) {
         viewModelScope.launch {
             try {
-                repository.deletePlayer(playerId)
-                loadPlayers(teamId)
+                playerRepository.deletePlayer(playerId)
+                val players = playerRepository.getPlayersByTeam(currentTeamId)
+                _uiState.update { it.copy(players = players) }
             } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Error deleting player: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message) }
             }
         }

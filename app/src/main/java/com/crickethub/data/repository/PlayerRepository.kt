@@ -12,16 +12,14 @@ class PlayerRepository {
         return SupabaseClient.client.postgrest["players"]
             .select {
                 filter { eq("team_id", teamId) }
-                order("jersey_no", Order.ASCENDING)
+                order("created_at", Order.ASCENDING)
             }
             .decodeList<Player>()
     }
 
-    suspend fun getPlayerById(id: String): Player? {
+    suspend fun getPlayerById(playerId: String): Player? {
         return SupabaseClient.client.postgrest["players"]
-            .select {
-                filter { eq("id", id) }
-            }
+            .select { filter { eq("id", playerId) } }
             .decodeSingleOrNull<Player>()
     }
 
@@ -31,32 +29,15 @@ class PlayerRepository {
             .decodeSingle<Player>()
     }
 
-    suspend fun updatePlayer(
-        id: String,
-        fullName: String,
-        jerseyNo: Int?,
-        role: String?,
-        battingStyle: String?,
-        bowlingStyle: String?
-    ): Player {
-        return SupabaseClient.client.postgrest["players"]
-            .update({
-                set("full_name", fullName)
-                set("jersey_no", jerseyNo)
-                set("role", role)
-                set("batting_style", battingStyle)
-                set("bowling_style", bowlingStyle)
-            }) {
-                filter { eq("id", id) }
-                select()
-            }
-            .decodeSingle<Player>()
+    suspend fun deletePlayer(playerId: String) {
+        SupabaseClient.client.postgrest["players"]
+            .delete { filter { eq("id", playerId) } }
     }
 
-    suspend fun deletePlayer(id: String) {
+    suspend fun updatePlayerAvailability(playerId: String, availability: String) {
         SupabaseClient.client.postgrest["players"]
-            .delete {
-                filter { eq("id", id) }
+            .update({ set("availability", availability) }) {
+                filter { eq("id", playerId) }
             }
     }
 }
