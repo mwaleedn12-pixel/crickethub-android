@@ -11,8 +11,11 @@ import kotlinx.coroutines.launch
 
 data class AuthUiState(
     val isLoading: Boolean = false,
+    val isLoggedIn: Boolean = false,
     val error: String? = null,
-    val isAuthenticated: Boolean = false
+    val resetEmailSent: Boolean = false,
+    val isUsernameAvailable: Boolean? = null,
+    val isCheckingUsername: Boolean = false
 )
 
 class AuthViewModel : ViewModel() {
@@ -22,52 +25,76 @@ class AuthViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    fun signIn(email: String, password: String) {
-        if (email.isBlank() || password.isBlank()) {
-            _uiState.update { it.copy(error = "Please fill in all fields") }
-            return
-        }
+    fun login(email: String, password: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = repository.signIn(email, password)
-            result.fold(
-                onSuccess = {
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
-                },
-                onFailure = { e ->
-                    _uiState.update {
-                        it.copy(isLoading = false, error = e.message ?: "Sign in failed")
-                    }
+            try {
+                repository.login(email, password)
+                _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = when {
+                            e.message?.contains("Invalid login") == true -> "Invalid email or password"
+                            e.message?.contains("Email not confirmed") == true -> "Please verify your email first"
+                            else -> "Login failed. Please try again."
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 
-    fun signUp(email: String, password: String, fullName: String) {
-        if (email.isBlank() || password.isBlank() || fullName.isBlank()) {
-            _uiState.update { it.copy(error = "Please fill in all fields") }
-            return
-        }
+    fun signup(
+        email: String,
+        password: String,
+        fullName: String,
+        username: String,
+        role: String
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = repository.signUp(email, password, fullName)
-            result.fold(
-                onSuccess = {
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
-                },
-                onFailure = { e ->
-                    _uiState.update {
-                        it.copy(isLoading = false, error = e.message ?: "Sign up failed")
-                    }
+            try {
+                repository.signup(email, password, fullName, username, role)
+                _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = when {
+                            e.message?.contains("already registered") == true -> "Email already registered"
+                            e.message?.contains("username") == true -> "Username already taken"
+                            e.message?.contains("Password") == true -> "Password must be at least 6 characters"
+                            else -> "Signup failed. Please try again."
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 
-    fun signOut() {
+    fun sendPasswordReset(email: String) {
         viewModelScope.launch {
-            repository.signOut()
-            _uiState.update { it.copy(isAuthenticated = false) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                repository.resetPassword(email)
+                _uiState.update { it.copy(isLoading = false, resetEmailSent = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "Could not send reset email. Check your email address.") }
+            }
+        }
+    }
+
+    fun checkUsername(username: String) {
+        if (username.length < 3) {
+            _uiState.update { it.copy(isUsernameAvailable = null) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingUsername = true) }
+            val available = repository.isUsernameAvailable(username)
+            _uiState.update { it.copy(isUsernameAvailable = available, isCheckingUsername = false) }
         }
     }
 
@@ -75,7 +102,7 @@ class AuthViewModel : ViewModel() {
         _uiState.update { it.copy(error = null) }
     }
 
-    fun checkSession() {
-        _uiState.update { it.copy(isAuthenticated = repository.hasActiveSession()) }
+    fun clearResetEmailSent() {
+        _uiState.update { it.copy(resetEmailSent = false) }
     }
 }

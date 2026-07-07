@@ -38,6 +38,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.crickethub.data.repository.MatchRepository
+import com.crickethub.ui.auth.ForgotPasswordScreen
 import com.crickethub.ui.auth.LoginScreen
 import com.crickethub.ui.auth.SignupScreen
 import com.crickethub.ui.match.CreateMatchScreen
@@ -170,7 +171,8 @@ fun CricketHubApp() {
                             popUpTo("login") { inclusive = true }
                         }
                     },
-                    onNavigateToSignup = { navController.navigate("signup") }
+                    onNavigateToSignup = { navController.navigate("signup") },
+                    onNavigateToForgotPassword = { navController.navigate("forgot_password") }
                 )
             }
             composable("signup") {
@@ -181,6 +183,11 @@ fun CricketHubApp() {
                         }
                     },
                     onNavigateToLogin = { navController.popBackStack() }
+                )
+            }
+            composable("forgot_password") {
+                ForgotPasswordScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("teams") {
@@ -306,14 +313,20 @@ fun CricketHubApp() {
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                LiveScorecardScreen(matchId = matchId, onBack = { navController.popBackStack() })
+                LiveScorecardScreen(
+                    matchId = matchId,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(
                 route = "analytics/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                AnalyticsScreen(matchId = matchId, onBack = { navController.popBackStack() })
+                AnalyticsScreen(
+                    matchId = matchId,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(
                 route = "post_match/{matchId}",
@@ -408,7 +421,9 @@ fun MatchFlowScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(BackgroundDark),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundDark),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(color = NeonGreen)
@@ -434,7 +449,9 @@ fun Team1PlayingXI(
 
     if (uiState.isLoading || match == null || team1 == null) {
         Box(
-            modifier = Modifier.fillMaxSize().background(BackgroundDark),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark),
             contentAlignment = Alignment.Center
         ) {
             CircularProgressIndicator(color = NeonGreen)
@@ -470,7 +487,9 @@ fun Team2PlayingXI(
 
     if (uiState.isLoading || match == null || team2 == null) {
         Box(
-            modifier = Modifier.fillMaxSize().background(BackgroundDark),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark),
             contentAlignment = Alignment.Center
         ) {
             CircularProgressIndicator(color = NeonGreen)
