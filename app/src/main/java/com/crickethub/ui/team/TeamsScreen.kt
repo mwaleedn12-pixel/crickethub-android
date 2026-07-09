@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,16 +24,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Team
+import com.crickethub.data.model.TeamInsert
 
 private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
 private val BorderColor = Color(0xFF1F2937)
 private val NeonGreen = Color(0xFF10B981)
-private val NeonBlue = Color(0xFF3B82F6)
 private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val ErrorRed = Color(0xFFEF4444)
 private val AmberColor = Color(0xFFF59E0B)
+
+val TEAM_CATEGORIES = listOf(
+    "International", "Domestic", "Club",
+    "School", "College", "Corporate", "Street/Tape Ball"
+)
+
+val JERSEY_COLORS = listOf(
+    "#10B981", "#3B82F6", "#EF4444", "#F59E0B",
+    "#8B5CF6", "#EC4899", "#06B6D4", "#F97316",
+    "#84CC16", "#FFFFFF", "#000000", "#6B7280"
+)
 
 @Composable
 fun TeamsScreen(
@@ -39,26 +52,19 @@ fun TeamsScreen(
     viewModel: TeamViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showCreateDialog by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var teamToEdit by remember { mutableStateOf<Team?>(null) }
+    var teamToDelete by remember { mutableStateOf<Team?>(null) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-    ) {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+        Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Teams",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                IconButton(onClick = { showCreateDialog = true }) {
+                Text("Teams", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                IconButton(onClick = { showAddDialog = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Add Team", tint = NeonGreen)
                 }
             }
@@ -69,36 +75,89 @@ fun TeamsScreen(
                 }
             } else if (uiState.teams.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("🏏", fontSize = 48.sp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.Groups, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
                         Text("No teams yet", color = TextSecondary, fontSize = 16.sp)
                         Text("Tap + to create your first team", color = TextSecondary, fontSize = 13.sp)
                     }
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
                     items(uiState.teams) { team ->
                         TeamCard(
                             team = team,
                             onClick = { onTeamClick(team.id) },
-                            onDelete = { viewModel.deleteTeam(team.id) }
+                            onEdit = { teamToEdit = team },
+                            onDelete = { teamToDelete = team }
                         )
                     }
                 }
             }
         }
 
-        if (showCreateDialog) {
-            CreateTeamDialog(
-                onDismiss = { showCreateDialog = false },
-                onCreate = { name, shortName, category, country, city, coach ->
-                    viewModel.createTeam(name, shortName, category, country, city, coach)
-                    showCreateDialog = false
+        // Add Dialog
+        if (showAddDialog) {
+            TeamDialog(
+                title = "Create Team",
+                onDismiss = { showAddDialog = false },
+                onConfirm = { teamInsert ->
+                    viewModel.createTeam(teamInsert)
+                    showAddDialog = false
                 }
             )
+        }
+
+        // Edit Dialog
+        teamToEdit?.let { team ->
+            TeamDialog(
+                title = "Edit Team",
+                team = team,
+                onDismiss = { teamToEdit = null },
+                onConfirm = { teamInsert ->
+                    viewModel.updateTeam(team.id, mapOf(
+                        "name" to teamInsert.name,
+                        "short_name" to teamInsert.shortName,
+                        "jersey_color" to teamInsert.jerseyColor,
+                        "category" to teamInsert.category,
+                        "country" to teamInsert.country,
+                        "city" to teamInsert.city,
+                        "home_ground" to teamInsert.homeGround,
+                        "coach" to teamInsert.coach
+                    ))
+                    teamToEdit = null
+                }
+            )
+        }
+
+        // Delete Dialog
+        teamToDelete?.let { team ->
+            AlertDialog(
+                onDismissRequest = { teamToDelete = null },
+                containerColor = SurfaceCard,
+                title = { Text("Delete Team", color = ErrorRed, fontWeight = FontWeight.Bold) },
+                text = { Text("Delete '${team.name}'? This cannot be undone.", color = TextSecondary) },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.deleteTeam(team.id); teamToDelete = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                    ) { Text("Delete", color = Color.White) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { teamToDelete = null }) { Text("Cancel", color = TextSecondary) }
+                }
+            )
+        }
+
+        // Error
+        uiState.error?.let {
+            Snackbar(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                containerColor = ErrorRed
+            ) { Text(it, color = Color.White) }
         }
     }
 }
@@ -107,273 +166,264 @@ fun TeamsScreen(
 fun TeamCard(
     team: Team,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val jerseyColor = try {
-        Color(android.graphics.Color.parseColor(team.jerseyColor))
-    } catch (e: Exception) {
-        NeonGreen
-    }
+        Color(android.graphics.Color.parseColor(team.jerseyColor ?: "#10B981"))
+    } catch (e: Exception) { NeonGreen }
 
-    val categoryColor = when (team.category) {
-        "international" -> AmberColor
-        "domestic" -> NeonBlue
-        "club" -> NeonGreen
-        "school", "college" -> Color(0xFF8B5CF6)
-        "corporate" -> Color(0xFFEC4899)
-        "street", "tape_ball" -> Color(0xFFF97316)
-        else -> TextSecondary
-    }
-
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SurfaceCard)
             .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
             .clickable { onClick() }
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(16.dp)
     ) {
-        // Team color circle / logo
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(jerseyColor.copy(alpha = 0.2f))
-                .border(2.dp, jerseyColor, CircleShape),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                team.shortName?.uppercase() ?: team.name.take(2).uppercase(),
-                color = jerseyColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Team logo / color circle
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(jerseyColor.copy(alpha = 0.2f))
+                    .border(2.dp, jerseyColor, CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    team.name,
-                    color = TextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
+                    team.shortName?.take(3) ?: team.name.take(2).uppercase(),
+                    color = jerseyColor,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(categoryColor.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        team.category.replaceFirstChar { it.uppercase() },
-                        color = categoryColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(team.name, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    team.category?.let {
+                        CategoryBadge(it)
+                    }
+                    team.city?.let {
+                        Text("📍 $it", color = TextSecondary, fontSize = 11.sp)
+                    }
                 }
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 2.dp)
-            ) {
-                team.city?.let {
-                    Text("📍 $it", color = TextSecondary, fontSize = 11.sp)
+            Row {
+                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
                 }
-                team.coach?.let {
-                    Text("👨‍💼 $it", color = TextSecondary, fontSize = 11.sp)
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed, modifier = Modifier.size(16.dp))
                 }
-            }
-
-            team.homeGround?.let {
-                Text("🏟 $it", color = TextSecondary, fontSize = 11.sp)
             }
         }
 
-        IconButton(
-            onClick = onDelete,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Default.Delete,
-                contentDescription = "Delete",
-                tint = ErrorRed.copy(alpha = 0.6f),
-                modifier = Modifier.size(18.dp)
-            )
+        if (team.coach != null || team.homeGround != null || team.joinCode != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                team.coach?.let {
+                    Text("🏏 Coach: $it", color = TextSecondary, fontSize = 11.sp)
+                }
+                team.joinCode?.let {
+                    Text("🔑 $it", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
 
 @Composable
-fun CreateTeamDialog(
+fun CategoryBadge(category: String) {
+    val color = when (category) {
+        "International" -> Color(0xFF3B82F6)
+        "Domestic" -> Color(0xFF8B5CF6)
+        "Club" -> NeonGreen
+        "School" -> Color(0xFFF59E0B)
+        "College" -> Color(0xFFEC4899)
+        "Corporate" -> Color(0xFF06B6D4)
+        else -> TextSecondary
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.15f))
+            .border(0.5.dp, color, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(category, color = color, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun TeamDialog(
+    title: String,
+    team: Team? = null,
     onDismiss: () -> Unit,
-    onCreate: (String, String?, String, String?, String?, String?) -> Unit
+    onConfirm: (TeamInsert) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var shortName by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("club") }
-    var country by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var coach by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(team?.name ?: "") }
+    var shortName by remember { mutableStateOf(team?.shortName ?: "") }
+    var selectedCategory by remember { mutableStateOf(team?.category ?: "Club") }
+    var selectedColor by remember { mutableStateOf(team?.jerseyColor ?: "#10B981") }
+    var country by remember { mutableStateOf(team?.country ?: "") }
+    var city by remember { mutableStateOf(team?.city ?: "") }
+    var homeGround by remember { mutableStateOf(team?.homeGround ?: "") }
+    var coach by remember { mutableStateOf(team?.coach ?: "") }
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
-    val categories = listOf(
-        "international" to "🌍 International",
-        "domestic" to "🏠 Domestic",
-        "club" to "🏏 Club",
-        "school" to "🏫 School",
-        "college" to "🎓 College",
-        "corporate" to "💼 Corporate",
-        "tape_ball" to "🎾 Street/Tape Ball"
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+        cursorColor = NeonGreen, focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary,
+        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF111827),
-        title = {
-            Text(
-                "Create Team",
-                color = Color(0xFFF9FAFB),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-        },
+        containerColor = SurfaceCard,
+        title = { Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
         text = {
-            Column(
+            LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.heightIn(max = 500.dp)
             ) {
-                // Team name
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Team Name *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
-
-                // Short name
-                OutlinedTextField(
-                    value = shortName,
-                    onValueChange = { if (it.length <= 4) shortName = it },
-                    label = { Text("Short Name (max 4 chars)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
-
-                // Category dropdown
-                Box {
+                item {
                     OutlinedTextField(
-                        value = categories.find { it.first == selectedCategory }?.second ?: "Club",
-                        onValueChange = {},
-                        label = { Text("Category") },
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = dialogFieldColors(),
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = null,
-                                tint = Color(0xFF9CA3AF)
+                        value = name, onValueChange = { name = it },
+                        label = { Text("Team Name *") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = shortName, onValueChange = { if (it.length <= 5) shortName = it },
+                        label = { Text("Short Name (e.g. PAK)") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    // Category dropdown
+                    Box {
+                        OutlinedTextField(
+                            value = selectedCategory,
+                            onValueChange = {},
+                            label = { Text("Category") },
+                            readOnly = true,
+                            trailingIcon = { Text("▼", color = TextSecondary) },
+                            modifier = Modifier.fillMaxWidth().clickable { showCategoryDropdown = true },
+                            colors = fieldColors
+                        )
+                        DropdownMenu(
+                            expanded = showCategoryDropdown,
+                            onDismissRequest = { showCategoryDropdown = false },
+                            modifier = Modifier.background(SurfaceCard)
+                        ) {
+                            TEAM_CATEGORIES.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat, color = TextPrimary) },
+                                    onClick = { selectedCategory = cat; showCategoryDropdown = false }
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    Text("Jersey Color", color = TextSecondary, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        JERSEY_COLORS.take(6).forEach { colorHex ->
+                            val c = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { NeonGreen }
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(if (selectedColor == colorHex) 3.dp else 0.dp, Color.White, CircleShape)
+                                    .clickable { selectedColor = colorHex }
                             )
                         }
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { showCategoryDropdown = true }
-                    )
-                    DropdownMenu(
-                        expanded = showCategoryDropdown,
-                        onDismissRequest = { showCategoryDropdown = false },
-                        modifier = Modifier.background(Color(0xFF111827))
-                    ) {
-                        categories.forEach { (value, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label, color = Color(0xFFF9FAFB)) },
-                                onClick = {
-                                    selectedCategory = value
-                                    showCategoryDropdown = false
-                                }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        JERSEY_COLORS.drop(6).forEach { colorHex ->
+                            val c = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { NeonGreen }
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(if (selectedColor == colorHex) 3.dp else 0.dp, Color.White, CircleShape)
+                                    .border(1.dp, BorderColor, CircleShape)
+                                    .clickable { selectedColor = colorHex }
                             )
                         }
                     }
                 }
-
-                // Country
-                OutlinedTextField(
-                    value = country,
-                    onValueChange = { country = it },
-                    label = { Text("Country") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
-
-                // City
-                OutlinedTextField(
-                    value = city,
-                    onValueChange = { city = it },
-                    label = { Text("City") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
-
-                // Coach
-                OutlinedTextField(
-                    value = coach,
-                    onValueChange = { coach = it },
-                    label = { Text("Coach") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
+                item {
+                    OutlinedTextField(
+                        value = country, onValueChange = { country = it },
+                        label = { Text("Country") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = city, onValueChange = { city = it },
+                        label = { Text("City") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = homeGround, onValueChange = { homeGround = it },
+                        label = { Text("Home Ground") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = coach, onValueChange = { coach = it },
+                        label = { Text("Coach") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
-                        onCreate(
-                            name.trim(),
-                            shortName.ifBlank { null },
-                            selectedCategory,
-                            country.ifBlank { null },
-                            city.ifBlank { null },
-                            coach.ifBlank { null }
-                        )
+                        onConfirm(TeamInsert(
+                            name = name.trim(),
+                            shortName = shortName.trim().ifBlank { null },
+                            jerseyColor = selectedColor,
+                            category = selectedCategory,
+                            country = country.trim().ifBlank { null },
+                            city = city.trim().ifBlank { null },
+                            homeGround = homeGround.trim().ifBlank { null },
+                            coach = coach.trim().ifBlank { null }
+                        ))
                     }
                 },
                 enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-            ) {
-                Text("Create", color = Color.Black, fontWeight = FontWeight.Bold)
-            }
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) { Text("Save", color = Color.Black, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color(0xFF9CA3AF))
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
         }
     )
 }
-
-@Composable
-fun dialogFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Color(0xFFF9FAFB),
-    unfocusedTextColor = Color(0xFFF9FAFB),
-    focusedBorderColor = Color(0xFF10B981),
-    unfocusedBorderColor = Color(0xFF1F2937),
-    focusedLabelColor = Color(0xFF10B981),
-    unfocusedLabelColor = Color(0xFF9CA3AF),
-    cursorColor = Color(0xFF10B981)
-)
