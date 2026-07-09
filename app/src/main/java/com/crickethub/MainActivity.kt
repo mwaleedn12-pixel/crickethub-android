@@ -37,19 +37,22 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.crickethub.data.model.Innings
+import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.ui.auth.ForgotPasswordScreen
 import com.crickethub.ui.auth.LoginScreen
 import com.crickethub.ui.auth.SignupScreen
 import com.crickethub.ui.match.CreateMatchScreen
-import com.crickethub.ui.match.MatchViewModel
 import com.crickethub.ui.match.MatchesScreen
 import com.crickethub.ui.match.PlayingXIScreen
 import com.crickethub.ui.match.TossScreen
 import com.crickethub.ui.match.analytics.AnalyticsScreen
 import com.crickethub.ui.match.live.LiveScorecardScreen
+import com.crickethub.ui.match.live.LiveScorecardViewModel
 import com.crickethub.ui.match.postmatch.PostMatchScreen
 import com.crickethub.ui.match.scoring.ScoringScreen
+import com.crickethub.ui.match.scoring.ScoringViewModel
 import com.crickethub.ui.player.PlayerCareerScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
@@ -57,6 +60,7 @@ import com.crickethub.ui.theme.CricketHubTheme
 import com.crickethub.ui.tournament.CreateTournamentScreen
 import com.crickethub.ui.tournament.TournamentDetailScreen
 import com.crickethub.ui.tournament.TournamentsScreen
+import io.github.jan.supabase.postgrest.postgrest
 
 private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
@@ -89,69 +93,45 @@ fun CricketHubApp() {
                 NavigationBar(containerColor = SurfaceCard, contentColor = NeonGreen) {
                     NavigationBarItem(
                         selected = currentRoute == "teams",
-                        onClick = {
-                            navController.navigate("teams") {
-                                popUpTo("teams") { inclusive = true }
-                            }
-                        },
+                        onClick = { navController.navigate("teams") { popUpTo("teams") { inclusive = true } } },
                         icon = { Icon(Icons.Default.Person, contentDescription = "Teams") },
                         label = { Text("Teams") },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen,
-                            selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary,
+                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
+                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
                             indicatorColor = NeonGreen.copy(alpha = 0.15f)
                         )
                     )
                     NavigationBarItem(
                         selected = currentRoute == "matches",
-                        onClick = {
-                            navController.navigate("matches") {
-                                popUpTo("teams") { inclusive = false }
-                            }
-                        },
+                        onClick = { navController.navigate("matches") { popUpTo("teams") { inclusive = false } } },
                         icon = { Icon(Icons.Default.List, contentDescription = "Matches") },
                         label = { Text("Matches") },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen,
-                            selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary,
+                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
+                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
                             indicatorColor = NeonGreen.copy(alpha = 0.15f)
                         )
                     )
                     NavigationBarItem(
                         selected = currentRoute == "tournaments",
-                        onClick = {
-                            navController.navigate("tournaments") {
-                                popUpTo("teams") { inclusive = false }
-                            }
-                        },
+                        onClick = { navController.navigate("tournaments") { popUpTo("teams") { inclusive = false } } },
                         icon = { Icon(Icons.Default.Star, contentDescription = "Tournaments") },
                         label = { Text("Tournaments") },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen,
-                            selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary,
+                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
+                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
                             indicatorColor = NeonGreen.copy(alpha = 0.15f)
                         )
                     )
                     NavigationBarItem(
                         selected = currentRoute == "career",
-                        onClick = {
-                            navController.navigate("career") {
-                                popUpTo("teams") { inclusive = false }
-                            }
-                        },
+                        onClick = { navController.navigate("career") { popUpTo("teams") { inclusive = false } } },
                         icon = { Icon(Icons.Default.AccountCircle, contentDescription = "Career") },
                         label = { Text("Career") },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen,
-                            selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary,
+                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
+                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
                             indicatorColor = NeonGreen.copy(alpha = 0.15f)
                         )
                     )
@@ -166,34 +146,22 @@ fun CricketHubApp() {
         ) {
             composable("login") {
                 LoginScreen(
-                    onLoginSuccess = {
-                        navController.navigate("teams") {
-                            popUpTo("login") { inclusive = true }
-                        }
-                    },
+                    onLoginSuccess = { navController.navigate("teams") { popUpTo("login") { inclusive = true } } },
                     onNavigateToSignup = { navController.navigate("signup") },
                     onNavigateToForgotPassword = { navController.navigate("forgot_password") }
                 )
             }
             composable("signup") {
                 SignupScreen(
-                    onSignupSuccess = {
-                        navController.navigate("teams") {
-                            popUpTo("login") { inclusive = true }
-                        }
-                    },
+                    onSignupSuccess = { navController.navigate("teams") { popUpTo("login") { inclusive = true } } },
                     onNavigateToLogin = { navController.popBackStack() }
                 )
             }
             composable("forgot_password") {
-                ForgotPasswordScreen(
-                    onBack = { navController.popBackStack() }
-                )
+                ForgotPasswordScreen(onBack = { navController.popBackStack() })
             }
             composable("teams") {
-                TeamsScreen(
-                    onTeamClick = { teamId -> navController.navigate("players/$teamId") }
-                )
+                TeamsScreen(onTeamClick = { teamId -> navController.navigate("players/$teamId") })
             }
             composable(
                 route = "players/{teamId}",
@@ -230,19 +198,24 @@ fun CricketHubApp() {
                             popUpTo("match_flow/$matchId") { inclusive = true }
                         }
                     },
-                    onGoToTeam1XI = {
-                        navController.navigate("playing_xi_team1/$matchId") {
+                    onGoToTeam1XI = { teamId, teamName, playersPerSide ->
+                        navController.navigate("playing_xi/$matchId/$teamId/$teamName/$playersPerSide") {
                             popUpTo("match_flow/$matchId") { inclusive = true }
                         }
                     },
-                    onGoToTeam2XI = {
-                        navController.navigate("playing_xi_team2/$matchId") {
+                    onGoToTeam2XI = { teamId, teamName, playersPerSide ->
+                        navController.navigate("playing_xi/$matchId/$teamId/$teamName/$playersPerSide") {
                             popUpTo("match_flow/$matchId") { inclusive = true }
                         }
                     },
                     onGoToScoring = {
                         navController.navigate("scoring/$matchId") {
                             popUpTo("match_flow/$matchId") { inclusive = true }
+                        }
+                    },
+                    onMatchComplete = {
+                        navController.navigate("post_match/$matchId") {
+                            popUpTo("matches")
                         }
                     }
                 )
@@ -262,30 +235,28 @@ fun CricketHubApp() {
                 )
             }
             composable(
-                route = "playing_xi_team1/{matchId}",
-                arguments = listOf(navArgument("matchId") { type = NavType.StringType })
-            ) { backStackEntry ->
-                val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                Team1PlayingXI(
-                    matchId = matchId,
-                    onBack = { navController.popBackStack() },
-                    onXISaved = {
-                        navController.navigate("playing_xi_team2/$matchId") {
-                            popUpTo("playing_xi_team1/$matchId") { inclusive = true }
-                        }
-                    }
+                route = "playing_xi/{matchId}/{teamId}/{teamName}/{playersPerSide}",
+                arguments = listOf(
+                    navArgument("matchId") { type = NavType.StringType },
+                    navArgument("teamId") { type = NavType.StringType },
+                    navArgument("teamName") { type = NavType.StringType },
+                    navArgument("playersPerSide") { type = NavType.IntType }
                 )
-            }
-            composable(
-                route = "playing_xi_team2/{matchId}",
-                arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                Team2PlayingXI(
+                val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
+                val teamName = backStackEntry.arguments?.getString("teamName") ?: ""
+                val playersPerSide = backStackEntry.arguments?.getInt("playersPerSide") ?: 11
+                PlayingXIScreen(
                     matchId = matchId,
+                    teamId = teamId,
+                    teamName = teamName,
+                    playersPerSide = playersPerSide,
                     onBack = { navController.popBackStack() },
                     onXISaved = {
-                        navController.navigate("scoring/$matchId") { popUpTo("matches") }
+                        navController.navigate("match_flow/$matchId") {
+                            popUpTo("match_flow/$matchId") { inclusive = true }
+                        }
                     }
                 )
             }
@@ -294,6 +265,7 @@ fun CricketHubApp() {
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+                val scoringViewModel: ScoringViewModel = viewModel(backStackEntry)
                 ScoringScreen(
                     matchId = matchId,
                     onBack = {
@@ -305,7 +277,14 @@ fun CricketHubApp() {
                         navController.navigate("post_match/$matchId") {
                             popUpTo("matches")
                         }
-                    }
+                    },
+                    onViewScorecard = {
+                        navController.navigate("live_scorecard/$matchId")
+                    },
+                    onViewAnalytics = {
+                        navController.navigate("analytics/$matchId")
+                    },
+                    viewModel = scoringViewModel
                 )
             }
             composable(
@@ -313,20 +292,71 @@ fun CricketHubApp() {
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                LiveScorecardScreen(
-                    matchId = matchId,
-                    onBack = { navController.popBackStack() }
-                )
+                val liveViewModel: LiveScorecardViewModel = viewModel(backStackEntry)
+
+                val scoringEntry = try {
+                    navController.getBackStackEntry("scoring/$matchId")
+                } catch (e: Exception) { null }
+
+                if (scoringEntry != null) {
+                    val scoringViewModel: ScoringViewModel = viewModel(scoringEntry)
+                    val scoringState by scoringViewModel.uiState.collectAsState()
+
+                    var team1Name by remember { mutableStateOf("Team 1") }
+                    var team2Name by remember { mutableStateOf("Team 2") }
+
+                    LaunchedEffect(matchId) {
+                        try {
+                            val match = MatchRepository().getMatchById(matchId)
+                            if (match != null) {
+                                val t1 = SupabaseClient.client.postgrest["teams"]
+                                    .select { filter { eq("id", match.team1Id) } }
+                                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                                val t2 = SupabaseClient.client.postgrest["teams"]
+                                    .select { filter { eq("id", match.team2Id) } }
+                                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                                team1Name = t1?.name ?: "Team 1"
+                                team2Name = t2?.name ?: "Team 2"
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("CricketHub", "Team names error: ${e.message}", e)
+                        }
+                    }
+
+                    LaunchedEffect(scoringState.balls.size, scoringState.innings?.totalRuns) {
+                        if (scoringState.innings != null) {
+                            liveViewModel.updateFromScoringState(scoringState, team1Name, team2Name)
+                        }
+                    }
+
+                    LaunchedEffect(team1Name, team2Name) {
+                        if (scoringState.innings != null && team1Name != "Team 1") {
+                            liveViewModel.updateFromScoringState(scoringState, team1Name, team2Name)
+                        }
+                    }
+
+                    LiveScorecardScreen(
+                        matchId = matchId,
+                        onBack = { navController.popBackStack() },
+                        viewModel = liveViewModel
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        liveViewModel.loadAndSubscribe(matchId)
+                    }
+                    LiveScorecardScreen(
+                        matchId = matchId,
+                        onBack = { navController.popBackStack() },
+                        viewModel = liveViewModel
+                    )
+                }
             }
             composable(
                 route = "analytics/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
-                AnalyticsScreen(
-                    matchId = matchId,
-                    onBack = { navController.popBackStack() }
-                )
+                AnalyticsScreen(matchId = matchId, onBack = { navController.popBackStack() })
             }
             composable(
                 route = "post_match/{matchId}",
@@ -353,9 +383,7 @@ fun CricketHubApp() {
                 CreateTournamentScreen(
                     onBack = { navController.popBackStack() },
                     onTournamentCreated = { id ->
-                        navController.navigate("tournament_detail/$id") {
-                            popUpTo("tournaments")
-                        }
+                        navController.navigate("tournament_detail/$id") { popUpTo("tournaments") }
                     }
                 )
             }
@@ -367,7 +395,9 @@ fun CricketHubApp() {
                 TournamentDetailScreen(
                     tournamentId = tournamentId,
                     onBack = { navController.popBackStack() },
-                    onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") }
+                    onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") },
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
                 )
             }
             composable("career") {
@@ -377,46 +407,106 @@ fun CricketHubApp() {
     }
 }
 
+// =============================================
+// MATCH FLOW SCREEN — Complete backend check
+// =============================================
 @Composable
 fun MatchFlowScreen(
     matchId: String,
     onGoToToss: () -> Unit,
-    onGoToTeam1XI: () -> Unit,
-    onGoToTeam2XI: () -> Unit,
-    onGoToScoring: () -> Unit
+    onGoToTeam1XI: (teamId: String, teamName: String, playersPerSide: Int) -> Unit,
+    onGoToTeam2XI: (teamId: String, teamName: String, playersPerSide: Int) -> Unit,
+    onGoToScoring: () -> Unit,
+    onMatchComplete: () -> Unit
 ) {
-    val viewModel: MatchViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsState()
-    var xiSaved by remember { mutableStateOf<Boolean?>(null) }
-    var team1XISaved by remember { mutableStateOf<Boolean?>(null) }
+    var statusText by remember { mutableStateOf("Loading match...") }
 
     LaunchedEffect(matchId) {
-        viewModel.loadMatchById(matchId)
-        viewModel.loadTeams()
         try {
             val repo = MatchRepository()
-            val xi = repo.getPlayingXI(matchId)
-            val match = repo.getMatchById(matchId)
-            val team1Id = match?.team1Id
-            val team2Id = match?.team2Id
-            val team1Count = xi.count { it.teamId == team1Id }
-            val team2Count = xi.count { it.teamId == team2Id }
-            team1XISaved = team1Count >= 11
-            xiSaved = team1Count >= 11 && team2Count >= 11
-        } catch (e: Exception) {
-            xiSaved = false
-            team1XISaved = false
-        }
-    }
 
-    LaunchedEffect(uiState.currentMatch, xiSaved, team1XISaved) {
-        val match = uiState.currentMatch
-        if (match == null || xiSaved == null || team1XISaved == null) return@LaunchedEffect
-        when {
-            match.tossWinnerId == null -> onGoToToss()
-            xiSaved == true -> onGoToScoring()
-            team1XISaved == false -> onGoToTeam1XI()
-            else -> onGoToTeam2XI()
+            // STEP 1: Match exist karta hai?
+            val match = repo.getMatchById(matchId)
+            if (match == null) {
+                statusText = "Match not found"
+                return@LaunchedEffect
+            }
+
+            // STEP 2: Toss hua?
+            if (match.tossWinnerId == null) {
+                statusText = "Going to toss..."
+                onGoToToss()
+                return@LaunchedEffect
+            }
+
+            // STEP 3: Playing XI select hua?
+            val xi = repo.getPlayingXI(matchId)
+            val playersNeeded = match.playersPerSide
+            val team1Count = xi.count { it.teamId == match.team1Id }
+            val team2Count = xi.count { it.teamId == match.team2Id }
+
+            if (team1Count < playersNeeded) {
+                statusText = "Selecting Team 1 XI..."
+                val t1 = SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", match.team1Id) } }
+                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                onGoToTeam1XI(match.team1Id, t1?.name ?: "Team 1", playersNeeded)
+                return@LaunchedEffect
+            }
+
+            if (team2Count < playersNeeded) {
+                statusText = "Selecting Team 2 XI..."
+                val t2 = SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", match.team2Id) } }
+                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                onGoToTeam2XI(match.team2Id, t2?.name ?: "Team 2", playersNeeded)
+                return@LaunchedEffect
+            }
+
+            // STEP 4: Innings check karo
+            val allInnings = SupabaseClient.client.postgrest["innings"]
+                .select { filter { eq("match_id", matchId) } }
+                .decodeList<Innings>()
+                .sortedBy { it.inningsNo }
+
+            val completedInnings = allInnings.filter { it.status == "completed" }
+            val liveInnings = allInnings.find { it.status == "live" }
+
+            // Dono innings complete — match khatam
+            if (completedInnings.size >= 2) {
+                statusText = "Match complete"
+                onMatchComplete()
+                return@LaunchedEffect
+            }
+
+            // 1st innings check
+            if (allInnings.isEmpty()) {
+                // Koi innings nahi — scoring shuru karo, ViewModel create karega
+                statusText = "Starting 1st innings..."
+                onGoToScoring()
+                return@LaunchedEffect
+            }
+
+            // Live innings hai — continue karo
+            if (liveInnings != null) {
+                statusText = "Continuing innings ${liveInnings.inningsNo}..."
+                onGoToScoring()
+                return@LaunchedEffect
+            }
+
+            // 1st innings complete, 2nd nahi shuru
+            if (completedInnings.size == 1 && allInnings.size == 1) {
+                statusText = "Starting 2nd innings..."
+                onGoToScoring()
+                return@LaunchedEffect
+            }
+
+            // Default — scoring pe jao
+            onGoToScoring()
+
+        } catch (e: Exception) {
+            statusText = "Error: ${e.message}"
+            android.util.Log.e("CricketHub", "MatchFlow error: ${e.message}", e)
         }
     }
 
@@ -427,81 +517,5 @@ fun MatchFlowScreen(
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(color = NeonGreen)
-    }
-}
-
-@Composable
-fun Team1PlayingXI(
-    matchId: String,
-    onBack: () -> Unit,
-    onXISaved: () -> Unit
-) {
-    val viewModel: MatchViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(matchId) {
-        viewModel.loadMatchById(matchId)
-        viewModel.loadTeams()
-    }
-
-    val match = uiState.currentMatch
-    val team1 = uiState.teams.find { it.id == match?.team1Id }
-
-    if (uiState.isLoading || match == null || team1 == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = NeonGreen)
-        }
-    } else {
-        PlayingXIScreen(
-            matchId = matchId,
-            teamId = team1.id,
-            teamName = team1.name,
-            playersPerSide = match.playersPerSide,
-            onBack = onBack,
-            onXISaved = onXISaved
-        )
-    }
-}
-
-@Composable
-fun Team2PlayingXI(
-    matchId: String,
-    onBack: () -> Unit,
-    onXISaved: () -> Unit
-) {
-    val viewModel: MatchViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(matchId) {
-        viewModel.loadMatchById(matchId)
-        viewModel.loadTeams()
-    }
-
-    val match = uiState.currentMatch
-    val team2 = uiState.teams.find { it.id == match?.team2Id }
-
-    if (uiState.isLoading || match == null || team2 == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = NeonGreen)
-        }
-    } else {
-        PlayingXIScreen(
-            matchId = matchId,
-            teamId = team2.id,
-            teamName = team2.name,
-            playersPerSide = match.playersPerSide,
-            onBack = onBack,
-            onXISaved = onXISaved
-        )
     }
 }

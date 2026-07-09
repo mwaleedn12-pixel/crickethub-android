@@ -5,27 +5,22 @@ import androidx.lifecycle.viewModelScope
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.BatsmanStats
 import com.crickethub.data.model.BowlerStats
-import com.crickethub.data.model.Innings
 import com.crickethub.data.model.Player
+import com.crickethub.data.model.ScoringUiState
+import com.crickethub.data.model.Team
 import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.data.repository.ScoringRepository
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.realtime.PostgresAction
-import io.github.jan.supabase.realtime.channel
-import io.github.jan.supabase.realtime.postgresChangeFlow
-import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class LiveScorecardUiState(
     val isLoading: Boolean = true,
-    val matchStatus: String = "SCHEDULED",
+    val matchStatus: String = "LIVE",
     val battingTeamName: String = "",
     val bowlingTeamName: String = "",
     val totalRuns: Int = 0,
@@ -40,243 +35,250 @@ data class LiveScorecardUiState(
     val batsmanStats: Map<String, BatsmanStats> = emptyMap(),
     val bowlerStats: Map<String, BowlerStats> = emptyMap(),
     val commentary: List<String> = emptyList(),
+    val balls: List<Ball> = emptyList(),
+    val wides: Int = 0,
+    val noBalls: Int = 0,
+    val extrasTotal: Int = 0,
+    val resultText: String = "",
     val shareableSlug: String? = null,
     val error: String? = null
 )
 
 class LiveScorecardViewModel : ViewModel() {
 
-    private val scoringRepository = ScoringRepository()
     private val matchRepository = MatchRepository()
+    private val scoringRepository = ScoringRepository()
 
     private val _uiState = MutableStateFlow(LiveScorecardUiState())
     val uiState: StateFlow<LiveScorecardUiState> = _uiState.asStateFlow()
 
-    private var currentMatchId: String? = null
-    private var currentInningsId: String? = null
-
-    fun loadAndSubscribe(matchId: String) {
-        currentMatchId = matchId
-        viewModelScope.launch {
-            loadData(matchId)
-            subscribeToRealtime(matchId)
-        }
-    }
-
-    private suspend fun loadData(matchId: String) {
-        try {
-            _uiState.update { it.copy(isLoading = true) }
-
-            val match = matchRepository.getMatchById(matchId) ?: return
-            val allInnings = scoringRepository.getInningsByMatch(matchId)
-            val currentInnings = allInnings.find { it.status == "live" }
-                ?: allInnings.lastOrNull()
-
-            currentInningsId = currentInnings?.id
-
-            val battingTeamId = currentInnings?.battingTeamId ?: match.battingFirstId ?: match.team1Id
-            val bowlingTeamId = currentInnings?.bowlingTeamId
-                ?: if (battingTeamId == match.team1Id) match.team2Id else match.team1Id
-
-            // Team names fetch karo
-            val battingTeam = SupabaseClient.client.postgrest["teams"]
-                .select { filter { eq("id", battingTeamId) } }
-                .decodeSingleOrNull<com.crickethub.data.model.Team>()
-
-            val bowlingTeam = SupabaseClient.client.postgrest["teams"]
-                .select { filter { eq("id", bowlingTeamId) } }
-                .decodeSingleOrNull<com.crickethub.data.model.Team>()
-
-            val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, battingTeamId)
-            val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, bowlingTeamId)
-
-            val balls = if (currentInnings != null) {
-                scoringRepository.getBallsByInnings(currentInnings.id)
-            } else emptyList()
-
-            // 2nd innings ke liye target calculate karo
-            val firstInnings = allInnings.firstOrNull { it.inningsNo == 1 }
-            val target = if (allInnings.size >= 2) (firstInnings?.totalRuns ?: 0) + 1 else null
-
-            updateState(
-                match = match,
-                innings = currentInnings,
-                balls = balls,
-                battingTeamName = battingTeam?.name ?: "Team 1",
-                bowlingTeamName = bowlingTeam?.name ?: "Team 2",
-                battingPlayers = battingPlayers,
-                bowlingPlayers = bowlingPlayers,
-                target = target
-            )
-
-        } catch (e: Exception) {
-            android.util.Log.e("CricketHub", "LiveScorecard error: ${e.message}", e)
-            _uiState.update { it.copy(error = e.message, isLoading = false) }
-        }
-    }
-
-    private fun updateState(
-        match: com.crickethub.data.model.Match,
-        innings: Innings?,
-        balls: List<Ball>,
-        battingTeamName: String,
-        bowlingTeamName: String,
-        battingPlayers: List<Player>,
-        bowlingPlayers: List<Player>,
-        target: Int?
+    // Scoring screen se directly state receive karo
+    fun updateFromScoringState(
+        scoringState: ScoringUiState,
+        team1Name: String,
+        team2Name: String
     ) {
-        val totalRuns = innings?.totalRuns ?: 0
-        val totalWickets = innings?.totalWickets ?: 0
-        val totalBalls = innings?.totalBalls ?: 0
-        val currentOver = totalBalls / 6
-        val currentBall = totalBalls % 6
-        val crr = if (totalBalls > 0) (totalRuns.toDouble() / totalBalls) * 6 else 0.0
-
-        val ballsLeft = match.totalOvers * 6 - totalBalls
-        val rrr = if (target != null && ballsLeft > 0) {
-            ((target - totalRuns).toDouble() / ballsLeft) * 6
-        } else null
-
-        val last6 = balls.takeLast(6).map { ball ->
-            when {
-                ball.isWicket -> "W"
-                ball.extrasType == "wide" -> "Wd"
-                ball.extrasType == "no_ball" -> "Nb"
-                ball.isSix -> "6"
-                ball.isBoundary -> "4"
-                else -> (ball.runsOffBat + (ball.extrasRuns ?: 0)).toString()
-            }
-        }
-
-        val commentary = balls
-            .mapNotNull { it.commentary }
-            .reversed()
-            .take(20)
-
-        val batsmanStats = computeBatsmanStats(balls, battingPlayers)
-        val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
-
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                matchStatus = match.status.uppercase(),
-                battingTeamName = battingTeamName,
-                bowlingTeamName = bowlingTeamName,
-                totalRuns = totalRuns,
-                totalWickets = totalWickets,
-                currentOver = currentOver,
-                currentBall = currentBall,
-                currentRunRate = crr,
-                requiredRunRate = rrr,
-                target = target,
-                ballsLeft = ballsLeft,
-                last6Balls = last6,
-                batsmanStats = batsmanStats,
-                bowlerStats = bowlerStats,
-                commentary = commentary,
-                shareableSlug = match.shareableSlug
-            )
-        }
-    }
-
-    private fun subscribeToRealtime(matchId: String) {
         viewModelScope.launch {
             try {
-                val channel = SupabaseClient.client.realtime.channel("live-$matchId")
+                val balls = scoringState.balls
+                val battingPlayers = scoringState.battingTeamPlayers
+                val bowlingPlayers = scoringState.bowlingTeamPlayers
+                val innings = scoringState.innings ?: return@launch
+                val match = scoringState.match ?: return@launch
 
-                channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                    table = "balls"
-                }.onEach {
-                    // Naya ball aaya — data reload karo
-                    loadData(matchId)
-                }.launchIn(viewModelScope)
+                val batsmanStats = computeBatsmanStats(balls, battingPlayers)
+                val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
+                val last6 = computeLast6Balls(balls)
+                val commentary = computeCommentary(balls)
 
-                channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
-                    table = "innings"
-                }.onEach {
-                    loadData(matchId)
-                }.launchIn(viewModelScope)
+                val legalBalls = innings.totalBalls
+                val overNo = legalBalls / 6
+                val ballNo = legalBalls % 6
+                val crr = if (legalBalls > 0) innings.totalRuns.toDouble() / legalBalls * 6 else 0.0
 
-                channel.subscribe()
+                val battingTeamName = if (innings.battingTeamId == match.team1Id) team1Name else team2Name
+                val bowlingTeamName = if (innings.bowlingTeamId == match.team1Id) team1Name else team2Name
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        matchStatus = "LIVE",
+                        battingTeamName = battingTeamName,
+                        bowlingTeamName = bowlingTeamName,
+                        totalRuns = innings.totalRuns,
+                        totalWickets = innings.totalWickets,
+                        currentOver = overNo,
+                        currentBall = ballNo,
+                        currentRunRate = crr,
+                        last6Balls = last6,
+                        batsmanStats = batsmanStats,
+                        bowlerStats = bowlerStats,
+                        commentary = commentary,
+                        balls = balls,
+                        wides = innings.wides,
+                        noBalls = innings.noBalls,
+                        extrasTotal = innings.extrasTotal
+                    )
+                }
             } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Realtime error: ${e.message}", e)
+                android.util.Log.e("CricketHub", "UpdateFromScoring error: ${e.message}", e)
             }
         }
     }
 
-    private fun computeBatsmanStats(
-        balls: List<Ball>,
-        players: List<Player>
-    ): Map<String, BatsmanStats> {
+    // DB se fresh load karo — direct access ke liye
+    fun loadAndSubscribe(matchId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val match = matchRepository.getMatchById(matchId) ?: return@launch
+                val allInnings = scoringRepository.getInningsByMatch(matchId)
+                val currentInnings = allInnings.find { it.status == "live" }
+                    ?: allInnings.lastOrNull()
+                    ?: return@launch
+
+                val team1 = SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", match.team1Id) } }
+                    .decodeSingleOrNull<Team>()
+                val team2 = SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", match.team2Id) } }
+                    .decodeSingleOrNull<Team>()
+
+                val battingTeamName = if (currentInnings.battingTeamId == match.team1Id)
+                    team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
+                val bowlingTeamName = if (currentInnings.bowlingTeamId == match.team1Id)
+                    team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
+
+                val balls = scoringRepository.getBallsByInnings(currentInnings.id)
+                val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, currentInnings.battingTeamId)
+                val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, currentInnings.bowlingTeamId)
+
+                val batsmanStats = computeBatsmanStats(balls, battingPlayers)
+                val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
+                val last6 = computeLast6Balls(balls)
+                val commentary = computeCommentary(balls)
+
+                val legalBalls = currentInnings.totalBalls
+                val overNo = legalBalls / 6
+                val ballNo = legalBalls % 6
+                val crr = if (legalBalls > 0) currentInnings.totalRuns.toDouble() / legalBalls * 6 else 0.0
+
+                val completedInnings = allInnings.filter { it.status == "completed" }
+                val target: Int?
+                val rrr: Double?
+                val ballsLeft: Int
+
+                if (allInnings.size >= 2 && completedInnings.isNotEmpty()) {
+                    val firstInnings = completedInnings.first()
+                    target = firstInnings.totalRuns + 1
+                    ballsLeft = (match.totalOvers * 6) - legalBalls
+                    val runsNeeded = target - currentInnings.totalRuns
+                    rrr = if (ballsLeft > 0) runsNeeded.toDouble() / ballsLeft * 6 else null
+                } else {
+                    target = null
+                    rrr = null
+                    ballsLeft = (match.totalOvers * 6) - legalBalls
+                }
+
+                val matchStatus = when (match.status) {
+                    "completed" -> "COMPLETED"
+                    "live" -> "LIVE"
+                    "abandoned" -> "ABANDONED"
+                    else -> "UPCOMING"
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        matchStatus = matchStatus,
+                        battingTeamName = battingTeamName,
+                        bowlingTeamName = bowlingTeamName,
+                        totalRuns = currentInnings.totalRuns,
+                        totalWickets = currentInnings.totalWickets,
+                        currentOver = overNo,
+                        currentBall = ballNo,
+                        currentRunRate = crr,
+                        requiredRunRate = rrr,
+                        target = target,
+                        ballsLeft = ballsLeft,
+                        last6Balls = last6,
+                        batsmanStats = batsmanStats,
+                        bowlerStats = bowlerStats,
+                        commentary = commentary,
+                        balls = balls,
+                        wides = currentInnings.wides,
+                        noBalls = currentInnings.noBalls,
+                        extrasTotal = currentInnings.extrasTotal,
+                        resultText = match.resultText ?: "",
+                        shareableSlug = match.shareableSlug
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "LiveScorecard error: ${e.message}", e)
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
+    private fun computeLast6Balls(balls: List<Ball>): List<String> {
+        val legalBalls = balls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
+        val currentOverNo = if (legalBalls.isEmpty()) 0 else legalBalls.last().overNo
+        val currentOverBalls = balls.filter { it.overNo == currentOverNo }
+        return currentOverBalls.map { ball ->
+            when {
+                ball.isWicket -> "W"
+                ball.isSix -> "6"
+                ball.isBoundary -> "4"
+                ball.extrasType == "wide" -> "Wd"
+                ball.extrasType == "no_ball" -> "Nb"
+                ball.runsOffBat == 0 && ball.extrasRuns == null -> "0"
+                else -> "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"
+            }
+        }
+    }
+
+    private fun computeCommentary(balls: List<Ball>): List<String> {
+        return balls.mapNotNull { ball ->
+            val overBall = "${ball.overNo}.${ball.ballNo}"
+            val outcome = when {
+                ball.isWicket -> "W"
+                ball.isSix -> "6"
+                ball.isBoundary -> "4"
+                ball.extrasType == "wide" -> "Wd"
+                ball.extrasType == "no_ball" -> "Nb"
+                ball.runsOffBat == 0 -> "0"
+                else -> "${ball.runsOffBat}"
+            }
+            val description = ball.commentary ?: return@mapNotNull null
+            "$overBall | $outcome | $description"
+        }
+    }
+
+    private fun computeBatsmanStats(balls: List<Ball>, players: List<Player>): Map<String, BatsmanStats> {
         val statsMap = mutableMapOf<String, BatsmanStats>()
         players.forEach { player ->
             val playerBalls = balls.filter { it.batsmanId == player.id }
-            if (playerBalls.isEmpty()) return@forEach
             val runs = playerBalls.sumOf { it.runsOffBat }
             val ballsFaced = playerBalls.count { it.extrasType != "wide" }
             val fours = playerBalls.count { it.isBoundary && !it.isSix }
             val sixes = playerBalls.count { it.isSix }
-            val isOut = playerBalls.any { it.isWicket && it.wicketType != "run_out" }
-            val dismissalType = playerBalls.firstOrNull { it.isWicket }?.wicketType
+            val isOut = playerBalls.any {
+                it.isWicket && it.wicketType != "run_out" && it.wicketType != "retired_hurt"
+            }
+            val wicketBall = playerBalls.firstOrNull { it.isWicket }
             statsMap[player.id] = BatsmanStats(
-                player = player,
-                runs = runs,
-                balls = ballsFaced,
-                fours = fours,
-                sixes = sixes,
-                isOut = isOut,
-                dismissalType = dismissalType
+                player = player, runs = runs, balls = ballsFaced,
+                fours = fours, sixes = sixes, isOut = isOut,
+                dismissalType = wicketBall?.wicketType,
+                fielderName = wicketBall?.fielderName,
+                bowlerOnWicket = wicketBall?.bowlerId
             )
         }
         return statsMap
     }
 
-    private fun computeBowlerStats(
-        balls: List<Ball>,
-        players: List<Player>
-    ): Map<String, BowlerStats> {
+    private fun computeBowlerStats(balls: List<Ball>, players: List<Player>): Map<String, BowlerStats> {
         val statsMap = mutableMapOf<String, BowlerStats>()
         players.forEach { player ->
             val playerBalls = balls.filter { it.bowlerId == player.id }
             if (playerBalls.isEmpty()) return@forEach
-            val legalBalls = playerBalls.count {
-                it.extrasType != "wide" && it.extrasType != "no_ball"
-            }
+            val legalBalls = playerBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
             val runs = playerBalls.sumOf { ball ->
-                when (ball.extrasType) {
-                    "bye", "leg_bye" -> 0
-                    else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
-                }
+                when (ball.extrasType) { "bye", "leg_bye" -> 0; else -> ball.runsOffBat + (ball.extrasRuns ?: 0) }
             }
             val wickets = playerBalls.count {
                 it.isWicket && it.wicketType !in listOf(
-                    "run_out", "obstructing", "handled_ball", "timed_out"
+                    "run_out", "obstructing", "handled_ball",
+                    "timed_out", "retired_hurt", "retired_out"
                 )
             }
             statsMap[player.id] = BowlerStats(
-                player = player,
-                balls = legalBalls,
-                runs = runs,
-                wickets = wickets,
+                player = player, balls = legalBalls, runs = runs, wickets = wickets,
+                overs = "${legalBalls / 6}.${legalBalls % 6}",
                 wides = playerBalls.count { it.extrasType == "wide" },
                 noBalls = playerBalls.count { it.extrasType == "no_ball" }
             )
         }
         return statsMap
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        viewModelScope.launch {
-            try {
-                currentMatchId?.let {
-                    SupabaseClient.client.realtime.removeChannel(
-                        SupabaseClient.client.realtime.channel("live-$it")
-                    )
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Channel cleanup error: ${e.message}", e)
-            }
-        }
     }
 }

@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Match
+import com.crickethub.data.model.Team
+import com.crickethub.data.model.TournamentTeam
 
 private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
@@ -31,12 +33,15 @@ private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val AmberColor = Color(0xFFF59E0B)
 private val ErrorRed = Color(0xFFEF4444)
+private val PurpleColor = Color(0xFF8B5CF6)
 
 @Composable
 fun TournamentDetailScreen(
     tournamentId: String,
     onBack: () -> Unit,
     onMatchClick: (String) -> Unit,
+    onViewScorecard: (String) -> Unit = {},
+    onViewAnalytics: (String) -> Unit = {},
     viewModel: TournamentViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -53,7 +58,6 @@ fun TournamentDetailScreen(
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
-        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,7 +82,6 @@ fun TournamentDetailScreen(
             }
         }
 
-        // Tabs
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -115,11 +118,13 @@ fun TournamentDetailScreen(
             }
         } else {
             when (selectedTab) {
-                0 -> PointsTableTab(uiState = uiState)
-                1 -> FixturesTab(
+                0 -> TournamentPointsTable(tournamentTeams = uiState.tournamentTeams, teamDetails = uiState.teamDetails)
+                1 -> TournamentFixtures(
                     fixtures = uiState.fixtures,
                     teamDetails = uiState.teamDetails,
-                    onMatchClick = onMatchClick
+                    onMatchClick = onMatchClick,
+                    onViewScorecard = onViewScorecard,
+                    onViewAnalytics = onViewAnalytics
                 )
             }
         }
@@ -127,16 +132,19 @@ fun TournamentDetailScreen(
 }
 
 @Composable
-fun PointsTableTab(uiState: TournamentUiState) {
+fun TournamentPointsTable(
+    tournamentTeams: List<TournamentTeam>,
+    teamDetails: List<Team>
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp)
     ) {
-        // Table header
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
                     .background(SurfaceCard)
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
@@ -150,14 +158,12 @@ fun PointsTableTab(uiState: TournamentUiState) {
             }
         }
 
-        // Sorted by points then NRR
-        val sortedTeams = uiState.tournamentTeams.sortedWith(
-            compareByDescending<com.crickethub.data.model.TournamentTeam> { it.points }
-                .thenByDescending { it.nrr }
+        val sortedTeams = tournamentTeams.sortedWith(
+            compareByDescending<TournamentTeam> { it.points }.thenByDescending { it.nrr }
         )
 
         items(sortedTeams.withIndex().toList()) { (index, tt) ->
-            val teamName = uiState.teamDetails.find { it.id == tt.teamId }?.name ?: tt.teamId.take(8)
+            val teamName = teamDetails.find { it.id == tt.teamId }?.name ?: "Team"
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -171,42 +177,11 @@ fun PointsTableTab(uiState: TournamentUiState) {
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(24.dp)
                 )
-                Text(
-                    teamName,
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    "${tt.matchesPlayed}",
-                    color = TextSecondary,
-                    fontSize = 13.sp,
-                    modifier = Modifier.width(28.dp),
-                    textAlign = TextAlign.End
-                )
-                Text(
-                    "${tt.wins}",
-                    color = NeonGreen,
-                    fontSize = 13.sp,
-                    modifier = Modifier.width(28.dp),
-                    textAlign = TextAlign.End
-                )
-                Text(
-                    "${tt.losses}",
-                    color = ErrorRed,
-                    fontSize = 13.sp,
-                    modifier = Modifier.width(28.dp),
-                    textAlign = TextAlign.End
-                )
-                Text(
-                    "${tt.points}",
-                    color = NeonBlue,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(32.dp),
-                    textAlign = TextAlign.End
-                )
+                Text(teamName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("${tt.matchesPlayed}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${tt.wins}", color = NeonGreen, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${tt.losses}", color = ErrorRed, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${tt.points}", color = NeonBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
                 Text(
                     "${"%.3f".format(tt.nrr)}",
                     color = if (tt.nrr >= 0) NeonGreen else ErrorRed,
@@ -221,10 +196,12 @@ fun PointsTableTab(uiState: TournamentUiState) {
 }
 
 @Composable
-fun FixturesTab(
+fun TournamentFixtures(
     fixtures: List<Match>,
-    teamDetails: List<com.crickethub.data.model.Team>,
-    onMatchClick: (String) -> Unit
+    teamDetails: List<Team>,
+    onMatchClick: (String) -> Unit,
+    onViewScorecard: (String) -> Unit,
+    onViewAnalytics: (String) -> Unit
 ) {
     if (fixtures.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -245,6 +222,8 @@ fun FixturesTab(
             val statusColor = when (match.status) {
                 "live" -> NeonGreen
                 "completed" -> TextSecondary
+                "abandoned" -> AmberColor
+                "cancelled" -> ErrorRed
                 else -> AmberColor
             }
 
@@ -254,53 +233,59 @@ fun FixturesTab(
                     .clip(RoundedCornerShape(12.dp))
                     .background(SurfaceCard)
                     .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .clickable { onMatchClick(match.id) }
-                    .padding(16.dp)
+                    .padding(14.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        match.status.uppercase(),
-                        color = statusColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text("${match.totalOvers} overs", color = TextSecondary, fontSize = 12.sp)
+                    Text(match.status.uppercase(), color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${match.matchType} • ${match.totalOvers} ov", color = TextSecondary, fontSize = 11.sp)
                 }
+
                 Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        team1Name,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        "vs",
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-                    Text(
-                        team2Name,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.End
-                    )
+                    Text(team1Name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text("vs", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 8.dp))
+                    Text(team2Name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
                 }
 
                 match.resultText?.let {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(it, color = NeonGreen, fontSize = 12.sp)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onMatchClick(match.id) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Score", fontSize = 11.sp) }
+
+                    OutlinedButton(
+                        onClick = { onViewScorecard(match.id) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonBlue),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Live", fontSize = 11.sp) }
+
+                    OutlinedButton(
+                        onClick = { onViewAnalytics(match.id) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Analytics", fontSize = 11.sp) }
                 }
             }
         }

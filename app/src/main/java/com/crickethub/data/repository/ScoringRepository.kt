@@ -77,8 +77,7 @@ class ScoringRepository {
 
     suspend fun deleteLastBall(ballId: String) {
         SupabaseClient.client.postgrest["balls"]
-            .delete {
-                filter { eq("id", ballId) }
+            .delete { filter { eq("id", ballId) }
             }
     }
 

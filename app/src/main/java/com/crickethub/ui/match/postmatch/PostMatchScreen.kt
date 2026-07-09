@@ -1,49 +1,38 @@
 package com.crickethub.ui.match.postmatch
 
-import android.content.Context
-import android.content.Intent
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.pdf.PdfDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color as ComposeColor
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.io.File
-import java.io.FileOutputStream
 
-private val BackgroundDark = ComposeColor(0xFF030712)
-private val SurfaceCard = ComposeColor(0xFF111827)
-private val BorderColor = ComposeColor(0xFF1F2937)
-private val NeonGreen = ComposeColor(0xFF10B981)
-private val NeonBlue = ComposeColor(0xFF3B82F6)
-private val TextPrimary = ComposeColor(0xFFF9FAFB)
-private val TextSecondary = ComposeColor(0xFF9CA3AF)
-private val ErrorRed = ComposeColor(0xFFEF4444)
-private val AmberColor = ComposeColor(0xFFF59E0B)
-private val PurpleColor = ComposeColor(0xFF8B5CF6)
+private val BackgroundDark = Color(0xFF030712)
+private val SurfaceCard = Color(0xFF111827)
+private val BorderColor = Color(0xFF1F2937)
+private val NeonGreen = Color(0xFF10B981)
+private val NeonBlue = Color(0xFF3B82F6)
+private val TextPrimary = Color(0xFFF9FAFB)
+private val TextSecondary = Color(0xFF9CA3AF)
+private val ErrorRed = Color(0xFFEF4444)
+private val AmberColor = Color(0xFFF59E0B)
 
 @Composable
 fun PostMatchScreen(
@@ -53,8 +42,7 @@ fun PostMatchScreen(
     viewModel: PostMatchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    var showMotmDialog by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Result", "1st Inn", "2nd Inn", "MOTM")
 
@@ -75,27 +63,23 @@ fun PostMatchScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
-                }
-                Text(
-                    "Match Summary",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
-            Row {
-                IconButton(onClick = {
-                    exportPdf(context, uiState)
-                }) {
-                    Icon(Icons.Default.Share, contentDescription = "Export PDF", tint = NeonGreen)
-                }
+            Text(
+                "Match Summary",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = {
+                clipboardManager.setText(AnnotatedString(uiState.resultText))
+            }) {
+                Icon(Icons.Default.Share, contentDescription = "Share", tint = NeonGreen)
             }
         }
 
@@ -111,7 +95,7 @@ fun PostMatchScreen(
                 Text(
                     uiState.resultText,
                     color = NeonGreen,
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
@@ -122,8 +106,8 @@ fun PostMatchScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             tabs.forEachIndexed { index, tab ->
                 val selected = selectedTab == index
@@ -139,7 +123,7 @@ fun PostMatchScreen(
                 ) {
                     Text(
                         tab,
-                        color = if (selected) ComposeColor.Black else TextSecondary,
+                        color = if (selected) Color.Black else TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
@@ -153,50 +137,62 @@ fun PostMatchScreen(
             }
         } else {
             when (selectedTab) {
-                0 -> ResultTab(uiState = uiState, onSaveResult = { viewModel.saveMatchResult(matchId) })
-                1 -> ScorecardTab(
+                0 -> ResultTab(uiState = uiState)
+                1 -> InningsTab(
+                    battingTeamName = uiState.innings1BattingTeamName,
+                    bowlingTeamName = uiState.innings1BowlingTeamName,
+                    innings = uiState.innings1,
                     batting = uiState.innings1Batting,
                     bowling = uiState.innings1Bowling,
-                    innings = uiState.innings1,
-                    teamName = uiState.team1?.name ?: "Team 1"
+                    bowlerMap = uiState.innings1Bowling.associate { it.player.id to it.player.fullName }
                 )
-                2 -> ScorecardTab(
+                2 -> InningsTab(
+                    battingTeamName = uiState.innings2BattingTeamName,
+                    bowlingTeamName = uiState.innings2BowlingTeamName,
+                    innings = uiState.innings2,
                     batting = uiState.innings2Batting,
                     bowling = uiState.innings2Bowling,
-                    innings = uiState.innings2,
-                    teamName = uiState.team2?.name ?: "Team 2"
+                    bowlerMap = uiState.innings2Bowling.associate { it.player.id to it.player.fullName }
                 )
-                3 -> MotmTab(
-                    uiState = uiState,
-                    onSelectMotm = { viewModel.selectMotm(it) }
-                )
+                3 -> MotmTab(uiState = uiState, onSelectMotm = { viewModel.selectMotm(it) })
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Save button
+            Button(
+                onClick = { viewModel.saveMatchResult(matchId) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) {
+                Text("Save & Complete Match", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }
 }
 
-// =============================================
-// RESULT TAB
-// =============================================
 @Composable
-fun ResultTab(uiState: PostMatchUiState, onSaveResult: () -> Unit) {
+fun ResultTab(uiState: PostMatchUiState) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Score summary
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(SurfaceCard)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                uiState.innings1?.let { i1 ->
+                // Innings 1
+                uiState.innings1?.let { inn ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,28 +200,31 @@ fun ResultTab(uiState: PostMatchUiState, onSaveResult: () -> Unit) {
                     ) {
                         Column {
                             Text(
-                                uiState.team1?.name ?: "Team 1",
+                                uiState.innings1BattingTeamName,
                                 color = NeonGreen,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                "${i1.totalRuns}/${i1.totalWickets}",
-                                color = TextPrimary,
-                                fontSize = 28.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Text("1st Innings", color = TextSecondary, fontSize = 11.sp)
                         }
                         Text(
-                            "(${i1.totalBalls / 6}.${i1.totalBalls % 6} ov)",
+                            "${inn.totalRuns}/${inn.totalWickets}",
+                            color = TextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "(${inn.totalBalls / 6}.${inn.totalBalls % 6} ov)",
                             color = TextSecondary,
-                            fontSize = 14.sp
+                            fontSize = 13.sp
                         )
                     }
                 }
 
-                uiState.innings2?.let { i2 ->
-                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                HorizontalDivider(color = BorderColor)
+
+                // Innings 2
+                uiState.innings2?.let { inn ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -233,519 +232,263 @@ fun ResultTab(uiState: PostMatchUiState, onSaveResult: () -> Unit) {
                     ) {
                         Column {
                             Text(
-                                uiState.team2?.name ?: "Team 2",
+                                uiState.innings2BattingTeamName,
                                 color = NeonBlue,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                "${i2.totalRuns}/${i2.totalWickets}",
-                                color = TextPrimary,
-                                fontSize = 28.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Text("2nd Innings", color = TextSecondary, fontSize = 11.sp)
                         }
                         Text(
-                            "(${i2.totalBalls / 6}.${i2.totalBalls % 6} ov)",
+                            "${inn.totalRuns}/${inn.totalWickets}",
+                            color = TextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "(${inn.totalBalls / 6}.${inn.totalBalls % 6} ov)",
                             color = TextSecondary,
-                            fontSize = 14.sp
+                            fontSize = 13.sp
                         )
                     }
                 }
             }
         }
 
-        // MOTM preview
+        // Player of the Match
         uiState.selectedMotm?.let { motm ->
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(AmberColor.copy(alpha = 0.1f))
-                        .border(1.dp, AmberColor.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .border(1.dp, AmberColor, RoundedCornerShape(12.dp))
                         .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = AmberColor)
-                    Column {
-                        Text("Player of the Match", color = AmberColor, fontSize = 12.sp)
-                        Text(motm.fullName, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
+                    Text("⭐", fontSize = 28.sp)
+                    Text("Player of the Match", color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(motm.fullName, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
-            }
-        }
-
-        // Save result button
-        item {
-            Button(
-                onClick = onSaveResult,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Save & Complete Match", color = ComposeColor.Black, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
-// =============================================
-// SCORECARD TAB
-// =============================================
 @Composable
-fun ScorecardTab(
+fun InningsTab(
+    battingTeamName: String,
+    bowlingTeamName: String,
+    innings: com.crickethub.data.model.Innings?,
     batting: List<BatsmanScorecard>,
     bowling: List<BowlerScorecard>,
-    innings: com.crickethub.data.model.Innings?,
-    teamName: String
+    bowlerMap: Map<String, String>
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         // Batting header
         item {
-            Text(
-                "$teamName — Batting",
-                color = NeonGreen,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // Batting table header
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceCard)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text("Batsman", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(2f))
-                Text("R", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
-                Text("B", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
-                Text("4s", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("6s", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("SR", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+            Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+                Text(
+                    battingTeamName,
+                    color = NeonGreen,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Text("BATTING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("B", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("4s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("6s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("SR", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                }
+                HorizontalDivider(color = BorderColor)
             }
         }
 
-        items(batting) { batsman ->
-            BatsmanRow(batsman = batsman)
+        // Batting rows
+        val battedList = batting.filter { it.balls > 0 || it.isOut }
+        items(battedList) { stats ->
+            val dismissalText = buildPostMatchDismissalText(stats, bowlerMap)
+            Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stats.player.fullName,
+                            color = if (stats.isOut) TextSecondary else TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = if (!stats.isOut) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        Text(dismissalText, color = TextSecondary, fontSize = 11.sp)
+                    }
+                    Text("${stats.runs}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.balls}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.fours}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.sixes}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${"%.2f".format(stats.strikeRate)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                }
+                HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            }
         }
 
-        // Extras & Total
-        innings?.let { i ->
+        // Did Not Bat
+        val didNotBat = batting.filter { it.balls == 0 && !it.isOut }
+        if (didNotBat.isNotEmpty()) {
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(SurfaceCard)
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Extras", color = TextSecondary, fontSize = 12.sp)
-                        Text(
-                            "${i.extrasTotal} (W:${i.wides}, NB:${i.noBalls}, B:${i.byes}, LB:${i.legByes})",
-                            color = TextPrimary,
-                            fontSize = 12.sp
-                        )
+                Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text("Did Not Bat", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+                    Text(didNotBat.joinToString(", ") { it.player.fullName }, color = TextSecondary, fontSize = 12.sp)
+                }
+                HorizontalDivider(color = BorderColor)
+            }
+        }
+
+        // Extras + Total
+        item {
+            innings?.let { inn ->
+                Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard).padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Extras", color = TextSecondary, fontSize = 13.sp)
+                        Text("(w ${inn.wides}, nb ${inn.noBalls}, b 0, lb 0)", color = TextSecondary, fontSize = 12.sp)
+                        Text("${inn.extrasTotal}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "Total",
-                            color = TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "${i.totalRuns}/${i.totalWickets} (${i.totalBalls / 6}.${i.totalBalls % 6} ov)",
-                            color = TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("${inn.totalBalls / 6}.${inn.totalBalls % 6} Ov", color = TextSecondary, fontSize = 12.sp)
+                        Text("${inn.totalRuns}/${inn.totalWickets}", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+                HorizontalDivider(color = BorderColor)
             }
         }
 
         // Bowling header
         item {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Bowling",
-                color = NeonBlue,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceCard)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text("Bowler", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(2f))
-                Text("O", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
-                Text("M", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("R", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("W", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("Eco", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
-            }
-        }
-
-        items(bowling) { bowler ->
-            BowlerRow(bowler = bowler)
-        }
-    }
-}
-
-@Composable
-fun BatsmanRow(batsman: BatsmanScorecard) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(2f)) {
-            Text(
-                batsman.player.fullName,
-                color = if (batsman.isOut) TextSecondary else TextPrimary,
-                fontSize = 13.sp,
-                fontWeight = if (!batsman.isOut) FontWeight.SemiBold else FontWeight.Normal
-            )
-            if (batsman.isOut) {
+            Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
                 Text(
-                    batsman.dismissalType?.replace("_", " ")
-                        ?.replaceFirstChar { it.uppercase() } ?: "Out",
-                    color = ErrorRed,
-                    fontSize = 10.sp
+                    bowlingTeamName,
+                    color = NeonBlue,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                 )
-            } else {
-                Text("not out", color = NeonGreen, fontSize = 10.sp)
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Text("BOWLING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text("O", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("M", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("W", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("Eco", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                }
+                HorizontalDivider(color = BorderColor)
             }
         }
-        Text(
-            "${batsman.runs}",
-            color = TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(32.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${batsman.balls}",
-            color = TextSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(32.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${batsman.fours}",
-            color = NeonBlue,
-            fontSize = 13.sp,
-            modifier = Modifier.width(28.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${batsman.sixes}",
-            color = NeonGreen,
-            fontSize = 13.sp,
-            modifier = Modifier.width(28.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${"%.1f".format(batsman.strikeRate)}",
-            color = TextSecondary,
-            fontSize = 12.sp,
-            modifier = Modifier.width(44.dp),
-            textAlign = TextAlign.End
-        )
+
+        items(bowling) { stats ->
+            Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stats.player.fullName, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Text(stats.overs, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.maidens}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.runs}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text(
+                        "${stats.wickets}",
+                        color = if (stats.wickets > 0) NeonGreen else TextSecondary,
+                        fontSize = 14.sp,
+                        fontWeight = if (stats.wickets > 0) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.width(28.dp),
+                        textAlign = TextAlign.End
+                    )
+                    Text("${"%.2f".format(stats.economy)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                }
+                HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            }
+        }
     }
-    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+}
+
+fun buildPostMatchDismissalText(stats: BatsmanScorecard, bowlerMap: Map<String, String>): String {
+    if (!stats.isOut) return "not out"
+    val bowlerName = stats.bowlerOnWicket?.let { bowlerMap[it] } ?: ""
+    val fielder = stats.fielderName ?: ""
+    return when (stats.dismissalType) {
+        "bowled" -> "b $bowlerName"
+        "caught" -> if (fielder.isNotBlank()) "c $fielder b $bowlerName" else "c & b $bowlerName"
+        "lbw" -> "lbw b $bowlerName"
+        "run_out" -> if (fielder.isNotBlank()) "run out ($fielder)" else "run out"
+        "stumped" -> if (fielder.isNotBlank()) "st $fielder b $bowlerName" else "st Keeper b $bowlerName"
+        "hit_wicket" -> "hit wicket b $bowlerName"
+        "retired_out" -> "retired out"
+        "retired_hurt" -> "retired hurt"
+        "obstructing" -> "obstructing the field"
+        else -> stats.dismissalType?.replace("_", " ") ?: "out"
+    }
 }
 
 @Composable
-fun BowlerRow(bowler: BowlerScorecard) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            bowler.player.fullName,
-            color = TextPrimary,
-            fontSize = 13.sp,
-            modifier = Modifier.weight(2f)
-        )
-        Text(
-            bowler.overs,
-            color = TextSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(32.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${bowler.maidens}",
-            color = TextSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(28.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${bowler.runs}",
-            color = TextPrimary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(28.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${bowler.wickets}",
-            color = NeonGreen,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(28.dp),
-            textAlign = TextAlign.End
-        )
-        Text(
-            "${"%.1f".format(bowler.economy)}",
-            color = when {
-                bowler.economy < 6 -> NeonGreen
-                bowler.economy < 8 -> AmberColor
-                else -> ErrorRed
-            },
-            fontSize = 12.sp,
-            modifier = Modifier.width(40.dp),
-            textAlign = TextAlign.End
-        )
+fun MotmTab(uiState: PostMatchUiState, onSelectMotm: (com.crickethub.data.model.Player) -> Unit) {
+    if (uiState.motmCandidates.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No candidates available", color = TextSecondary)
+        }
+        return
     }
-    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
-}
 
-// =============================================
-// MOTM TAB
-// =============================================
-@Composable
-fun MotmTab(
-    uiState: PostMatchUiState,
-    onSelectMotm: (com.crickethub.data.model.Player) -> Unit
-) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
             Text(
-                "Player of the Match",
-                color = AmberColor,
+                "Select Player of the Match",
+                color = TextPrimary,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "Auto-suggested based on performance. Tap to override.",
-                color = TextSecondary,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp)
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
         }
 
-        items(uiState.motmCandidates.take(10)) { candidate ->
+        items(uiState.motmCandidates) { candidate ->
             val isSelected = uiState.selectedMotm?.id == candidate.player.id
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isSelected) AmberColor.copy(alpha = 0.15f) else SurfaceCard
-                    )
-                    .border(
-                        1.dp,
-                        if (isSelected) AmberColor else BorderColor,
-                        RoundedCornerShape(12.dp)
-                    )
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) AmberColor.copy(alpha = 0.15f) else SurfaceCard)
+                    .border(1.dp, if (isSelected) AmberColor else BorderColor, RoundedCornerShape(10.dp))
                     .clickable { onSelectMotm(candidate.player) }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (isSelected) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = null,
-                            tint = AmberColor,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .border(1.dp, BorderColor, CircleShape)
-                        )
-                    }
-                    Column {
-                        Text(
-                            candidate.player.fullName,
-                            color = if (isSelected) AmberColor else TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
-                        Text(
-                            buildString {
-                                if (candidate.runs > 0) append("${candidate.runs} runs")
-                                if (candidate.runs > 0 && candidate.wickets > 0) append(" | ")
-                                if (candidate.wickets > 0) append("${candidate.wickets} wkts")
-                            },
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(candidate.player.fullName, color = if (isSelected) AmberColor else TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        buildString {
+                            if (candidate.runs > 0) append("${candidate.runs} runs")
+                            if (candidate.runs > 0 && candidate.wickets > 0) append(", ")
+                            if (candidate.wickets > 0) append("${candidate.wickets} wkts")
+                        },
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
                 }
-                Text(
-                    "Score: ${candidate.score.toInt()}",
-                    color = if (isSelected) AmberColor else TextSecondary,
-                    fontSize = 12.sp
-                )
+                if (isSelected) Text("⭐", fontSize = 20.sp)
             }
         }
-    }
-}
-
-// =============================================
-// PDF EXPORT
-// =============================================
-fun exportPdf(context: Context, uiState: PostMatchUiState) {
-    try {
-        val document = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
-        val page = document.startPage(pageInfo)
-        val canvas: Canvas = page.canvas
-
-        val titlePaint = Paint().apply {
-            color = Color.BLACK
-            textSize = 20f
-            isFakeBoldText = true
-        }
-        val headerPaint = Paint().apply {
-            color = Color.DKGRAY
-            textSize = 14f
-            isFakeBoldText = true
-        }
-        val bodyPaint = Paint().apply {
-            color = Color.BLACK
-            textSize = 12f
-        }
-        val smallPaint = Paint().apply {
-            color = Color.GRAY
-            textSize = 10f
-        }
-
-        var y = 50f
-
-        // Title
-        canvas.drawText("CricketHub — Match Scorecard", 30f, y, titlePaint)
-        y += 30f
-
-        // Result
-        canvas.drawText(uiState.resultText, 30f, y, headerPaint)
-        y += 25f
-
-        // MOTM
-        uiState.selectedMotm?.let {
-            canvas.drawText("Player of the Match: ${it.fullName}", 30f, y, headerPaint)
-            y += 25f
-        }
-
-        y += 10f
-
-        // Innings 1
-        uiState.innings1?.let { i1 ->
-            canvas.drawText(
-                "${uiState.team1?.name ?: "Team 1"}: ${i1.totalRuns}/${i1.totalWickets} (${i1.totalBalls / 6}.${i1.totalBalls % 6} ov)",
-                30f, y, headerPaint
-            )
-            y += 20f
-
-            canvas.drawText("Batsman                    R    B   4s  6s    SR", 30f, y, smallPaint)
-            y += 15f
-
-            uiState.innings1Batting.forEach { b ->
-                val status = if (b.isOut) b.dismissalType?.replace("_", " ") ?: "out" else "not out"
-                canvas.drawText(
-                    "${b.player.fullName.take(20).padEnd(20)} ${b.runs.toString().padStart(4)} ${b.balls.toString().padStart(4)} ${b.fours.toString().padStart(4)} ${b.sixes.toString().padStart(3)} ${"%.1f".format(b.strikeRate).padStart(6)}",
-                    30f, y, bodyPaint
-                )
-                y += 14f
-            }
-
-            canvas.drawText("Extras: ${i1.extrasTotal}", 30f, y, bodyPaint)
-            y += 20f
-        }
-
-        // Innings 2
-        uiState.innings2?.let { i2 ->
-            canvas.drawText(
-                "${uiState.team2?.name ?: "Team 2"}: ${i2.totalRuns}/${i2.totalWickets} (${i2.totalBalls / 6}.${i2.totalBalls % 6} ov)",
-                30f, y, headerPaint
-            )
-            y += 20f
-
-            canvas.drawText("Batsman                    R    B   4s  6s    SR", 30f, y, smallPaint)
-            y += 15f
-
-            uiState.innings2Batting.forEach { b ->
-                canvas.drawText(
-                    "${b.player.fullName.take(20).padEnd(20)} ${b.runs.toString().padStart(4)} ${b.balls.toString().padStart(4)} ${b.fours.toString().padStart(4)} ${b.sixes.toString().padStart(3)} ${"%.1f".format(b.strikeRate).padStart(6)}",
-                    30f, y, bodyPaint
-                )
-                y += 14f
-            }
-
-            canvas.drawText("Extras: ${i2.extrasTotal}", 30f, y, bodyPaint)
-            y += 20f
-        }
-
-        document.finishPage(page)
-
-        // Save file
-        val file = File(context.cacheDir, "scorecard_${System.currentTimeMillis()}.pdf")
-        document.writeTo(FileOutputStream(file))
-        document.close()
-
-        // Share
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.provider",
-            file
-        )
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(Intent.createChooser(intent, "Share Scorecard"))
-
-    } catch (e: Exception) {
-        android.util.Log.e("CricketHub", "PDF error: ${e.message}", e)
     }
 }

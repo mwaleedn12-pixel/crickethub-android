@@ -2,6 +2,7 @@ package com.crickethub.ui.match
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,10 +26,11 @@ private val SurfaceCard = Color(0xFF111827)
 private val BorderColor = Color(0xFF1F2937)
 private val NeonGreen = Color(0xFF10B981)
 private val NeonBlue = Color(0xFF3B82F6)
-private val PurpleColor = Color(0xFF8B5CF6)
 private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val AmberColor = Color(0xFFF59E0B)
+private val ErrorRed = Color(0xFFEF4444)
+private val PurpleColor = Color(0xFF8B5CF6)
 
 @Composable
 fun MatchesScreen(
@@ -64,7 +66,14 @@ fun MatchesScreen(
                 }
             } else if (uiState.matches.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No matches yet. Tap + to create one.", color = TextSecondary)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("🏏", fontSize = 48.sp)
+                        Text("No matches yet", color = TextSecondary, fontSize = 16.sp)
+                        Text("Tap + to create one", color = TextSecondary, fontSize = 13.sp)
+                    }
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -75,7 +84,9 @@ fun MatchesScreen(
                             team2Name = uiState.teams.find { it.id == match.team2Id }?.name ?: "Team 2",
                             onClick = { onMatchClick(match.id) },
                             onViewScorecard = { onViewScorecard(match.id) },
-                            onViewAnalytics = { onViewAnalytics(match.id) }
+                            onViewAnalytics = { onViewAnalytics(match.id) },
+                            onAbandon = { viewModel.abandonMatch(match.id) },
+                            onCancel = { viewModel.cancelMatch(match.id) }
                         )
                     }
                 }
@@ -91,11 +102,17 @@ fun MatchCard(
     team2Name: String,
     onClick: () -> Unit,
     onViewScorecard: () -> Unit,
-    onViewAnalytics: () -> Unit
+    onViewAnalytics: () -> Unit,
+    onAbandon: () -> Unit,
+    onCancel: () -> Unit
 ) {
+    var showMoreMenu by remember { mutableStateOf(false) }
+
     val statusColor = when (match.status) {
         "live" -> NeonGreen
         "completed" -> TextSecondary
+        "abandoned" -> AmberColor
+        "cancelled" -> ErrorRed
         else -> AmberColor
     }
 
@@ -112,13 +129,55 @@ fun MatchCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                match.status.uppercase(),
-                color = statusColor,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text("${match.totalOvers} overs", color = TextSecondary, fontSize = 12.sp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    match.status.uppercase(),
+                    color = statusColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                match.title?.let {
+                    Text("• $it", color = TextSecondary, fontSize = 11.sp)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${match.matchType} • ${match.totalOvers} ov",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Box {
+                    IconButton(
+                        onClick = { showMoreMenu = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Text("⋮", color = TextSecondary, fontSize = 18.sp)
+                    }
+                    DropdownMenu(
+                        expanded = showMoreMenu,
+                        onDismissRequest = { showMoreMenu = false },
+                        modifier = Modifier.background(SurfaceCard)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("🏳️ Abandon Match", color = AmberColor) },
+                            onClick = {
+                                onAbandon()
+                                showMoreMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("❌ Cancel Match", color = ErrorRed) },
+                            onClick = {
+                                onCancel()
+                                showMoreMenu = false
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -135,8 +194,12 @@ fun MatchCard(
                 fontSize = 16.sp,
                 modifier = Modifier.weight(1f)
             )
-            Text("vs", color = TextSecondary, fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 8.dp))
+            Text(
+                "vs",
+                color = TextSecondary,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
             Text(
                 team2Name,
                 color = TextPrimary,
@@ -147,12 +210,18 @@ fun MatchCard(
         }
 
         match.venue?.let {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text("📍 $it", color = TextSecondary, fontSize = 12.sp)
+        }
+
+        match.resultText?.let {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(it, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Action buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
