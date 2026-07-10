@@ -61,16 +61,16 @@ data class PostMatchUiState(
     val innings2: Innings? = null,
     val team1: Team? = null,
     val team2: Team? = null,
-    // Innings 1
     val innings1BattingTeamName: String = "",
     val innings1BowlingTeamName: String = "",
     val innings1Batting: List<BatsmanScorecard> = emptyList(),
     val innings1Bowling: List<BowlerScorecard> = emptyList(),
-    // Innings 2
     val innings2BattingTeamName: String = "",
     val innings2BowlingTeamName: String = "",
     val innings2Batting: List<BatsmanScorecard> = emptyList(),
     val innings2Bowling: List<BowlerScorecard> = emptyList(),
+    val inn1Balls: List<Ball> = emptyList(),
+    val inn2Balls: List<Ball> = emptyList(),
     val motmCandidates: List<MotmCandidate> = emptyList(),
     val selectedMotm: Player? = null,
     val resultText: String = "",
@@ -108,37 +108,35 @@ class PostMatchViewModel : ViewModel() {
                 val balls2 = if (innings2 != null)
                     scoringRepository.getBallsByInnings(innings2.id) else emptyList()
 
-                // Innings 1 — correct teams
-                val inn1BattingTeamId = innings1?.battingTeamId ?: match.battingFirstId ?: match.team1Id
+                // Innings 1 teams
+                val inn1BattingTeamId = innings1?.battingTeamId
+                    ?: match.battingFirstId
+                    ?: match.team1Id
                 val inn1BowlingTeamId = innings1?.bowlingTeamId
                     ?: if (inn1BattingTeamId == match.team1Id) match.team2Id else match.team1Id
                 val inn1BattingTeamName = if (inn1BattingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
                 val inn1BowlingTeamName = if (inn1BowlingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
 
-                val inn1BatPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn1BattingTeamId)
-                val inn1BowlPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn1BowlingTeamId)
-
-                // Innings 2 — correct teams (opposite of innings 1)
+                // Innings 2 teams (opposite of innings 1)
                 val inn2BattingTeamId = inn1BowlingTeamId
                 val inn2BowlingTeamId = inn1BattingTeamId
                 val inn2BattingTeamName = inn1BowlingTeamName
                 val inn2BowlingTeamName = inn1BattingTeamName
 
+                val inn1BatPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn1BattingTeamId)
+                val inn1BowlPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn1BowlingTeamId)
                 val inn2BatPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn2BattingTeamId)
                 val inn2BowlPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn2BowlingTeamId)
 
-                // Bowling scorecard — STRICT: sirf us innings ke bowlers
-                val innings1Batting = computeBattingScorecard(balls1, inn1BatPlayers, balls1)
+                val innings1Batting = computeBattingScorecard(balls1, inn1BatPlayers)
                 val innings1Bowling = computeBowlingScorecard(balls1, inn1BowlPlayers)
-                val innings2Batting = computeBattingScorecard(balls2, inn2BatPlayers, balls2)
+                val innings2Batting = computeBattingScorecard(balls2, inn2BatPlayers)
                 val innings2Bowling = computeBowlingScorecard(balls2, inn2BowlPlayers)
 
-                // MOTM — saare players se
                 val allPlayers = (inn1BatPlayers + inn1BowlPlayers + inn2BatPlayers + inn2BowlPlayers)
                     .distinctBy { it.id }
                 val motmCandidates = computeMotmCandidates(allPlayers, balls1, balls2)
 
-                // Result text — innings se compute karo
                 val resultText = computeResultText(
                     match, innings1, innings2, team1, team2,
                     inn1BattingTeamId, inn1BattingTeamName, inn1BowlingTeamName
@@ -160,6 +158,8 @@ class PostMatchViewModel : ViewModel() {
                         innings1Bowling = innings1Bowling,
                         innings2Batting = innings2Batting,
                         innings2Bowling = innings2Bowling,
+                        inn1Balls = balls1,
+                        inn2Balls = balls2,
                         motmCandidates = motmCandidates,
                         selectedMotm = motmCandidates.firstOrNull()?.player,
                         resultText = resultText
@@ -248,8 +248,14 @@ class PostMatchViewModel : ViewModel() {
             } else {
                 listOf(battingFirstId, battingSecondId).forEach { teamId ->
                     val entry = SupabaseClient.client.postgrest["tournament_teams"]
-                        .select { filter { eq("tournament_id", tournamentId); eq("team_id", teamId) } }
+                        .select {
+                            filter {
+                                eq("tournament_id", tournamentId)
+                                eq("team_id", teamId)
+                            }
+                        }
                         .decodeSingleOrNull<TournamentTeam>()
+
                     if (entry != null) {
                         SupabaseClient.client.postgrest["tournament_teams"]
                             .update({
@@ -257,7 +263,10 @@ class PostMatchViewModel : ViewModel() {
                                 set("matches_played", entry.matchesPlayed + 1)
                                 set("draws", entry.draws + 1)
                             }) {
-                                filter { eq("tournament_id", tournamentId); eq("team_id", teamId) }
+                                filter {
+                                    eq("tournament_id", tournamentId)
+                                    eq("team_id", teamId)
+                                }
                             }
                     }
                 }
@@ -269,8 +278,7 @@ class PostMatchViewModel : ViewModel() {
 
     private fun computeBattingScorecard(
         balls: List<Ball>,
-        players: List<Player>,
-        inningsBalls: List<Ball>
+        players: List<Player>
     ): List<BatsmanScorecard> {
         if (players.isEmpty()) return emptyList()
         return players.map { player ->
@@ -285,15 +293,23 @@ class PostMatchViewModel : ViewModel() {
                         it.wicketType != "retired_hurt"
             }
             val wicketBall = playerBalls.firstOrNull { it.isWicket }
-            val dismissalType = wicketBall?.wicketType
-            val fielderName = wicketBall?.fielderName
-            val bowlerOnWicket = wicketBall?.bowlerId
             val sr = if (ballsFaced > 0) (runs.toDouble() / ballsFaced) * 100 else 0.0
             BatsmanScorecard(
-                player, runs, ballsFaced, fours, sixes, sr,
-                isOut, dismissalType, fielderName, bowlerOnWicket
+                player = player,
+                runs = runs,
+                balls = ballsFaced,
+                fours = fours,
+                sixes = sixes,
+                strikeRate = sr,
+                isOut = isOut,
+                dismissalType = wicketBall?.wicketType,
+                fielderName = wicketBall?.fielderName,
+                bowlerOnWicket = wicketBall?.bowlerId
             )
-        }.sortedWith(compareByDescending<BatsmanScorecard> { it.balls > 0 || it.isOut }.thenByDescending { it.runs })
+        }.sortedWith(
+            compareByDescending<BatsmanScorecard> { it.balls > 0 || it.isOut }
+                .thenByDescending { it.runs }
+        )
     }
 
     private fun computeBowlingScorecard(
@@ -301,16 +317,19 @@ class PostMatchViewModel : ViewModel() {
         players: List<Player>
     ): List<BowlerScorecard> {
         if (players.isEmpty()) return emptyList()
-        // SIRF is innings ke balls use karo — koi mixing nahi
         return players.mapNotNull { player ->
             val playerBalls = balls.filter { it.bowlerId == player.id }
             if (playerBalls.isEmpty()) return@mapNotNull null
-            val legalBalls = playerBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+            val legalBalls = playerBalls.count {
+                it.extrasType != "wide" && it.extrasType != "no_ball"
+            }
             val overs = "${legalBalls / 6}.${legalBalls % 6}"
             val runs = playerBalls.sumOf { ball ->
-                when (ball.extrasType) { "bye", "leg_bye" -> 0; else -> ball.runsOffBat + (ball.extrasRuns ?: 0) }
+                when (ball.extrasType) {
+                    "bye", "leg_bye" -> 0
+                    else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
+                }
             }
-            // Wickets — sirf bowler ke wickets (run_out exclude)
             val wickets = playerBalls.count {
                 it.isWicket && it.wicketType !in listOf(
                     "run_out", "obstructing", "handled_ball",
@@ -321,10 +340,21 @@ class PostMatchViewModel : ViewModel() {
             val wides = playerBalls.count { it.extrasType == "wide" }
             val noBalls = playerBalls.count { it.extrasType == "no_ball" }
             val maidens = playerBalls.groupBy { it.overNo }.values.count { overBalls ->
-                overBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" } == 6 &&
+                overBalls.count {
+                    it.extrasType != "wide" && it.extrasType != "no_ball"
+                } == 6 &&
                         overBalls.sumOf { it.runsOffBat + (it.extrasRuns ?: 0) } == 0
             }
-            BowlerScorecard(player, overs, maidens, runs, wickets, economy, wides, noBalls)
+            BowlerScorecard(
+                player = player,
+                overs = overs,
+                maidens = maidens,
+                runs = runs,
+                wickets = wickets,
+                economy = economy,
+                wides = wides,
+                noBalls = noBalls
+            )
         }.sortedByDescending { it.wickets }
     }
 
@@ -340,24 +370,56 @@ class PostMatchViewModel : ViewModel() {
             val runs = battingBalls.sumOf { it.runsOffBat }
             val ballsFaced = battingBalls.count { it.extrasType != "wide" }.coerceAtLeast(1)
             val strikeRate = (runs.toDouble() / ballsFaced) * 100
-            val legalBallsBowled = bowlingBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+            val legalBallsBowled = bowlingBalls.count {
+                it.extrasType != "wide" && it.extrasType != "no_ball"
+            }
             val runsConceded = bowlingBalls.sumOf { ball ->
-                when (ball.extrasType) { "bye", "leg_bye" -> 0; else -> ball.runsOffBat + (ball.extrasRuns ?: 0) }
+                when (ball.extrasType) {
+                    "bye", "leg_bye" -> 0
+                    else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
+                }
             }
             val wickets = bowlingBalls.count {
-                it.isWicket && it.wicketType !in listOf("run_out", "obstructing", "retired_hurt")
+                it.isWicket && it.wicketType !in listOf(
+                    "run_out", "obstructing", "retired_hurt"
+                )
             }
-            val economy = if (legalBallsBowled > 0) (runsConceded.toDouble() / legalBallsBowled) * 6 else 99.0
+            val economy = if (legalBallsBowled > 0)
+                (runsConceded.toDouble() / legalBallsBowled) * 6 else 99.0
             val oversBowled = legalBallsBowled / 6
+
             if (runs == 0 && wickets == 0) return@mapNotNull null
 
             var score = runs.toDouble()
-            score += when { strikeRate > 150 -> 15.0; strikeRate > 120 -> 8.0; else -> 0.0 }
-            score += when { runs >= 100 -> 25.0; runs >= 50 -> 10.0; else -> 0.0 }
+            score += when {
+                strikeRate > 150 -> 15.0
+                strikeRate > 120 -> 8.0
+                else -> 0.0
+            }
+            score += when {
+                runs >= 100 -> 25.0
+                runs >= 50 -> 10.0
+                else -> 0.0
+            }
             score += wickets * 25.0
             if (wickets >= 5) score += 20.0
-            if (oversBowled >= 2) score += when { economy < 6.0 -> 15.0; economy < 7.5 -> 8.0; else -> 0.0 }
-            MotmCandidate(player, score, runs, wickets, strikeRate, economy, 0)
+            if (oversBowled >= 2) {
+                score += when {
+                    economy < 6.0 -> 15.0
+                    economy < 7.5 -> 8.0
+                    else -> 0.0
+                }
+            }
+
+            MotmCandidate(
+                player = player,
+                score = score,
+                runs = runs,
+                wickets = wickets,
+                strikeRate = strikeRate,
+                economy = economy,
+                catches = 0
+            )
         }.sortedByDescending { it.score }
     }
 
@@ -374,16 +436,12 @@ class PostMatchViewModel : ViewModel() {
         if (innings1 == null) return "Match result pending"
         if (innings2 == null) return "$inn1BattingTeamName scored ${innings1.totalRuns}/${innings1.totalWickets}"
 
-        // innings1 = first batting team ka score
-        // innings2 = second batting team ka score
         return when {
             innings2.totalRuns > innings1.totalRuns -> {
-                // Batting second team jeeta
                 val wicketsLeft = (match.playersPerSide - 1) - innings2.totalWickets
                 "$inn1BowlingTeamName won by $wicketsLeft wickets"
             }
             innings2.totalRuns < innings1.totalRuns -> {
-                // Batting first team jeeta
                 val margin = innings1.totalRuns - innings2.totalRuns
                 "$inn1BattingTeamName won by $margin runs"
             }
