@@ -4,7 +4,7 @@ import com.crickethub.data.model.Team
 import com.crickethub.data.model.TeamInsert
 import com.crickethub.data.remote.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.query.Columns
 
 class TeamRepository {
 
@@ -25,27 +25,40 @@ class TeamRepository {
     suspend fun createTeam(team: TeamInsert): Team {
         val joinCode = generateJoinCode()
         return client.postgrest["teams"]
-            .insert(mapOf(
-                "name" to team.name,
-                "short_name" to team.shortName,
-                "logo_url" to team.logoUrl,
-                "jersey_color" to (team.jerseyColor ?: "#10B981"),
-                "category" to (team.category ?: "Club"),
-                "country" to team.country,
-                "city" to team.city,
-                "home_ground" to team.homeGround,
-                "coach" to team.coach,
-                "join_code" to joinCode,
-                "is_public" to team.isPublic
-            )) {
-                select()
-            }
+            .insert(
+                TeamInsert(
+                    name = team.name,
+                    shortName = team.shortName,
+                    logoUrl = team.logoUrl,
+                    jerseyColor = team.jerseyColor ?: "#10B981",
+                    category = team.category ?: "Club",
+                    country = team.country,
+                    city = team.city,
+                    homeGround = team.homeGround,
+                    coach = team.coach,
+                    captainId = team.captainId,
+                    viceCaptainId = team.viceCaptainId,
+                    joinCode = joinCode,
+                    isPublic = team.isPublic
+                )
+            ) { select() }
             .decodeSingle()
     }
 
-    suspend fun updateTeam(teamId: String, updates: Map<String, Any?>): Team {
+    suspend fun updateTeam(teamId: String, name: String, shortName: String?, jerseyColor: String?, category: String?, country: String?, city: String?, homeGround: String?, coach: String?): Team {
         return client.postgrest["teams"]
-            .update(updates) {
+            .update(
+                TeamInsert(
+                    name = name,
+                    shortName = shortName,
+                    jerseyColor = jerseyColor,
+                    category = category,
+                    country = country,
+                    city = city,
+                    homeGround = homeGround,
+                    coach = coach
+                )
+            ) {
                 filter { eq("id", teamId) }
                 select()
             }
@@ -55,13 +68,6 @@ class TeamRepository {
     suspend fun deleteTeam(teamId: String) {
         client.postgrest["teams"]
             .delete { filter { eq("id", teamId) } }
-    }
-
-    suspend fun getTeamsByUser(): List<Team> {
-        val userId = client.auth.currentUserOrNull()?.id ?: return emptyList()
-        return client.postgrest["teams"]
-            .select()
-            .decodeList()
     }
 
     suspend fun getTeamByJoinCode(code: String): Team? {

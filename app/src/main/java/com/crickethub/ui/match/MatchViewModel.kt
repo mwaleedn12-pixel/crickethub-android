@@ -36,7 +36,6 @@ class MatchViewModel : ViewModel() {
 
     init {
         loadMatches()
-        loadTeams()
     }
 
     fun loadMatches() {
@@ -46,19 +45,7 @@ class MatchViewModel : ViewModel() {
                 val matches = matchRepository.getAllMatches()
                 _uiState.update { it.copy(matches = matches, isLoading = false) }
             } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Error loading matches: ${e.message}", e)
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
-            }
-        }
-    }
-
-    fun loadMatchById(matchId: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                val match = matchRepository.getMatchById(matchId)
-                _uiState.update { it.copy(currentMatch = match, isLoading = false) }
-            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Load matches error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
@@ -75,18 +62,34 @@ class MatchViewModel : ViewModel() {
         }
     }
 
+    fun loadMatchById(matchId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val match = matchRepository.getMatchById(matchId)
+                _uiState.update { it.copy(currentMatch = match, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
     fun createMatch(matchInsert: MatchInsert) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id ?: return@launch
+                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
                 val insertWithUser = matchInsert.copy(createdBy = userId)
                 val match = matchRepository.createMatch(insertWithUser)
                 _uiState.update {
-                    it.copy(currentMatch = match, isLoading = false, matchCreated = true)
+                    it.copy(
+                        currentMatch = match,
+                        isLoading = false,
+                        matchCreated = true
+                    )
                 }
             } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Error creating match: ${e.message}", e)
+                android.util.Log.e("CricketHub", "Create match error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
@@ -99,9 +102,12 @@ class MatchViewModel : ViewModel() {
                     tossWinnerId
                 } else {
                     val match = _uiState.value.currentMatch
-                    if (match?.team1Id == tossWinnerId) match.team2Id else match?.team1Id ?: tossWinnerId
+                    if (match?.team1Id == tossWinnerId) match.team2Id
+                    else match?.team1Id ?: tossWinnerId
                 }
-                val updated = matchRepository.updateToss(matchId, tossWinnerId, tossDecision, battingFirstId)
+                val updated = matchRepository.updateToss(
+                    matchId, tossWinnerId, tossDecision, battingFirstId
+                )
                 _uiState.update { it.copy(currentMatch = updated) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -163,5 +169,9 @@ class MatchViewModel : ViewModel() {
 
     fun resetMatchCreated() {
         _uiState.update { it.copy(matchCreated = false) }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
     }
 }

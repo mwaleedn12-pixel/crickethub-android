@@ -69,7 +69,6 @@ class TournamentRepository {
                         team2Id = teams[j].id,
                         totalOvers = totalOvers,
                         createdBy = createdBy,
-                        status = "scheduled"
                     )
                 )
             }

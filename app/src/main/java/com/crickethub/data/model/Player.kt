@@ -53,8 +53,24 @@ data class PlayerInsert(
     @SerialName("debut_date") val debutDate: String? = null
 )
 
+@Serializable
+data class PlayerUpdate(
+    @SerialName("full_name") val fullName: String? = null,
+    val nickname: String? = null,
+    @SerialName("jersey_no") val jerseyNo: Int? = null,
+    @SerialName("date_of_birth") val dateOfBirth: String? = null,
+    val gender: String? = null,
+    val country: String? = null,
+    val city: String? = null,
+    @SerialName("batting_hand") val battingHand: String? = null,
+    @SerialName("bowling_hand") val bowlingHand: String? = null,
+    @SerialName("bowling_style") val bowlingStyle: String? = null,
+    val role: String? = null,
+    val availability: String? = null,
+    @SerialName("injury_status") val injuryStatus: String? = null
+)
+
 data class PlayerStats(
-    // Batting
     val matches: Int = 0,
     val innings: Int = 0,
     val runs: Int = 0,
@@ -70,7 +86,6 @@ data class PlayerStats(
     val notOuts: Int = 0,
     val boundaryPercent: Double = 0.0,
     val dotBallPercent: Double = 0.0,
-    // Bowling
     val oversBowled: Double = 0.0,
     val maidens: Int = 0,
     val runsConceded: Int = 0,
@@ -84,17 +99,16 @@ data class PlayerStats(
     val dotBalls: Int = 0,
     val wides: Int = 0,
     val noBalls: Int = 0,
-    // Fielding
     val catches: Int = 0,
     val runOuts: Int = 0,
     val stumpings: Int = 0,
     val missedChances: Int = 0
 )
 
-// Bowling style options based on hand
 val RIGHT_HAND_BOWLING_STYLES = listOf(
     "Fast", "Fast Medium", "Medium", "Off Spin", "Leg Spin"
 )
+
 val LEFT_HAND_BOWLING_STYLES = listOf(
     "Fast", "Fast Medium", "Medium", "Chinaman", "Orthodox"
 )

@@ -2,33 +2,31 @@ package com.crickethub.data.repository
 
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.MatchInsert
+import com.crickethub.data.model.PlayingXI
 import com.crickethub.data.model.PlayingXIInsert
 import com.crickethub.data.remote.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Order
 
 class MatchRepository {
 
+    private val client = SupabaseClient.client
+
     suspend fun getAllMatches(): List<Match> {
-        return SupabaseClient.client.postgrest["matches"]
-            .select {
-                order("created_at", Order.DESCENDING)
-            }
-            .decodeList<Match>()
+        return client.postgrest["matches"]
+            .select()
+            .decodeList()
     }
 
-    suspend fun getMatchById(id: String): Match? {
-        return SupabaseClient.client.postgrest["matches"]
-            .select {
-                filter { eq("id", id) }
-            }
-            .decodeSingleOrNull<Match>()
+    suspend fun getMatchById(matchId: String): Match? {
+        return client.postgrest["matches"]
+            .select { filter { eq("id", matchId) } }
+            .decodeSingleOrNull()
     }
 
     suspend fun createMatch(match: MatchInsert): Match {
-        return SupabaseClient.client.postgrest["matches"]
+        return client.postgrest["matches"]
             .insert(match) { select() }
-            .decodeSingle<Match>()
+            .decodeSingle()
     }
 
     suspend fun updateToss(
@@ -37,7 +35,7 @@ class MatchRepository {
         tossDecision: String,
         battingFirstId: String
     ): Match {
-        return SupabaseClient.client.postgrest["matches"]
+        return client.postgrest["matches"]
             .update({
                 set("toss_winner_id", tossWinnerId)
                 set("toss_decision", tossDecision)
@@ -47,28 +45,17 @@ class MatchRepository {
                 filter { eq("id", matchId) }
                 select()
             }
-            .decodeSingle<Match>()
+            .decodeSingle()
+    }
+
+    suspend fun getPlayingXI(matchId: String): List<PlayingXI> {
+        return client.postgrest["playing_xi"]
+            .select { filter { eq("match_id", matchId) } }
+            .decodeList()
     }
 
     suspend fun insertPlayingXI(players: List<PlayingXIInsert>) {
-        SupabaseClient.client.postgrest["playing_xi"]
-            .insert(players)
-    }
-
-    suspend fun getPlayingXI(matchId: String): List<PlayingXIInsert> {
-        return SupabaseClient.client.postgrest["playing_xi"]
-            .select {
-                filter { eq("match_id", matchId) }
-            }
-            .decodeList<PlayingXIInsert>()
-    }
-
-    suspend fun isPlayingXISaved(matchId: String): Boolean {
-        val result = SupabaseClient.client.postgrest["playing_xi"]
-            .select {
-                filter { eq("match_id", matchId) }
-            }
-            .decodeList<PlayingXIInsert>()
-        return result.size >= 22
+        if (players.isEmpty()) return
+        client.postgrest["playing_xi"].insert(players)
     }
 }

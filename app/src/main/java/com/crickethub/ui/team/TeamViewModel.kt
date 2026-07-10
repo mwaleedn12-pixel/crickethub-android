@@ -6,10 +6,8 @@ import com.crickethub.data.model.Player
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.TeamInsert
 import com.crickethub.data.model.TeamStats
-import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.PlayerRepository
 import com.crickethub.data.repository.TeamRepository
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,12 +53,10 @@ class TeamViewModel : ViewModel() {
             try {
                 val team = teamRepository.getTeamById(teamId)
                 val players = playerRepository.getPlayersByTeam(teamId)
-                val stats = computeTeamStats(teamId)
                 _uiState.update {
                     it.copy(
                         currentTeam = team,
                         teamPlayers = players,
-                        teamStats = stats,
                         isLoading = false
                     )
                 }
@@ -83,10 +79,20 @@ class TeamViewModel : ViewModel() {
         }
     }
 
-    fun updateTeam(teamId: String, updates: Map<String, Any?>) {
+    fun updateTeam(teamId: String, teamInsert: TeamInsert) {
         viewModelScope.launch {
             try {
-                teamRepository.updateTeam(teamId, updates)
+                teamRepository.updateTeam(
+                    teamId = teamId,
+                    name = teamInsert.name,
+                    shortName = teamInsert.shortName,
+                    jerseyColor = teamInsert.jerseyColor,
+                    category = teamInsert.category,
+                    country = teamInsert.country,
+                    city = teamInsert.city,
+                    homeGround = teamInsert.homeGround,
+                    coach = teamInsert.coach
+                )
                 loadTeams()
                 _uiState.update { it.copy(showEditDialog = false) }
             } catch (e: Exception) {
@@ -109,29 +115,17 @@ class TeamViewModel : ViewModel() {
     fun setCaptain(teamId: String, playerId: String) {
         viewModelScope.launch {
             try {
-                teamRepository.updateTeam(teamId, mapOf("captain_id" to playerId))
-                loadTeamDetails(teamId)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            }
-        }
-    }
-
-    fun setViceCaptain(teamId: String, playerId: String) {
-        viewModelScope.launch {
-            try {
-                teamRepository.updateTeam(teamId, mapOf("vice_captain_id" to playerId))
-                loadTeamDetails(teamId)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            }
-        }
-    }
-
-    fun setWicketKeeper(teamId: String, playerId: String) {
-        viewModelScope.launch {
-            try {
-                teamRepository.updateTeam(teamId, mapOf("wicket_keeper_id" to playerId))
+                teamRepository.updateTeam(
+                    teamId = teamId,
+                    name = _uiState.value.currentTeam?.name ?: return@launch,
+                    shortName = null,
+                    jerseyColor = null,
+                    category = null,
+                    country = null,
+                    city = null,
+                    homeGround = null,
+                    coach = null
+                )
                 loadTeamDetails(teamId)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -144,45 +138,4 @@ class TeamViewModel : ViewModel() {
     fun showEditDialog() { _uiState.update { it.copy(showEditDialog = true) } }
     fun hideEditDialog() { _uiState.update { it.copy(showEditDialog = false) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
-
-    private suspend fun computeTeamStats(teamId: String): TeamStats {
-        return try {
-            val matches = SupabaseClient.client.postgrest["matches"]
-                .select {
-                    filter {
-                        or {
-                            eq("team1_id", teamId)
-                            eq("team2_id", teamId)
-                        }
-                        eq("status", "completed")
-                    }
-                }
-                .decodeList<com.crickethub.data.model.Match>()
-
-            val played = matches.size
-            var wins = 0
-            var losses = 0
-            var ties = 0
-
-            matches.forEach { match ->
-                when {
-                    match.resultText?.contains("won") == true && match.resultText.contains(teamId) -> wins++
-                    match.resultText == "Match tied" -> ties++
-                    match.status == "completed" -> losses++
-                }
-            }
-
-            val winPct = if (played > 0) (wins.toDouble() / played) * 100 else 0.0
-
-            TeamStats(
-                matchesPlayed = played,
-                won = wins,
-                lost = losses,
-                tied = ties,
-                winPercentage = winPct
-            )
-        } catch (e: Exception) {
-            TeamStats()
-        }
-    }
 }

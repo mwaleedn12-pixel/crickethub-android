@@ -4,9 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crickethub.data.model.MATCH_TYPES
 import com.crickethub.data.model.MatchInsert
 import com.crickethub.data.model.Team
 
@@ -26,7 +27,6 @@ private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
 private val BorderColor = Color(0xFF1F2937)
 private val NeonGreen = Color(0xFF10B981)
-private val NeonBlue = Color(0xFF3B82F6)
 private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val ErrorRed = Color(0xFFEF4444)
@@ -39,48 +39,42 @@ fun CreateMatchScreen(
     viewModel: MatchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var currentStep by remember { mutableIntStateOf(0) }
+    val steps = listOf("Match Info", "Teams", "Rules", "Officials", "Review")
 
-    var matchTitle by remember { mutableStateOf("") }
+    // Step 1 — Match Info
+    var title by remember { mutableStateOf("") }
     var selectedMatchType by remember { mutableStateOf("T20") }
-    var selectedOvers by remember { mutableStateOf(20) }
-    var customOvers by remember { mutableStateOf("") }
-    var selectedPlayers by remember { mutableStateOf(11) }
-    var venue by remember { mutableStateOf("") }
     var matchDate by remember { mutableStateOf("") }
     var matchTime by remember { mutableStateOf("") }
-    var selectedTeam1 by remember { mutableStateOf<Team?>(null) }
-    var selectedTeam2 by remember { mutableStateOf<Team?>(null) }
-    var showTeam1Dropdown by remember { mutableStateOf(false) }
-    var showTeam2Dropdown by remember { mutableStateOf(false) }
+    var venue by remember { mutableStateOf("") }
+    var customOvers by remember { mutableStateOf("20") }
 
-    // Match rules
-    var powerplayOvers by remember { mutableStateOf(6) }
-    var superOverEnabled by remember { mutableStateOf(false) }
-    var followOnEnabled by remember { mutableStateOf(false) }
+    // Step 2 — Teams
+    var team1Id by remember { mutableStateOf("") }
+    var team2Id by remember { mutableStateOf("") }
+    var playersPerSide by remember { mutableStateOf("11") }
+
+    // Step 3 — Rules
+    var powerplayOvers by remember { mutableStateOf("6") }
+    var powerplay2Overs by remember { mutableStateOf("0") }
+    var powerplay3Overs by remember { mutableStateOf("0") }
+    var maxOversPerBowler by remember { mutableStateOf("") }
+    var inningsBreak by remember { mutableStateOf("20") }
     var freeHitOnNoball by remember { mutableStateOf(true) }
-    var liveSharingEnabled by remember { mutableStateOf(true) }
+    var superOverEnabled by remember { mutableStateOf(false) }
+    var dlsEnabled by remember { mutableStateOf(false) }
+    var liveSharingEnabled by remember { mutableStateOf(false) }
+    var isPublic by remember { mutableStateOf(true) }
 
-    // Officials
-    var showOfficialsSection by remember { mutableStateOf(false) }
+    // Step 4 — Officials
     var umpire1 by remember { mutableStateOf("") }
     var umpire2 by remember { mutableStateOf("") }
     var thirdUmpire by remember { mutableStateOf("") }
     var matchReferee by remember { mutableStateOf("") }
     var scorerName by remember { mutableStateOf("") }
 
-    // Current step
-    var currentStep by remember { mutableIntStateOf(0) }
-    val steps = listOf("Match Info", "Teams", "Rules", "Officials", "Review")
-
-    val matchTypes = listOf(
-        "T20" to "T20 (20 overs)",
-        "ODI" to "ODI (50 overs)",
-        "T10" to "T10 (10 overs)",
-        "Test" to "Test Match",
-        "Custom" to "Custom Overs"
-    )
-
-    val playersOptions = listOf(6, 7, 8, 9, 10, 11)
+    LaunchedEffect(Unit) { viewModel.loadTeams() }
 
     LaunchedEffect(uiState.matchCreated) {
         if (uiState.matchCreated) {
@@ -89,52 +83,38 @@ fun CreateMatchScreen(
         }
     }
 
-    // Auto set overs based on match type
-    LaunchedEffect(selectedMatchType) {
-        selectedOvers = when (selectedMatchType) {
-            "T20" -> 20
-            "ODI" -> 50
-            "T10" -> 10
-            "Test" -> 90
-            else -> selectedOvers
-        }
-        powerplayOvers = when (selectedMatchType) {
-            "T20" -> 6
-            "ODI" -> 10
-            "T10" -> 2
-            else -> 6
-        }
-        followOnEnabled = selectedMatchType == "Test"
+    val totalOvers = when (selectedMatchType) {
+        "T5" -> 5; "T10" -> 10; "T20" -> 20; "ODI" -> 50; "Test" -> 90
+        "Custom" -> customOvers.toIntOrNull() ?: 20
+        else -> 20
     }
 
+    val defaultMaxOversPerBowler = totalOvers / 5
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+        cursorColor = NeonGreen, focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary,
+        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
+    )
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
+        modifier = Modifier.fillMaxSize().background(BackgroundDark)
     ) {
         // Header
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
-            Text(
-                "Create Match",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
+            Text("New Match", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.weight(1f))
         }
 
-        // Step indicator
+        // Step indicators
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             steps.forEachIndexed { index, step ->
@@ -152,319 +132,296 @@ fun CreateMatchScreen(
                             .background(
                                 when {
                                     isDone -> NeonGreen
-                                    isActive -> NeonBlue
+                                    isActive -> NeonGreen.copy(alpha = 0.5f)
                                     else -> BorderColor
                                 }
                             )
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         step,
-                        color = when {
-                            isDone -> NeonGreen
-                            isActive -> NeonBlue
-                            else -> TextSecondary
-                        },
+                        color = if (isActive) NeonGreen else TextSecondary,
                         fontSize = 9.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Step content
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        LazyColumn(
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             when (currentStep) {
 
-                // ========================
-                // STEP 0 — Match Info
-                // ========================
+                // ── STEP 0: Match Info ──────────────────────
                 0 -> {
-                    SectionTitle("Match Information")
-
-                    MatchTextField(
-                        value = matchTitle,
-                        onValueChange = { matchTitle = it },
-                        label = "Match Title (optional)"
-                    )
-
-                    SectionTitle("Match Type")
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        matchTypes.forEach { (type, label) ->
-                            val selected = selectedMatchType == type
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (selected) NeonGreen.copy(alpha = 0.15f) else SurfaceCard
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (selected) NeonGreen else BorderColor,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { selectedMatchType = type }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (selected) NeonGreen else TextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                                )
-                                if (selected) Text("✓", color = NeonGreen, fontSize = 16.sp)
+                    item {
+                        Text("Match Information", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = title, onValueChange = { title = it },
+                            label = { Text("Match Title (optional)") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                    item {
+                        Text("Match Type", color = TextSecondary, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            MATCH_TYPES.take(3).forEach { type ->
+                                MatchTypeChip(type, selectedMatchType) { selectedMatchType = it }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            MATCH_TYPES.drop(3).forEach { type ->
+                                MatchTypeChip(type, selectedMatchType) { selectedMatchType = it }
                             }
                         }
                     }
-
                     if (selectedMatchType == "Custom") {
-                        MatchTextField(
-                            value = customOvers,
-                            onValueChange = {
-                                if (it.all { c -> c.isDigit() } && it.length <= 3) {
-                                    customOvers = it
-                                    it.toIntOrNull()?.let { o -> selectedOvers = o }
-                                }
-                            },
-                            label = "Custom Overs"
-                        )
-                    }
-
-                    SectionTitle("Players per Side")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        playersOptions.forEach { count ->
-                            val selected = selectedPlayers == count
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (selected) NeonBlue.copy(alpha = 0.2f) else SurfaceCard
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (selected) NeonBlue else BorderColor,
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { selectedPlayers = count }
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "$count",
-                                    color = if (selected) NeonBlue else TextSecondary,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 15.sp
-                                )
-                            }
-                        }
-                    }
-
-                    SectionTitle("Match Details")
-                    MatchTextField(value = venue, onValueChange = { venue = it }, label = "Venue/Ground")
-                    MatchTextField(value = matchDate, onValueChange = { matchDate = it }, label = "Match Date (YYYY-MM-DD)")
-                    MatchTextField(value = matchTime, onValueChange = { matchTime = it }, label = "Match Time (HH:MM)")
-                }
-
-                // ========================
-                // STEP 1 — Teams
-                // ========================
-                1 -> {
-                    SectionTitle("Select Teams")
-
-                    Text("Team A", color = TextSecondary, fontSize = 13.sp)
-                    MatchTeamSelector(
-                        selectedTeam = selectedTeam1,
-                        teams = uiState.teams.filter { it.id != selectedTeam2?.id },
-                        expanded = showTeam1Dropdown,
-                        onExpand = { showTeam1Dropdown = true },
-                        onDismiss = { showTeam1Dropdown = false },
-                        onTeamSelected = { selectedTeam1 = it; showTeam1Dropdown = false }
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text("Team B", color = TextSecondary, fontSize = 13.sp)
-                    MatchTeamSelector(
-                        selectedTeam = selectedTeam2,
-                        teams = uiState.teams.filter { it.id != selectedTeam1?.id },
-                        expanded = showTeam2Dropdown,
-                        onExpand = { showTeam2Dropdown = true },
-                        onDismiss = { showTeam2Dropdown = false },
-                        onTeamSelected = { selectedTeam2 = it; showTeam2Dropdown = false }
-                    )
-                }
-
-                // ========================
-                // STEP 2 — Rules
-                // ========================
-                2 -> {
-                    SectionTitle("Match Rules")
-
-                    InfoRow("Match Type", selectedMatchType)
-                    InfoRow("Total Overs", "$selectedOvers overs")
-
-                    SectionTitle("Powerplay Overs")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Powerplay 1 overs", color = TextSecondary, fontSize = 13.sp)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            IconButton(
-                                onClick = { if (powerplayOvers > 1) powerplayOvers-- },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Text("-", color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Text(
-                                "$powerplayOvers",
-                                color = TextPrimary,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                        item {
+                            OutlinedTextField(
+                                value = customOvers,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) customOvers = it },
+                                label = { Text("Custom Overs") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth(), colors = fieldColors
                             )
-                            IconButton(
-                                onClick = { if (powerplayOvers < selectedOvers) powerplayOvers++ },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Text("+", color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = matchDate, onValueChange = { matchDate = it },
+                                label = { Text("Date (YYYY-MM-DD)") }, singleLine = true,
+                                modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                            OutlinedTextField(
+                                value = matchTime, onValueChange = { matchTime = it },
+                                label = { Text("Time (HH:MM)") }, singleLine = true,
+                                modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                        }
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = venue, onValueChange = { venue = it },
+                            label = { Text("Venue / Ground") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = playersPerSide,
+                            onValueChange = { if (it.all { c -> c.isDigit() } && (it.toIntOrNull() ?: 0) <= 15) playersPerSide = it },
+                            label = { Text("Players per Side") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                }
+
+                // ── STEP 1: Teams ───────────────────────────
+                1 -> {
+                    item {
+                        Text("Select Teams", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    item {
+                        Text("Team A", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                    items(uiState.teams) { team ->
+                        TeamSelectCard(
+                            team = team,
+                            isSelected = team1Id == team.id,
+                            isDisabled = team2Id == team.id,
+                            onClick = { team1Id = if (team1Id == team.id) "" else team.id }
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Team B", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                    items(uiState.teams) { team ->
+                        TeamSelectCard(
+                            team = team,
+                            isSelected = team2Id == team.id,
+                            isDisabled = team1Id == team.id,
+                            onClick = { team2Id = if (team2Id == team.id) "" else team.id }
+                        )
+                    }
+                }
+
+                // ── STEP 2: Rules ───────────────────────────
+                2 -> {
+                    item {
+                        Text("Match Rules", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    item {
+                        InfoCard("Total Overs: $totalOvers  •  Default Max/Bowler: $defaultMaxOversPerBowler")
+                    }
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = powerplayOvers,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) powerplayOvers = it },
+                                label = { Text("Powerplay 1 (PP)") }, singleLine = true,
+                                modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                            OutlinedTextField(
+                                value = powerplay2Overs,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) powerplay2Overs = it },
+                                label = { Text("Middle (P2)") }, singleLine = true,
+                                modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                            OutlinedTextField(
+                                value = powerplay3Overs,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) powerplay3Overs = it },
+                                label = { Text("Death (P3)") }, singleLine = true,
+                                modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                        }
+                    }
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = maxOversPerBowler,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) maxOversPerBowler = it },
+                                label = { Text("Max Overs/Bowler (default: $defaultMaxOversPerBowler)") },
+                                singleLine = true, modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                            OutlinedTextField(
+                                value = inningsBreak,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) inningsBreak = it },
+                                label = { Text("Innings Break (min)") }, singleLine = true,
+                                modifier = Modifier.weight(1f), colors = fieldColors
+                            )
+                        }
+                    }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            ToggleRow("Free Hit on No Ball", freeHitOnNoball) { freeHitOnNoball = it }
+                            ToggleRow("Super Over Enabled", superOverEnabled) { superOverEnabled = it }
+                            ToggleRow("DLS / Target Revision", dlsEnabled) { dlsEnabled = it }
+                            ToggleRow("Live Score Sharing", liveSharingEnabled) { liveSharingEnabled = it }
+                            ToggleRow("Public Match", isPublic) { isPublic = it }
+                        }
+                    }
+                }
+
+                // ── STEP 3: Officials ───────────────────────
+                3 -> {
+                    item {
+                        Text("Match Officials", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("All fields are optional", color = TextSecondary, fontSize = 12.sp)
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = umpire1, onValueChange = { umpire1 = it },
+                            label = { Text("Umpire 1") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = umpire2, onValueChange = { umpire2 = it },
+                            label = { Text("Umpire 2") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = thirdUmpire, onValueChange = { thirdUmpire = it },
+                            label = { Text("Third Umpire") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = matchReferee, onValueChange = { matchReferee = it },
+                            label = { Text("Match Referee") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = scorerName, onValueChange = { scorerName = it },
+                            label = { Text("Scorer Name") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                        )
+                    }
+                }
+
+                // ── STEP 4: Review ──────────────────────────
+                4 -> {
+                    item {
+                        Text("Match Summary", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    item {
+                        ReviewCard {
+                            ReviewRow("Type", selectedMatchType)
+                            ReviewRow("Overs", totalOvers.toString())
+                            if (title.isNotBlank()) ReviewRow("Title", title)
+                            if (venue.isNotBlank()) ReviewRow("Venue", venue)
+                            if (matchDate.isNotBlank()) ReviewRow("Date", matchDate)
+                            ReviewRow("Players/Side", playersPerSide)
+                        }
+                    }
+                    item {
+                        val t1 = uiState.teams.find { it.id == team1Id }
+                        val t2 = uiState.teams.find { it.id == team2Id }
+                        ReviewCard {
+                            ReviewRow("Team A", t1?.name ?: "Not selected")
+                            ReviewRow("Team B", t2?.name ?: "Not selected")
+                        }
+                    }
+                    item {
+                        ReviewCard {
+                            ReviewRow("Powerplay", "${powerplayOvers} ov (PP)")
+                            if (powerplay2Overs != "0") ReviewRow("Middle", "${powerplay2Overs} ov (P2)")
+                            if (powerplay3Overs != "0") ReviewRow("Death", "${powerplay3Overs} ov (P3)")
+                            ReviewRow("Max Overs/Bowler", maxOversPerBowler.ifBlank { defaultMaxOversPerBowler.toString() })
+                            ReviewRow("Free Hit", if (freeHitOnNoball) "Yes" else "No")
+                            ReviewRow("Super Over", if (superOverEnabled) "Yes" else "No")
+                        }
+                    }
+                    if (umpire1.isNotBlank() || umpire2.isNotBlank()) {
+                        item {
+                            ReviewCard {
+                                if (umpire1.isNotBlank()) ReviewRow("Umpire 1", umpire1)
+                                if (umpire2.isNotBlank()) ReviewRow("Umpire 2", umpire2)
+                                if (thirdUmpire.isNotBlank()) ReviewRow("3rd Umpire", thirdUmpire)
+                                if (matchReferee.isNotBlank()) ReviewRow("Referee", matchReferee)
                             }
                         }
                     }
-
-                    SectionTitle("Match Options")
-
-                    ToggleRow(
-                        label = "Super Over Enabled",
-                        description = "Enable super over for tie situations",
-                        checked = superOverEnabled,
-                        onCheckedChange = { superOverEnabled = it }
-                    )
-
-                    ToggleRow(
-                        label = "Free Hit on No Ball",
-                        description = "Next ball is free hit after no ball",
-                        checked = freeHitOnNoball,
-                        onCheckedChange = { freeHitOnNoball = it }
-                    )
-
-                    if (selectedMatchType == "Test") {
-                        ToggleRow(
-                            label = "Follow-on Enabled",
-                            description = "Team can enforce follow-on (200+ run lead)",
-                            checked = followOnEnabled,
-                            onCheckedChange = { followOnEnabled = it }
-                        )
-                    }
-
-                    ToggleRow(
-                        label = "Live Score Sharing",
-                        description = "Allow sharing live score via WhatsApp/SMS",
-                        checked = liveSharingEnabled,
-                        onCheckedChange = { liveSharingEnabled = it }
-                    )
-                }
-
-                // ========================
-                // STEP 3 — Officials
-                // ========================
-                3 -> {
-                    SectionTitle("Match Officials")
-
-                    ToggleRow(
-                        label = "Add Officials",
-                        description = "Name umpires, referee, and scorer",
-                        checked = showOfficialsSection,
-                        onCheckedChange = { showOfficialsSection = it }
-                    )
-
-                    if (showOfficialsSection) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        MatchTextField(value = umpire1, onValueChange = { umpire1 = it }, label = "Umpire 1 (optional)")
-                        MatchTextField(value = umpire2, onValueChange = { umpire2 = it }, label = "Umpire 2 (optional)")
-                        MatchTextField(value = thirdUmpire, onValueChange = { thirdUmpire = it }, label = "Third Umpire (optional)")
-                        MatchTextField(value = matchReferee, onValueChange = { matchReferee = it }, label = "Match Referee (optional)")
-                        MatchTextField(value = scorerName, onValueChange = { scorerName = it }, label = "Scorer (optional)")
-                    }
-                }
-
-                // ========================
-                // STEP 4 — Review
-                // ========================
-                4 -> {
-                    SectionTitle("Match Summary")
-
-                    ReviewCard {
-                        if (matchTitle.isNotBlank()) ReviewRow("Title", matchTitle)
-                        ReviewRow("Type", selectedMatchType)
-                        ReviewRow("Overs", "$selectedOvers overs")
-                        ReviewRow("Players", "$selectedPlayers per side")
-                        if (venue.isNotBlank()) ReviewRow("Venue", venue)
-                        if (matchDate.isNotBlank()) ReviewRow("Date", matchDate)
-                        if (matchTime.isNotBlank()) ReviewRow("Time", matchTime)
-                    }
-
-                    ReviewCard {
-                        ReviewRow("Team A", selectedTeam1?.name ?: "Not selected")
-                        ReviewRow("Team B", selectedTeam2?.name ?: "Not selected")
-                    }
-
-                    ReviewCard {
-                        ReviewRow("Powerplay", "$powerplayOvers overs")
-                        ReviewRow("Super Over", if (superOverEnabled) "✅ Yes" else "❌ No")
-                        ReviewRow("Free Hit", if (freeHitOnNoball) "✅ Yes" else "❌ No")
-                        ReviewRow("Live Sharing", if (liveSharingEnabled) "✅ Yes" else "❌ No")
-                        if (selectedMatchType == "Test") ReviewRow("Follow-on", if (followOnEnabled) "✅ Yes" else "❌ No")
-                    }
-
-                    if (showOfficialsSection) {
-                        ReviewCard {
-                            if (umpire1.isNotBlank()) ReviewRow("Umpire 1", umpire1)
-                            if (umpire2.isNotBlank()) ReviewRow("Umpire 2", umpire2)
-                            if (thirdUmpire.isNotBlank()) ReviewRow("3rd Umpire", thirdUmpire)
-                            if (matchReferee.isNotBlank()) ReviewRow("Referee", matchReferee)
-                            if (scorerName.isNotBlank()) ReviewRow("Scorer", scorerName)
-                        }
-                    }
-
                     if (uiState.error != null) {
-                        Text(uiState.error ?: "", color = ErrorRed, fontSize = 13.sp)
+                        item {
+                            Text(uiState.error ?: "", color = ErrorRed, fontSize = 13.sp)
+                        }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Bottom navigation buttons
+        // Navigation buttons
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (currentStep > 0) {
                 OutlinedButton(
                     onClick = { currentStep-- },
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Back")
-                }
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                ) { Text("Back") }
             }
 
             Button(
@@ -473,59 +430,48 @@ fun CreateMatchScreen(
                         currentStep++
                     } else {
                         // Create match
-                        val t1 = selectedTeam1 ?: return@Button
-                        val t2 = selectedTeam2 ?: return@Button
-                        val overs = if (selectedMatchType == "Custom")
-                            customOvers.toIntOrNull() ?: 20 else selectedOvers
-
-                        viewModel.createMatch(
-                            MatchInsert(
-                                title = matchTitle.ifBlank { null },
-                                matchType = selectedMatchType,
-                                team1Id = t1.id,
-                                team2Id = t2.id,
-                                venue = venue.ifBlank { null },
-                                matchDate = matchDate.ifBlank { null },
-                                matchTime = matchTime.ifBlank { null },
-                                totalOvers = overs,
-                                playersPerSide = selectedPlayers,
-                                powerplayOvers = powerplayOvers,
-                                superOverEnabled = superOverEnabled,
-                                followOnEnabled = followOnEnabled,
-                                freeHitOnNoball = freeHitOnNoball,
-                                liveSharingEnabled = liveSharingEnabled,
-                                umpire1 = umpire1.ifBlank { null },
-                                umpire2 = umpire2.ifBlank { null },
-                                thirdUmpire = thirdUmpire.ifBlank { null },
-                                matchReferee = matchReferee.ifBlank { null },
-                                scorerName = scorerName.ifBlank { null },
-                                createdBy = "",
-                                status = "scheduled"
-                            )
-                        )
+                        viewModel.createMatch(MatchInsert(
+                            title = title.trim().ifBlank { null },
+                            matchType = selectedMatchType,
+                            matchDate = matchDate.trim().ifBlank { null },
+                            matchTime = matchTime.trim().ifBlank { null },
+                            venue = venue.trim().ifBlank { null },
+                            team1Id = team1Id,
+                            team2Id = team2Id,
+                            playersPerSide = playersPerSide.toIntOrNull() ?: 11,
+                            totalOvers = totalOvers,
+                            powerplayOvers = powerplayOvers.toIntOrNull() ?: 6,
+                            powerplay2Overs = powerplay2Overs.toIntOrNull() ?: 0,
+                            powerplay3Overs = powerplay3Overs.toIntOrNull() ?: 0,
+                            inningsBreakMinutes = inningsBreak.toIntOrNull() ?: 20,
+                            superOverEnabled = superOverEnabled,
+                            freeHitOnNoball = freeHitOnNoball,
+                            dlsEnabled = dlsEnabled,
+                            maxOversPerBowler = maxOversPerBowler.toIntOrNull() ?: defaultMaxOversPerBowler,
+                            umpire1 = umpire1.trim().ifBlank { null },
+                            umpire2 = umpire2.trim().ifBlank { null },
+                            thirdUmpire = thirdUmpire.trim().ifBlank { null },
+                            matchReferee = matchReferee.trim().ifBlank { null },
+                            scorerName = scorerName.trim().ifBlank { null },
+                            liveSharingEnabled = liveSharingEnabled,
+                            isPublic = isPublic
+                        ))
                     }
                 },
                 enabled = when (currentStep) {
-                    1 -> selectedTeam1 != null && selectedTeam2 != null
-                    4 -> selectedTeam1 != null && selectedTeam2 != null && !uiState.isLoading
+                    1 -> team1Id.isNotBlank() && team2Id.isNotBlank()
                     else -> true
-                },
-                modifier = Modifier.weight(1f).height(50.dp),
+                } && !uiState.isLoading,
+                modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                if (uiState.isLoading && currentStep == 4) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.Black,
-                        strokeWidth = 2.dp
-                    )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
                     Text(
-                        if (currentStep == steps.size - 1) "Start Match" else "Next →",
-                        color = Color.Black,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        if (currentStep == steps.size - 1) "Create Match" else "Next",
+                        color = Color.Black, fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -533,151 +479,88 @@ fun CreateMatchScreen(
     }
 }
 
-// ========================
-// Helper Composables
-// ========================
+// ── Helper Composables ──────────────────────────────────────
 
 @Composable
-fun SectionTitle(text: String) {
-    Text(
-        text,
-        color = NeonGreen,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 4.dp)
-    )
-}
-
-@Composable
-fun MatchTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = TextPrimary,
-            unfocusedTextColor = TextPrimary,
-            focusedBorderColor = NeonGreen,
-            unfocusedBorderColor = BorderColor,
-            focusedLabelColor = NeonGreen,
-            unfocusedLabelColor = TextSecondary,
-            cursorColor = NeonGreen
-        )
-    )
-}
-
-@Composable
-fun MatchTeamSelector(
-    selectedTeam: Team?,
-    teams: List<Team>,
-    expanded: Boolean,
-    onExpand: () -> Unit,
-    onDismiss: () -> Unit,
-    onTeamSelected: (Team) -> Unit
-) {
-    Box {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(SurfaceCard)
-                .border(
-                    1.dp,
-                    if (selectedTeam != null) NeonGreen else BorderColor,
-                    RoundedCornerShape(10.dp)
-                )
-                .clickable { onExpand() }
-                .padding(16.dp)
-        ) {
-            Text(
-                selectedTeam?.name ?: "Select team",
-                color = if (selectedTeam != null) TextPrimary else TextSecondary
-            )
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-            modifier = Modifier.background(SurfaceCard)
-        ) {
-            if (teams.isEmpty()) {
-                DropdownMenuItem(
-                    text = { Text("No teams available", color = TextSecondary) },
-                    onClick = onDismiss
-                )
-            }
-            teams.forEach { team ->
-                DropdownMenuItem(
-                    text = { Text(team.name, color = TextPrimary) },
-                    onClick = { onTeamSelected(team) }
-                )
-            }
-        }
+fun MatchTypeChip(type: String, selected: String, onClick: (String) -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected == type) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
+            .border(1.dp, if (selected == type) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+            .clickable { onClick(type) }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(type, color = if (selected == type) NeonGreen else TextSecondary, fontSize = 13.sp, fontWeight = if (selected == type) FontWeight.Bold else FontWeight.Normal)
     }
 }
 
 @Composable
-fun ToggleRow(
-    label: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
+fun TeamSelectCard(team: Team, isSelected: Boolean, isDisabled: Boolean, onClick: () -> Unit) {
+    val jerseyColor = try {
+        Color(android.graphics.Color.parseColor(team.jerseyColor ?: "#10B981"))
+    } catch (e: Exception) { NeonGreen }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+            .background(if (isSelected) NeonGreen.copy(alpha = 0.1f) else SurfaceCard)
+            .border(1.dp, if (isSelected) NeonGreen else if (isDisabled) BorderColor.copy(alpha = 0.3f) else BorderColor, RoundedCornerShape(10.dp))
+            .then(if (!isDisabled) Modifier.clickable { onClick() } else Modifier)
             .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(jerseyColor.copy(alpha = if (isDisabled) 0.05f else 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(team.shortName?.take(3) ?: team.name.take(2).uppercase(), color = if (isDisabled) TextSecondary else jerseyColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(team.name, color = if (isDisabled) TextSecondary else TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            team.category?.let { Text(it, color = TextSecondary, fontSize = 11.sp) }
+        }
+        if (isSelected) {
+            Text("✓", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+        if (isDisabled) {
+            Text("Used", color = TextSecondary, fontSize = 11.sp)
+        }
+    }
+    Spacer(modifier = Modifier.height(6.dp))
+}
+
+@Composable
+fun ToggleRow(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 14.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text(description, color = TextSecondary, fontSize = 11.sp)
-        }
+        Text(label, color = TextPrimary, fontSize = 14.sp)
         Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.Black,
-                checkedTrackColor = NeonGreen,
-                uncheckedThumbColor = TextSecondary,
-                uncheckedTrackColor = BorderColor
-            )
+            checked = value, onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = NeonGreen, uncheckedTrackColor = BorderColor)
         )
     }
 }
 
 @Composable
-fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+fun InfoCard(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(NeonGreen.copy(alpha = 0.1f)).border(1.dp, NeonGreen, RoundedCornerShape(8.dp)).padding(12.dp)
     ) {
-        Text(label, color = TextSecondary, fontSize = 13.sp)
-        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(text, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
 fun ReviewCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-            .padding(14.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SurfaceCard).border(1.dp, BorderColor, RoundedCornerShape(10.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         content = content
     )
@@ -685,11 +568,8 @@ fun ReviewCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 fun ReviewRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = TextSecondary, fontSize = 13.sp)
-        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }

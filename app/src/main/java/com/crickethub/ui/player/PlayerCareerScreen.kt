@@ -1,14 +1,16 @@
 package com.crickethub.ui.player
 
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,12 +18,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import com.crickethub.data.model.Player
+import com.crickethub.data.model.PlayerStats
+import com.crickethub.data.remote.SupabaseClient
+import com.crickethub.data.repository.PlayerRepository
+import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.launch
 
 private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
@@ -32,402 +38,294 @@ private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val ErrorRed = Color(0xFFEF4444)
 private val AmberColor = Color(0xFFF59E0B)
-private val PurpleColor = Color(0xFF8B5CF6)
 
 @Composable
-fun PlayerCareerScreen(
-    onBack: () -> Unit,
-    viewModel: PlayerCareerViewModel = viewModel()
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    var selectedPlayerId by remember { mutableStateOf<String?>(null) }
-    var showPlayerDropdown by remember { mutableStateOf(false) }
+fun PlayerCareerScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(true) }
+    var playerName by remember { mutableStateOf("") }
+    var playerRole by remember { mutableStateOf("") }
+    var battingHand by remember { mutableStateOf("") }
+    var bowlingStyle by remember { mutableStateOf("") }
+    var jerseyNo by remember { mutableStateOf("") }
+    var teamName by remember { mutableStateOf("") }
+    var stats by remember { mutableStateOf(PlayerStats()) }
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Batting", "Bowling", "Fielding", "Career")
 
     LaunchedEffect(Unit) {
-        viewModel.loadAllPlayers()
-    }
+        scope.launch {
+            try {
+                val repo = PlayerRepository()
+                val allPlayers = SupabaseClient.client.postgrest["players"]
+                    .select()
+                    .decodeList<Player>()
 
-    LaunchedEffect(selectedPlayerId) {
-        selectedPlayerId?.let { viewModel.loadPlayerCareer(it) }
+                val myPlayer = allPlayers.firstOrNull()
+                if (myPlayer != null) {
+                    playerName = myPlayer.fullName
+                    playerRole = myPlayer.role?.replaceFirstChar { it.uppercase() } ?: "Player"
+                    battingHand = "${myPlayer.battingHand?.replaceFirstChar { it.uppercase() } ?: "Right"} Hand Bat"
+                    bowlingStyle = myPlayer.bowlingStyle ?: ""
+                    jerseyNo = myPlayer.jerseyNo?.toString() ?: ""
+                    stats = repo.computePlayerStats(myPlayer.id)
+                }
+                isLoading = false
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Career error: ${e.message}", e)
+                isLoading = false
+            }
+        }
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
+        modifier = Modifier.fillMaxSize().background(BackgroundDark)
     ) {
         // Header
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
             Text(
-                "Career Profiles",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                "Career Profile",
+                fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                color = TextPrimary, modifier = Modifier.weight(1f)
             )
         }
 
-        // Player selector
-        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(SurfaceCard)
-                    .border(
-                        1.dp,
-                        if (selectedPlayerId != null) NeonGreen else BorderColor,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable { showPlayerDropdown = true }
-                    .padding(16.dp)
-            ) {
-                Text(
-                    uiState.player?.fullName ?: "Select a player",
-                    color = if (selectedPlayerId != null) TextPrimary else TextSecondary,
-                    fontSize = 15.sp
-                )
-            }
-
-            DropdownMenu(
-                expanded = showPlayerDropdown,
-                onDismissRequest = { showPlayerDropdown = false },
-                modifier = Modifier.background(SurfaceCard)
-            ) {
-                uiState.allPlayers.forEach { player ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(player.fullName, color = TextPrimary, fontSize = 14.sp)
-                                player.role?.let {
-                                    Text(
-                                        it.replace("_", " ")
-                                            .replaceFirstChar { c -> c.uppercase() },
-                                        color = TextSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-                        },
-                        onClick = {
-                            selectedPlayerId = player.id
-                            showPlayerDropdown = false
-                        }
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (uiState.isLoading && selectedPlayerId != null) {
+        if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NeonGreen)
             }
-        } else if (selectedPlayerId == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            return@Column
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            // Profile card
+            item {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceCard)
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("🏏", fontSize = 48.sp)
-                    Text(
-                        "Select a player to view career stats",
-                        color = TextSecondary,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Player info card
-                item {
-                    uiState.player?.let { player ->
-                        PlayerInfoCard(player = player)
-                    }
-                }
-
-                // Batting stats
-                item {
-                    CareerCard(title = "🏏 Batting Career") {
-                        BattingStatsGrid(stats = uiState.battingStats)
-                    }
-                }
-
-                // Bowling stats — sirf tab dikhao jab bowled hai
-                if (uiState.bowlingStats.wickets > 0 || uiState.bowlingStats.balls > 0) {
-                    item {
-                        CareerCard(title = "🎳 Bowling Career") {
-                            BowlingStatsGrid(stats = uiState.bowlingStats)
-                        }
-                    }
-                }
-
-                // Recent form
-                if (uiState.recentForm.isNotEmpty()) {
-                    item {
-                        CareerCard(title = "📈 Recent Form (Last ${uiState.recentForm.size} innings)") {
-                            RecentFormChart(form = uiState.recentForm)
-                        }
-                    }
-                }
-
-                // AI Insights — Coming Soon
-                item {
-                    Column(
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SurfaceCard)
-                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(NeonGreen.copy(alpha = 0.2f))
+                            .border(2.dp, NeonGreen, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("🤖 AI Performance Insight", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Coming soon — AI-powered analysis of this player's strengths, weaknesses, and potential.",
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp
-                        )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(NeonGreen.copy(alpha = 0.1f))
-                                .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("Coming Soon", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        if (jerseyNo.isNotBlank()) {
+                            Text(jerseyNo, color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(40.dp))
                         }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        playerName.ifBlank { "Your Profile" },
+                        color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (playerRole.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(NeonGreen.copy(alpha = 0.15f))
+                                    .border(0.5.dp, NeonGreen, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(playerRole, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        if (battingHand.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(NeonBlue.copy(alpha = 0.15f))
+                                    .border(0.5.dp, NeonBlue, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(battingHand, color = NeonBlue, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    if (bowlingStyle.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(bowlingStyle, color = TextSecondary, fontSize = 13.sp)
+                    }
+                }
+                HorizontalDivider(color = BorderColor)
+            }
+
+            // Quick stats
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceCard)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    QuickStatItem("Matches", stats.matches.toString())
+                    QuickStatItem("Runs", stats.runs.toString())
+                    QuickStatItem("Wickets", stats.wickets.toString())
+                    QuickStatItem("HS", stats.highestScore.toString())
+                }
+                HorizontalDivider(color = BorderColor)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Tabs
+            item {
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = SurfaceCard,
+                    contentColor = NeonGreen,
+                    edgePadding = 0.dp
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    tab,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selectedTab == index) NeonGreen else TextSecondary
+                                )
+                            }
+                        )
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun PlayerInfoCard(player: com.crickethub.data.model.Player) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(NeonGreen.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                player.jerseyNo?.toString() ?: player.fullName.take(1).uppercase(),
-                color = NeonGreen,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                player.fullName,
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-            player.role?.let {
-                Text(
-                    it.replace("_", " ").replaceFirstChar { c -> c.uppercase() },
-                    color = NeonGreen,
-                    fontSize = 13.sp
-                )
-            }
-            player.battingStyle?.let {
-                Text("Bat: $it", color = TextSecondary, fontSize = 12.sp)
-            }
-            player.bowlingStyle?.let {
-                Text("Bowl: $it", color = TextSecondary, fontSize = 12.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun CareerCard(title: String, content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-            .padding(16.dp)
-    ) {
-        Text(
-            title,
-            color = TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        content()
-    }
-}
-
-@Composable
-fun BattingStatsGrid(stats: CareerBattingStats) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatBox("Matches", "${stats.matches}", Modifier.weight(1f))
-            StatBox("Innings", "${stats.innings}", Modifier.weight(1f))
-            StatBox("Runs", "${stats.runs}", Modifier.weight(1f))
-            StatBox("HS", "${stats.highScore}", Modifier.weight(1f))
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatBox("Avg", "${"%.2f".format(stats.average)}", Modifier.weight(1f), NeonGreen)
-            StatBox("SR", "${"%.2f".format(stats.strikeRate)}", Modifier.weight(1f), NeonBlue)
-            StatBox("50s", "${stats.fifties}", Modifier.weight(1f), AmberColor)
-            StatBox("100s", "${stats.hundreds}", Modifier.weight(1f), PurpleColor)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatBox("4s", "${stats.fours}", Modifier.weight(1f), NeonBlue)
-            StatBox("6s", "${stats.sixes}", Modifier.weight(1f), NeonGreen)
-            StatBox("Ducks", "${stats.ducks}", Modifier.weight(1f), ErrorRed)
-            StatBox("NO", "${stats.notOuts}", Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-fun BowlingStatsGrid(stats: CareerBowlingStats) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatBox("Wickets", "${stats.wickets}", Modifier.weight(1f), NeonGreen)
-            StatBox("Best", stats.bestFigures, Modifier.weight(1f), PurpleColor)
-            StatBox("Avg", "${"%.2f".format(stats.average)}", Modifier.weight(1f))
-            StatBox("Eco", "${"%.2f".format(stats.economy)}", Modifier.weight(1f), AmberColor)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatBox("SR", "${"%.1f".format(stats.strikeRate)}", Modifier.weight(1f))
-            StatBox("5W", "${stats.fiveWickets}", Modifier.weight(1f), NeonGreen)
-            StatBox("Innings", "${stats.innings}", Modifier.weight(1f))
-            StatBox("Balls", "${stats.balls}", Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-fun StatBox(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    valueColor: Color = TextPrimary
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(BackgroundDark)
-            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(value, color = valueColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = TextSecondary, fontSize = 10.sp)
-    }
-}
-
-@Composable
-fun RecentFormChart(form: List<InningsForm>) {
-    if (form.isEmpty()) return
-
-    val maxRuns = form.maxOfOrNull { it.runs }?.coerceAtLeast(1) ?: 1
-
-    Column {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-        ) {
-            val w = size.width
-            val h = size.height
-            val barWidth = (w / (form.size * 1.5f)).coerceAtMost(40f)
-            val spacing = w / form.size
-
-            form.forEachIndexed { index, innings ->
-                val x = spacing * index + spacing / 2 - barWidth / 2
-                val barH = (innings.runs.toFloat() / maxRuns) * (h - 20f)
-                val barColor = when {
-                    innings.runs >= 50 -> NeonGreen
-                    innings.runs >= 30 -> AmberColor
-                    innings.runs == 0  -> ErrorRed
-                    else               -> NeonBlue.copy(alpha = 0.8f)
-                }
-
-                drawRect(
-                    color = barColor,
-                    topLeft = Offset(x, h - 20f - barH),
-                    size = Size(barWidth, barH)
-                )
-
-                if (innings.isOut) {
-                    drawCircle(
-                        color = ErrorRed,
-                        radius = 3f,
-                        center = Offset(x + barWidth / 2, h - 8f)
-                    )
+            // Tab content
+            item {
+                when (selectedTab) {
+                    0 -> BattingStatsTab(stats)
+                    1 -> BowlingStatsTab(stats)
+                    2 -> FieldingStatsTab(stats)
+                    3 -> CareerInfoTab(stats)
                 }
             }
         }
-
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            LegendDot(color = NeonGreen, label = "50+")
-            LegendDot(color = AmberColor, label = "30-49")
-            LegendDot(color = NeonBlue, label = "<30")
-            LegendDot(color = ErrorRed, label = "Duck/Out")
-        }
     }
 }
 
 @Composable
-fun LegendDot(color: Color, label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+fun QuickStatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = TextSecondary, fontSize = 11.sp)
+    }
+}
+
+@Composable
+fun BattingStatsTab(stats: PlayerStats) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
-        Text(label, color = TextSecondary, fontSize = 10.sp)
+        Text("Batting Statistics", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        StatRow("Matches", stats.matches.toString())
+        StatRow("Innings", stats.innings.toString())
+        StatRow("Runs", stats.runs.toString())
+        StatRow("Balls Faced", stats.ballsFaced.toString())
+        StatRow("Highest Score", stats.highestScore.toString())
+        StatRow("Average", "%.2f".format(stats.average))
+        StatRow("Strike Rate", "%.2f".format(stats.strikeRate))
+        StatRow("50s", stats.fifties.toString())
+        StatRow("100s", stats.hundreds.toString())
+        StatRow("Ducks", stats.ducks.toString())
+        StatRow("Fours", stats.fours.toString())
+        StatRow("Sixes", stats.sixes.toString())
+        StatRow("Not Outs", stats.notOuts.toString())
+        StatRow("Boundary %", "%.1f%%".format(stats.boundaryPercent))
+    }
+}
+
+@Composable
+fun BowlingStatsTab(stats: PlayerStats) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Bowling Statistics", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        StatRow("Overs", "%.1f".format(stats.oversBowled))
+        StatRow("Maidens", stats.maidens.toString())
+        StatRow("Runs Conceded", stats.runsConceded.toString())
+        StatRow("Wickets", stats.wickets.toString())
+        StatRow("Economy", "%.2f".format(stats.economy))
+        StatRow("Average", "%.2f".format(stats.bowlingAverage))
+        StatRow("Strike Rate", "%.2f".format(stats.bowlingStrikeRate))
+        StatRow("Best Bowling", stats.bestBowling)
+        StatRow("3W Hauls", stats.threeWicketHauls.toString())
+        StatRow("5W Hauls", stats.fiveWicketHauls.toString())
+        StatRow("Dot Balls", stats.dotBalls.toString())
+        StatRow("Wides", stats.wides.toString())
+        StatRow("No Balls", stats.noBalls.toString())
+    }
+}
+
+@Composable
+fun FieldingStatsTab(stats: PlayerStats) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Fielding Statistics", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        StatRow("Catches", stats.catches.toString())
+        StatRow("Run Outs", stats.runOuts.toString())
+        StatRow("Stumpings", stats.stumpings.toString())
+        StatRow("Missed Chances", stats.missedChances.toString())
+    }
+}
+
+@Composable
+fun CareerInfoTab(stats: PlayerStats) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Career Records", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        StatRow("Highest Score", stats.highestScore.toString())
+        StatRow("Best Bowling", stats.bestBowling)
+        StatRow("5 Wicket Hauls", stats.fiveWicketHauls.toString())
+        StatRow("Total Matches", stats.matches.toString())
+        StatRow("Total Runs", stats.runs.toString())
+        StatRow("Total Wickets", stats.wickets.toString())
+        StatRow("Total Catches", stats.catches.toString())
+    }
+}
+
+@Composable
+fun StatRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(SurfaceCard)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = TextSecondary, fontSize = 13.sp)
+        Text(value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
     }
 }

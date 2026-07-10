@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.PlayerInsert
 import com.crickethub.data.model.PlayerStats
+import com.crickethub.data.model.PlayerUpdate
 import com.crickethub.data.repository.PlayerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +18,7 @@ data class PlayerUiState(
     val currentPlayer: Player? = null,
     val playerStats: PlayerStats = PlayerStats(),
     val isLoading: Boolean = false,
-    val error: String? = null,
-    val showAddDialog: Boolean = false
+    val error: String? = null
 )
 
 class PlayerViewModel : ViewModel() {
@@ -40,35 +40,36 @@ class PlayerViewModel : ViewModel() {
         }
     }
 
-    fun loadPlayerDetails(playerId: String) {
-        viewModelScope.launch {
-            try {
-                val player = playerRepository.getPlayerById(playerId)
-                val stats = playerRepository.computePlayerStats(playerId)
-                _uiState.update { it.copy(currentPlayer = player, playerStats = stats) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            }
-        }
-    }
-
     fun addPlayer(player: PlayerInsert, teamId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 playerRepository.createPlayer(player)
                 loadPlayers(teamId)
-                _uiState.update { it.copy(showAddDialog = false) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
     }
 
-    fun updatePlayer(playerId: String, updates: Map<String, Any?>, teamId: String) {
+    fun updatePlayer(playerId: String, insert: PlayerInsert, teamId: String) {
         viewModelScope.launch {
             try {
-                playerRepository.updatePlayer(playerId, updates)
+                val update = PlayerUpdate(
+                    fullName = insert.fullName,
+                    nickname = insert.nickname,
+                    jerseyNo = insert.jerseyNo,
+                    dateOfBirth = insert.dateOfBirth,
+                    gender = insert.gender,
+                    country = insert.country,
+                    city = insert.city,
+                    battingHand = insert.battingHand,
+                    bowlingHand = insert.bowlingHand,
+                    bowlingStyle = insert.bowlingStyle,
+                    role = insert.role,
+                    availability = insert.availability
+                )
+                playerRepository.updatePlayer(playerId, update)
                 loadPlayers(teamId)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -90,7 +91,10 @@ class PlayerViewModel : ViewModel() {
     fun updateAvailability(playerId: String, availability: String, teamId: String) {
         viewModelScope.launch {
             try {
-                playerRepository.updatePlayer(playerId, mapOf("availability" to availability))
+                playerRepository.updatePlayer(
+                    playerId,
+                    PlayerUpdate(availability = availability)
+                )
                 loadPlayers(teamId)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -98,7 +102,5 @@ class PlayerViewModel : ViewModel() {
         }
     }
 
-    fun showAddDialog() { _uiState.update { it.copy(showAddDialog = true) } }
-    fun hideAddDialog() { _uiState.update { it.copy(showAddDialog = false) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
 }

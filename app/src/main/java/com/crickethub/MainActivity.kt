@@ -442,8 +442,8 @@ fun MatchFlowScreen(
             // STEP 3: Playing XI select hua?
             val xi = repo.getPlayingXI(matchId)
             val playersNeeded = match.playersPerSide
-            val team1Count = xi.count { it.teamId == match.team1Id }
-            val team2Count = xi.count { it.teamId == match.team2Id }
+            val team1Count = xi.count { player -> player.teamId == match.team1Id }
+            val team2Count = xi.count { player -> player.teamId == match.team2Id }
 
             if (team1Count < playersNeeded) {
                 statusText = "Selecting Team 1 XI..."

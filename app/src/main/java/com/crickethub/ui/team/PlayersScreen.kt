@@ -40,7 +40,6 @@ private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val ErrorRed = Color(0xFFEF4444)
 private val AmberColor = Color(0xFFF59E0B)
-private val PurpleColor = Color(0xFF8B5CF6)
 
 @Composable
 fun PlayersScreen(
@@ -53,17 +52,10 @@ fun PlayersScreen(
     var playerToEdit by remember { mutableStateOf<Player?>(null) }
     var playerToDelete by remember { mutableStateOf<Player?>(null) }
 
-    LaunchedEffect(teamId) {
-        viewModel.loadPlayers(teamId)
-    }
-
-    LaunchedEffect(showAddDialog) {
-        if (!showAddDialog) viewModel.loadPlayers(teamId)
-    }
+    LaunchedEffect(teamId) { viewModel.loadPlayers(teamId) }
 
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -73,15 +65,14 @@ fun PlayersScreen(
                 }
                 Text(
                     "Players (${uiState.players.size})",
-                    fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
-                    modifier = Modifier.weight(1f)
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    color = TextPrimary, modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { showAddDialog = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Add Player", tint = NeonGreen)
                 }
             }
 
-            // Stats summary
             if (uiState.players.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -105,7 +96,10 @@ fun PlayersScreen(
                 }
             } else if (uiState.players.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         Icon(Icons.Default.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
                         Text("No players yet", color = TextSecondary, fontSize = 16.sp)
                         Text("Tap + to add players", color = TextSecondary, fontSize = 13.sp)
@@ -128,7 +122,6 @@ fun PlayersScreen(
             }
         }
 
-        // Add dialog
         if (showAddDialog) {
             PlayerDialog(
                 title = "Add Player",
@@ -141,7 +134,6 @@ fun PlayersScreen(
             )
         }
 
-        // Edit dialog
         playerToEdit?.let { player ->
             PlayerDialog(
                 title = "Edit Player",
@@ -149,26 +141,12 @@ fun PlayersScreen(
                 player = player,
                 onDismiss = { playerToEdit = null },
                 onConfirm = { insert ->
-                    viewModel.updatePlayer(player.id, mapOf(
-                        "full_name" to insert.fullName,
-                        "nickname" to insert.nickname,
-                        "jersey_no" to insert.jerseyNo,
-                        "date_of_birth" to insert.dateOfBirth,
-                        "gender" to insert.gender,
-                        "country" to insert.country,
-                        "city" to insert.city,
-                        "batting_hand" to insert.battingHand,
-                        "bowling_hand" to insert.bowlingHand,
-                        "bowling_style" to insert.bowlingStyle,
-                        "role" to insert.role,
-                        "availability" to insert.availability
-                    ), teamId)
+                    viewModel.updatePlayer(player.id, insert, teamId)
                     playerToEdit = null
                 }
             )
         }
 
-        // Delete dialog
         playerToDelete?.let { player ->
             AlertDialog(
                 onDismissRequest = { playerToDelete = null },
@@ -182,7 +160,9 @@ fun PlayersScreen(
                     ) { Text("Remove", color = Color.White) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { playerToDelete = null }) { Text("Cancel", color = TextSecondary) }
+                    TextButton(onClick = { playerToDelete = null }) {
+                        Text("Cancel", color = TextSecondary)
+                    }
                 }
             )
         }
@@ -224,7 +204,6 @@ fun PlayerCard(
         "wicket keeper" -> AmberColor
         else -> TextSecondary
     }
-
     val availabilityColor = when (player.availability) {
         "available" -> NeonGreen
         "unavailable" -> ErrorRed
@@ -240,7 +219,6 @@ fun PlayerCard(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Jersey number circle
         Box(
             modifier = Modifier
                 .size(44.dp)
@@ -251,23 +229,16 @@ fun PlayerCard(
         ) {
             Text(
                 player.jerseyNo?.toString() ?: player.fullName.first().toString(),
-                color = roleColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                color = roleColor, fontSize = 14.sp, fontWeight = FontWeight.Bold
             )
         }
-
         Spacer(modifier = Modifier.width(10.dp))
-
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(player.fullName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                player.nickname?.let {
-                    Text("($it)", color = TextSecondary, fontSize = 11.sp)
-                }
+                player.nickname?.let { Text("($it)", color = TextSecondary, fontSize = 11.sp) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Role badge
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -279,26 +250,14 @@ fun PlayerCard(
                         color = roleColor, fontSize = 10.sp, fontWeight = FontWeight.SemiBold
                     )
                 }
-
-                // Batting/Bowling hand
                 Text(
-                    "${player.battingHand?.take(1)?.uppercase() ?: "R"}HB / ${player.bowlingHand?.take(1)?.uppercase() ?: "R"}HBwl",
+                    "${player.battingHand?.take(1)?.uppercase() ?: "R"}HB",
                     color = TextSecondary, fontSize = 10.sp
                 )
-
-                // Availability dot
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(availabilityColor)
-                )
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(availabilityColor))
             }
-            player.bowlingStyle?.let {
-                Text(it, color = TextSecondary, fontSize = 10.sp)
-            }
+            player.bowlingStyle?.let { Text(it, color = TextSecondary, fontSize = 10.sp) }
         }
-
         Row {
             IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
@@ -331,16 +290,15 @@ fun PlayerDialog(
     var selectedRole by remember { mutableStateOf(player?.role?.replaceFirstChar { it.uppercase() } ?: "Batsman") }
     var availability by remember { mutableStateOf(player?.availability ?: "available") }
 
-    var showRoleDropdown by remember { mutableStateOf(false) }
-    var showStyleDropdown by remember { mutableStateOf(false) }
-
     val bowlingStyles = if (bowlingHand == "right") RIGHT_HAND_BOWLING_STYLES else LEFT_HAND_BOWLING_STYLES
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
         focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-        cursorColor = NeonGreen, focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary,
-        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
+        cursorColor = NeonGreen, focusedLabelColor = NeonGreen,
+        unfocusedLabelColor = TextSecondary,
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent
     )
 
     AlertDialog(
@@ -367,7 +325,8 @@ fun PlayerDialog(
                             modifier = Modifier.weight(1f), colors = fieldColors
                         )
                         OutlinedTextField(
-                            value = jerseyNo, onValueChange = { if (it.all { c -> c.isDigit() }) jerseyNo = it },
+                            value = jerseyNo,
+                            onValueChange = { if (it.all { c -> c.isDigit() }) jerseyNo = it },
                             label = { Text("Jersey #") }, singleLine = true,
                             modifier = Modifier.width(90.dp), colors = fieldColors
                         )
@@ -376,13 +335,13 @@ fun PlayerDialog(
                 item {
                     OutlinedTextField(
                         value = dateOfBirth, onValueChange = { dateOfBirth = it },
-                        label = { Text("Date of Birth (YYYY-MM-DD)") }, singleLine = true,
+                        label = { Text("DOB (YYYY-MM-DD)") }, singleLine = true,
                         modifier = Modifier.fillMaxWidth(), colors = fieldColors
                     )
                 }
                 item {
-                    // Gender
                     Text("Gender", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("male", "female", "other").forEach { g ->
                             FilterChip(
@@ -414,8 +373,8 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    // Batting hand
                     Text("Batting Hand", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("right", "left").forEach { hand ->
                             FilterChip(
@@ -433,15 +392,15 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    // Bowling hand
                     Text("Bowling Hand", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("right", "left").forEach { hand ->
                             FilterChip(
                                 selected = bowlingHand == hand,
                                 onClick = {
                                     bowlingHand = hand
-                                    bowlingStyle = "" // reset style when hand changes
+                                    bowlingStyle = ""
                                 },
                                 label = { Text("${hand.replaceFirstChar { it.uppercase() }} Hand", fontSize = 11.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
@@ -455,60 +414,85 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    // Bowling style dropdown — depends on bowling hand
-                    Box {
-                        OutlinedTextField(
-                            value = bowlingStyle.ifBlank { "Select Bowling Style" },
-                            onValueChange = {},
-                            label = { Text("Bowling Style") },
-                            readOnly = true,
-                            trailingIcon = { Text("▼", color = TextSecondary) },
-                            modifier = Modifier.fillMaxWidth().clickable { showStyleDropdown = true },
-                            colors = fieldColors
-                        )
-                        DropdownMenu(
-                            expanded = showStyleDropdown,
-                            onDismissRequest = { showStyleDropdown = false },
-                            modifier = Modifier.background(SurfaceCard)
-                        ) {
-                            bowlingStyles.forEach { style ->
-                                DropdownMenuItem(
-                                    text = { Text(style, color = TextPrimary) },
-                                    onClick = { bowlingStyle = style; showStyleDropdown = false }
-                                )
+                    Text("Bowling Style", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        bowlingStyles.chunked(2).forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { style ->
+                                    val isSelected = bowlingStyle == style
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) ErrorRed.copy(alpha = 0.2f) else BackgroundDark)
+                                            .border(1.dp, if (isSelected) ErrorRed else BorderColor, RoundedCornerShape(8.dp))
+                                            .clickable { bowlingStyle = style }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            style,
+                                            color = if (isSelected) ErrorRed else TextSecondary,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
                 }
                 item {
-                    // Role dropdown
-                    Box {
-                        OutlinedTextField(
-                            value = selectedRole,
-                            onValueChange = {},
-                            label = { Text("Primary Role") },
-                            readOnly = true,
-                            trailingIcon = { Text("▼", color = TextSecondary) },
-                            modifier = Modifier.fillMaxWidth().clickable { showRoleDropdown = true },
-                            colors = fieldColors
-                        )
-                        DropdownMenu(
-                            expanded = showRoleDropdown,
-                            onDismissRequest = { showRoleDropdown = false },
-                            modifier = Modifier.background(SurfaceCard)
-                        ) {
-                            PLAYER_ROLES.forEach { role ->
-                                DropdownMenuItem(
-                                    text = { Text(role, color = TextPrimary) },
-                                    onClick = { selectedRole = role; showRoleDropdown = false }
-                                )
+                    Text("Primary Role", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PLAYER_ROLES.chunked(2).forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { role ->
+                                    val isSelected = selectedRole == role
+                                    val roleColor = when (role) {
+                                        "Batsman" -> NeonBlue
+                                        "Bowler" -> ErrorRed
+                                        "All-rounder" -> NeonGreen
+                                        "Wicket Keeper" -> AmberColor
+                                        else -> TextSecondary
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) roleColor.copy(alpha = 0.2f) else BackgroundDark)
+                                            .border(1.dp, if (isSelected) roleColor else BorderColor, RoundedCornerShape(8.dp))
+                                            .clickable { selectedRole = role }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            role,
+                                            color = if (isSelected) roleColor else TextSecondary,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
                 }
                 item {
-                    // Availability
                     Text("Availability", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("available", "unavailable", "injured").forEach { status ->
                             val color = when (status) {

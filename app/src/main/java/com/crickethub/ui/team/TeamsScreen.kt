@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,6 +31,7 @@ private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
 private val BorderColor = Color(0xFF1F2937)
 private val NeonGreen = Color(0xFF10B981)
+private val NeonBlue = Color(0xFF3B82F6)
 private val TextPrimary = Color(0xFFF9FAFB)
 private val TextSecondary = Color(0xFF9CA3AF)
 private val ErrorRed = Color(0xFFEF4444)
@@ -75,7 +77,10 @@ fun TeamsScreen(
                 }
             } else if (uiState.teams.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         Icon(Icons.Default.Groups, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
                         Text("No teams yet", color = TextSecondary, fontSize = 16.sp)
                         Text("Tap + to create your first team", color = TextSecondary, fontSize = 13.sp)
@@ -99,7 +104,6 @@ fun TeamsScreen(
             }
         }
 
-        // Add Dialog
         if (showAddDialog) {
             TeamDialog(
                 title = "Create Team",
@@ -111,29 +115,18 @@ fun TeamsScreen(
             )
         }
 
-        // Edit Dialog
         teamToEdit?.let { team ->
             TeamDialog(
                 title = "Edit Team",
                 team = team,
                 onDismiss = { teamToEdit = null },
                 onConfirm = { teamInsert ->
-                    viewModel.updateTeam(team.id, mapOf(
-                        "name" to teamInsert.name,
-                        "short_name" to teamInsert.shortName,
-                        "jersey_color" to teamInsert.jerseyColor,
-                        "category" to teamInsert.category,
-                        "country" to teamInsert.country,
-                        "city" to teamInsert.city,
-                        "home_ground" to teamInsert.homeGround,
-                        "coach" to teamInsert.coach
-                    ))
+                    viewModel.updateTeam(team.id, teamInsert)
                     teamToEdit = null
                 }
             )
         }
 
-        // Delete Dialog
         teamToDelete?.let { team ->
             AlertDialog(
                 onDismissRequest = { teamToDelete = null },
@@ -147,12 +140,13 @@ fun TeamsScreen(
                     ) { Text("Delete", color = Color.White) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { teamToDelete = null }) { Text("Cancel", color = TextSecondary) }
+                    TextButton(onClick = { teamToDelete = null }) {
+                        Text("Cancel", color = TextSecondary)
+                    }
                 }
             )
         }
 
-        // Error
         uiState.error?.let {
             Snackbar(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
@@ -182,11 +176,7 @@ fun TeamCard(
             .clickable { onClick() }
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Team logo / color circle
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -197,26 +187,17 @@ fun TeamCard(
             ) {
                 Text(
                     team.shortName?.take(3) ?: team.name.take(2).uppercase(),
-                    color = jerseyColor,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    color = jerseyColor, fontSize = 14.sp, fontWeight = FontWeight.Bold
                 )
             }
-
             Spacer(modifier = Modifier.width(12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(team.name, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    team.category?.let {
-                        CategoryBadge(it)
-                    }
-                    team.city?.let {
-                        Text("📍 $it", color = TextSecondary, fontSize = 11.sp)
-                    }
+                    team.category?.let { CategoryBadge(it) }
+                    team.city?.let { Text("📍 $it", color = TextSecondary, fontSize = 11.sp) }
                 }
             }
-
             Row {
                 IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
@@ -226,18 +207,13 @@ fun TeamCard(
                 }
             }
         }
-
-        if (team.coach != null || team.homeGround != null || team.joinCode != null) {
+        if (team.coach != null || team.joinCode != null) {
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                team.coach?.let {
-                    Text("🏏 Coach: $it", color = TextSecondary, fontSize = 11.sp)
-                }
-                team.joinCode?.let {
-                    Text("🔑 $it", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
+                team.coach?.let { Text("🏏 Coach: $it", color = TextSecondary, fontSize = 11.sp) }
+                team.joinCode?.let { Text("🔑 $it", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             }
         }
     }
@@ -280,13 +256,14 @@ fun TeamDialog(
     var city by remember { mutableStateOf(team?.city ?: "") }
     var homeGround by remember { mutableStateOf(team?.homeGround ?: "") }
     var coach by remember { mutableStateOf(team?.coach ?: "") }
-    var showCategoryDropdown by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
         focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-        cursorColor = NeonGreen, focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary,
-        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
+        cursorColor = NeonGreen, focusedLabelColor = NeonGreen,
+        unfocusedLabelColor = TextSecondary,
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent
     )
 
     AlertDialog(
@@ -308,34 +285,53 @@ fun TeamDialog(
                 }
                 item {
                     OutlinedTextField(
-                        value = shortName, onValueChange = { if (it.length <= 5) shortName = it },
+                        value = shortName,
+                        onValueChange = { if (it.length <= 5) shortName = it },
                         label = { Text("Short Name (e.g. PAK)") },
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
                         colors = fieldColors
                     )
                 }
                 item {
-                    // Category dropdown
-                    Box {
-                        OutlinedTextField(
-                            value = selectedCategory,
-                            onValueChange = {},
-                            label = { Text("Category") },
-                            readOnly = true,
-                            trailingIcon = { Text("▼", color = TextSecondary) },
-                            modifier = Modifier.fillMaxWidth().clickable { showCategoryDropdown = true },
-                            colors = fieldColors
-                        )
-                        DropdownMenu(
-                            expanded = showCategoryDropdown,
-                            onDismissRequest = { showCategoryDropdown = false },
-                            modifier = Modifier.background(SurfaceCard)
-                        ) {
-                            TEAM_CATEGORIES.forEach { cat ->
-                                DropdownMenuItem(
-                                    text = { Text(cat, color = TextPrimary) },
-                                    onClick = { selectedCategory = cat; showCategoryDropdown = false }
-                                )
+                    Text("Category", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TEAM_CATEGORIES.chunked(2).forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { cat ->
+                                    val isSelected = selectedCategory == cat
+                                    val catColor = when (cat) {
+                                        "International" -> NeonBlue
+                                        "Domestic" -> Color(0xFF8B5CF6)
+                                        "Club" -> NeonGreen
+                                        "School" -> AmberColor
+                                        "College" -> Color(0xFFEC4899)
+                                        "Corporate" -> Color(0xFF06B6D4)
+                                        else -> TextSecondary
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) catColor.copy(alpha = 0.2f) else BackgroundDark)
+                                            .border(1.dp, if (isSelected) catColor else BorderColor, RoundedCornerShape(8.dp))
+                                            .clickable { selectedCategory = cat }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            cat,
+                                            color = if (isSelected) catColor else TextSecondary,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
@@ -348,9 +344,7 @@ fun TeamDialog(
                             val c = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { NeonGreen }
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(c)
+                                    .size(32.dp).clip(CircleShape).background(c)
                                     .border(if (selectedColor == colorHex) 3.dp else 0.dp, Color.White, CircleShape)
                                     .clickable { selectedColor = colorHex }
                             )
@@ -362,9 +356,7 @@ fun TeamDialog(
                             val c = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { NeonGreen }
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(c)
+                                    .size(32.dp).clip(CircleShape).background(c)
                                     .border(if (selectedColor == colorHex) 3.dp else 0.dp, Color.White, CircleShape)
                                     .border(1.dp, BorderColor, CircleShape)
                                     .clickable { selectedColor = colorHex }
