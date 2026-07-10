@@ -51,15 +51,58 @@ class ScoringViewModel : ViewModel() {
                 val currentInnings = allInnings.find { it.status == "live" }
                 val completedInnings = allInnings.filter { it.status == "completed" }
 
+                // Check if match is complete
                 if (completedInnings.size >= 2) {
-                    _uiState.update { it.copy(isLoading = false, matchComplete = true) }
-                    return@launch
+                    val inn1 = allInnings.find { it.inningsNo == 1 }
+                    val inn2 = allInnings.find { it.inningsNo == 2 }
+                    val tied = inn1 != null && inn2 != null &&
+                            inn1.totalRuns == inn2.totalRuns
+                    val superOverEnabled = match.superOverEnabled
+
+                    // Super over innings
+                    val superOverInnings = allInnings.filter { it.inningsNo >= 3 }
+                    val superOverLive = superOverInnings.find { it.status == "live" }
+                    val superOverComplete = superOverInnings.filter { it.status == "completed" }
+
+                    when {
+                        superOverLive != null -> {
+                            // Super over live hai — continue scoring
+                            if (superOverLive.inningsNo == 4) {
+                                val superInn1 = allInnings.find { it.inningsNo == 3 }
+                                target = if (superInn1 != null) superInn1.totalRuns + 1 else null
+                            }
+                            // Fall through to normal loading below
+                        }
+                        superOverComplete.size >= 2 -> {
+                            _uiState.update { it.copy(isLoading = false, matchComplete = true) }
+                            return@launch
+                        }
+                        tied && superOverEnabled -> {
+                            // Tie — super over hoga, wait for checkAndStartNextInnings
+                            _uiState.update { it.copy(isLoading = false, matchComplete = true) }
+                            return@launch
+                        }
+                        else -> {
+                            _uiState.update { it.copy(isLoading = false, matchComplete = true) }
+                            return@launch
+                        }
+                    }
                 }
 
+                // Set target for 2nd innings
                 val firstInnings = allInnings.find { it.inningsNo == 1 }
-                target = if (firstInnings != null && firstInnings.status == "completed") {
-                    firstInnings.totalRuns + 1
-                } else null
+                val thirdInnings = allInnings.find { it.inningsNo == 3 }
+
+                target = when {
+                    // Super over 2nd innings
+                    currentInnings?.inningsNo == 4 && thirdInnings != null ->
+                        thirdInnings.totalRuns + 1
+                    // Normal 2nd innings
+                    firstInnings != null && firstInnings.status == "completed" &&
+                            (currentInnings?.inningsNo == 2 || allInnings.count { it.status == "completed" } == 1) ->
+                        firstInnings.totalRuns + 1
+                    else -> null
+                }
 
                 val battingTeamId: String
                 val bowlingTeamId: String
@@ -105,8 +148,12 @@ class ScoringViewModel : ViewModel() {
                             isLoading = false
                         )
                     }
-                } else if (allInnings.isEmpty() || completedInnings.size == 1) {
-                    val inningsNo = if (allInnings.isEmpty()) 1 else 2
+                } else {
+                    val inningsNo = when {
+                        allInnings.isEmpty() -> 1
+                        completedInnings.size == 1 && allInnings.none { it.inningsNo >= 3 } -> 2
+                        else -> (allInnings.maxOfOrNull { it.inningsNo } ?: 0) + 1
+                    }
                     val newInnings = scoringRepository.createInnings(
                         InningsInsert(
                             matchId = matchId,
@@ -146,14 +193,85 @@ class ScoringViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                val match = matchRepository.getMatchById(matchId) ?: return@launch
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
                 val completedInnings = allInnings.filter { it.status == "completed" }
+
                 when {
-                    completedInnings.size >= 2 -> onMatchComplete()
-                    else -> {
-                        target = null
+                    // Super over innings complete check
+                    completedInnings.size >= 4 -> {
+                        onMatchComplete()
+                    }
+
+                    // Super over 1st innings complete - start 2nd
+                    completedInnings.size == 3 -> {
+                        val superInn1 = allInnings.find { it.inningsNo == 3 }
+                        if (superInn1 != null) {
+                            target = superInn1.totalRuns + 1
+                            _uiState.update { it.copy(inningsComplete = false, matchComplete = false) }
+                            isMatchLoaded = false
+                            inningsCompleteHandled = false
+                            loadMatch(matchId)
+                        } else {
+                            onMatchComplete()
+                        }
+                    }
+
+                    // Normal 2 innings complete
+                    completedInnings.size >= 2 -> {
+                        val inn1 = allInnings.find { it.inningsNo == 1 }
+                        val inn2 = allInnings.find { it.inningsNo == 2 }
+
+                        if (inn1 != null && inn2 != null) {
+                            val tied = inn2.totalRuns == inn1.totalRuns
+                            val superOverEnabled = match.superOverEnabled
+
+                            if (tied && superOverEnabled) {
+                                // Super over — innings 3 create karo
+                                // Batting second team pehle bats in super over
+                                val superInn1 = allInnings.find { it.inningsNo == 3 }
+                                if (superInn1 == null) {
+                                    val superOverOvers = 1 // Super over = 1 over
+                                    scoringRepository.createInnings(
+                                        InningsInsert(
+                                            matchId = matchId,
+                                            inningsNo = 3,
+                                            battingTeamId = inn2.battingTeamId,
+                                            bowlingTeamId = inn2.bowlingTeamId
+                                        )
+                                    )
+                                    target = null
+                                    _uiState.update {
+                                        it.copy(inningsComplete = false, matchComplete = false)
+                                    }
+                                    isMatchLoaded = false
+                                    inningsCompleteHandled = false
+                                    loadMatch(matchId)
+                                } else {
+                                    onMatchComplete()
+                                }
+                            } else {
+                                onMatchComplete()
+                            }
+                        } else {
+                            onMatchComplete()
+                        }
+                    }
+
+                    // 1 innings complete - 2nd innings start
+                    completedInnings.size == 1 -> {
+                        val inn1 = completedInnings.first()
+                        target = inn1.totalRuns + 1
                         _uiState.update { it.copy(inningsComplete = false) }
                         isMatchLoaded = false
+                        inningsCompleteHandled = false
+                        loadMatch(matchId)
+                    }
+
+                    else -> {
+                        _uiState.update { it.copy(inningsComplete = false) }
+                        isMatchLoaded = false
+                        inningsCompleteHandled = false
                         loadMatch(matchId)
                     }
                 }
@@ -255,15 +373,12 @@ class ScoringViewModel : ViewModel() {
                     newBalls, newExtras, newWides, newNoBalls
                 )
 
-                val newBatsmanStats = computeBatsmanStats(updatedBalls, battingPlayers)
-                val newBowlerStats = computeBowlerStats(updatedBalls, bowlingPlayers)
-
                 _uiState.update {
                     it.copy(
                         innings = updatedInnings,
                         balls = updatedBalls,
-                        batsmanStats = newBatsmanStats,
-                        bowlerStats = newBowlerStats,
+                        batsmanStats = computeBatsmanStats(updatedBalls, battingPlayers),
+                        bowlerStats = computeBowlerStats(updatedBalls, bowlingPlayers),
                         inningsComplete = false,
                         error = null
                     )
@@ -393,8 +508,11 @@ class ScoringViewModel : ViewModel() {
                 val maxWickets = match.playersPerSide - 1
                 val currentTarget = target
                 val targetChased = currentTarget != null && newTotalRuns >= currentTarget
+
+                // Super over max overs = 1
+                val maxOvers = if (innings.inningsNo >= 3) 1 else match.totalOvers
                 val isInningsComplete = newTotalWickets >= maxWickets ||
-                        newTotalBalls >= match.totalOvers * 6 ||
+                        newTotalBalls >= maxOvers * 6 ||
                         targetChased
 
                 if (isInningsComplete) {
