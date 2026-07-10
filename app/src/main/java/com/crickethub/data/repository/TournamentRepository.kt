@@ -2,94 +2,149 @@ package com.crickethub.data.repository
 
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.MatchInsert
-import com.crickethub.data.model.Team
 import com.crickethub.data.model.Tournament
 import com.crickethub.data.model.TournamentInsert
 import com.crickethub.data.model.TournamentTeam
 import com.crickethub.data.model.TournamentTeamInsert
 import com.crickethub.data.remote.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Order
 
 class TournamentRepository {
 
+    private val client = SupabaseClient.client
+
     suspend fun getAllTournaments(): List<Tournament> {
-        return SupabaseClient.client.postgrest["tournaments"]
-            .select { order("created_at", Order.DESCENDING) }
-            .decodeList<Tournament>()
+        return client.postgrest["tournaments"]
+            .select()
+            .decodeList()
     }
 
-    suspend fun getTournamentById(id: String): Tournament? {
-        return SupabaseClient.client.postgrest["tournaments"]
-            .select { filter { eq("id", id) } }
-            .decodeSingleOrNull<Tournament>()
+    suspend fun getTournamentById(tournamentId: String): Tournament? {
+        return client.postgrest["tournaments"]
+            .select { filter { eq("id", tournamentId) } }
+            .decodeSingleOrNull()
     }
 
     suspend fun createTournament(tournament: TournamentInsert): Tournament {
-        return SupabaseClient.client.postgrest["tournaments"]
+        return client.postgrest["tournaments"]
             .insert(tournament) { select() }
-            .decodeSingle<Tournament>()
-    }
-
-    suspend fun addTeamToTournament(tournamentId: String, teamId: String): TournamentTeam {
-        return SupabaseClient.client.postgrest["tournament_teams"]
-            .insert(TournamentTeamInsert(tournamentId, teamId)) { select() }
-            .decodeSingle<TournamentTeam>()
+            .decodeSingle()
     }
 
     suspend fun getTournamentTeams(tournamentId: String): List<TournamentTeam> {
-        return SupabaseClient.client.postgrest["tournament_teams"]
+        return client.postgrest["tournament_teams"]
             .select { filter { eq("tournament_id", tournamentId) } }
-            .decodeList<TournamentTeam>()
+            .decodeList()
     }
 
-    suspend fun getTournamentMatches(tournamentId: String): List<Match> {
-        return SupabaseClient.client.postgrest["matches"]
-            .select {
-                filter { eq("tournament_id", tournamentId) }
-                order("created_at", Order.ASCENDING)
-            }
-            .decodeList<Match>()
+    suspend fun getTournamentFixtures(tournamentId: String): List<Match> {
+        return client.postgrest["matches"]
+            .select { filter { eq("tournament_id", tournamentId) } }
+            .decodeList()
     }
 
-    suspend fun generateFixtures(
-        tournamentId: String,
-        teams: List<Team>,
-        totalOvers: Int,
-        createdBy: String
-    ): List<Match> {
-        val matches = mutableListOf<MatchInsert>()
-
-        // Round robin — har team har doosri team se ek baar khele
-        for (i in teams.indices) {
-            for (j in i + 1 until teams.size) {
-                matches.add(
-                    MatchInsert(
-                        team1Id = teams[i].id,
-                        team2Id = teams[j].id,
-                        totalOvers = totalOvers,
-                        createdBy = createdBy,
-                    )
-                )
-            }
-        }
-
-        val createdMatches = mutableListOf<Match>()
-        matches.forEach { matchInsert ->
-            val match = SupabaseClient.client.postgrest["matches"]
-                .insert(matchInsert) { select() }
-                .decodeSingle<Match>()
-
-            // Tournament ID link karo
-            SupabaseClient.client.postgrest["matches"]
-                .update({ set("tournament_id", tournamentId) }) {
-                    filter { eq("id", match.id) }
+    suspend fun addTeamToTournament(tournamentId: String, teamId: String) {
+        try {
+            val existing = client.postgrest["tournament_teams"]
+                .select {
+                    filter {
+                        eq("tournament_id", tournamentId)
+                        eq("team_id", teamId)
+                    }
                 }
+                .decodeList<TournamentTeam>()
 
-            createdMatches.add(match)
+            if (existing.isEmpty()) {
+                client.postgrest["tournament_teams"]
+                    .insert(
+                        TournamentTeamInsert(
+                            tournamentId = tournamentId,
+                            teamId = teamId
+                        )
+                    )
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Add team error: ${e.message}", e)
+            throw e
+        }
+    }
+
+    suspend fun removeTeamFromTournament(tournamentId: String, teamId: String) {
+        client.postgrest["tournament_teams"]
+            .delete {
+                filter {
+                    eq("tournament_id", tournamentId)
+                    eq("team_id", teamId)
+                }
+            }
+    }
+
+    suspend fun generateFixtures(tournamentId: String, format: String): List<Match> {
+        val teams = getTournamentTeams(tournamentId)
+        val teamIds = teams.map { it.teamId }
+        if (teamIds.size < 2) return emptyList()
+
+        val pairs = mutableListOf<Pair<String, String>>()
+
+        when (format) {
+            "League", "Round Robin" -> {
+                for (i in teamIds.indices) {
+                    for (j in i + 1 until teamIds.size) {
+                        pairs.add(Pair(teamIds[i], teamIds[j]))
+                    }
+                }
+            }
+            "Double Round Robin" -> {
+                for (round in 1..2) {
+                    for (i in teamIds.indices) {
+                        for (j in i + 1 until teamIds.size) {
+                            pairs.add(Pair(teamIds[i], teamIds[j]))
+                        }
+                    }
+                }
+            }
+            "Knockout" -> {
+                for (i in teamIds.indices step 2) {
+                    if (i + 1 < teamIds.size) {
+                        pairs.add(Pair(teamIds[i], teamIds[i + 1]))
+                    }
+                }
+            }
+            "Group + Knockout", "Hybrid" -> {
+                for (i in teamIds.indices) {
+                    for (j in i + 1 until teamIds.size) {
+                        pairs.add(Pair(teamIds[i], teamIds[j]))
+                    }
+                }
+            }
         }
 
-        return createdMatches
+        pairs.forEachIndexed { index, (team1Id, team2Id) ->
+            try {
+                client.postgrest["matches"]
+                    .insert(
+                        MatchInsert(
+                            team1Id = team1Id,
+                            team2Id = team2Id,
+                            matchType = "T20",
+                            totalOvers = 20,
+                            playersPerSide = 11,
+                            tournamentId = tournamentId,
+                            matchNumber = index + 1,
+                            powerplayOvers = 6,
+                            freeHitOnNoball = true,
+                            superOverEnabled = false,
+                            maxOversPerBowler = 4,
+                            isPublic = true,
+                            inningsBreakMinutes = 20
+                        )
+                    )
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Fixture create error: ${e.message}", e)
+            }
+        }
+
+        return getTournamentFixtures(tournamentId)
     }
 
     suspend fun updatePointsTable(
@@ -101,59 +156,79 @@ class TournamentRepository {
         winnerOvers: Double,
         loserOvers: Double
     ) {
-        // Winner update
-        val winnerEntry = SupabaseClient.client.postgrest["tournament_teams"]
-            .select {
-                filter {
-                    eq("tournament_id", tournamentId)
-                    eq("team_id", winnerTeamId)
-                }
-            }
-            .decodeSingleOrNull<TournamentTeam>()
-
-        if (winnerEntry != null) {
-            SupabaseClient.client.postgrest["tournament_teams"]
-                .update({
-                    set("points", winnerEntry.points + 2)
-                    set("wins", winnerEntry.wins + 1)
-                    set("matches_played", winnerEntry.matchesPlayed + 1)
-                    set("runs_scored", winnerEntry.runsScored + winnerRuns)
-                    set("runs_conceded", winnerEntry.runsConceded + loserRuns)
-                    set("overs_faced", winnerEntry.oversFaced + winnerOvers)
-                    set("overs_bowled", winnerEntry.oversBowled + loserOvers)
-                }) {
+        try {
+            val winnerEntry = client.postgrest["tournament_teams"]
+                .select {
                     filter {
                         eq("tournament_id", tournamentId)
                         eq("team_id", winnerTeamId)
                     }
                 }
-        }
+                .decodeSingleOrNull<TournamentTeam>()
 
-        // Loser update
-        val loserEntry = SupabaseClient.client.postgrest["tournament_teams"]
-            .select {
-                filter {
-                    eq("tournament_id", tournamentId)
-                    eq("team_id", loserTeamId)
-                }
+            if (winnerEntry != null) {
+                val newRunsScored = winnerEntry.runsScoreTotal + winnerRuns
+                val newRunsConceded = winnerEntry.runsConcededTotal + loserRuns
+                val newOversFaced = winnerEntry.oversFacedTotal + winnerOvers
+                val newOversBowled = winnerEntry.oversBowledTotal + loserOvers
+                val nrr = if (newOversFaced > 0 && newOversBowled > 0)
+                    (newRunsScored / newOversFaced) - (newRunsConceded / newOversBowled)
+                else 0.0
+
+                client.postgrest["tournament_teams"]
+                    .update({
+                        set("wins", winnerEntry.wins + 1)
+                        set("matches_played", winnerEntry.matchesPlayed + 1)
+                        set("points", winnerEntry.points + 2)
+                        set("runs_scored_total", newRunsScored)
+                        set("runs_conceded_total", newRunsConceded)
+                        set("overs_faced_total", newOversFaced)
+                        set("overs_bowled_total", newOversBowled)
+                        set("nrr", nrr)
+                    }) {
+                        filter {
+                            eq("tournament_id", tournamentId)
+                            eq("team_id", winnerTeamId)
+                        }
+                    }
             }
-            .decodeSingleOrNull<TournamentTeam>()
 
-        if (loserEntry != null) {
-            SupabaseClient.client.postgrest["tournament_teams"]
-                .update({
-                    set("losses", loserEntry.losses + 1)
-                    set("matches_played", loserEntry.matchesPlayed + 1)
-                    set("runs_scored", loserEntry.runsScored + loserRuns)
-                    set("runs_conceded", loserEntry.runsConceded + winnerRuns)
-                    set("overs_faced", loserEntry.oversFaced + loserOvers)
-                    set("overs_bowled", loserEntry.oversBowled + winnerOvers)
-                }) {
+            val loserEntry = client.postgrest["tournament_teams"]
+                .select {
                     filter {
                         eq("tournament_id", tournamentId)
                         eq("team_id", loserTeamId)
                     }
                 }
+                .decodeSingleOrNull<TournamentTeam>()
+
+            if (loserEntry != null) {
+                val newRunsScored = loserEntry.runsScoreTotal + loserRuns
+                val newRunsConceded = loserEntry.runsConcededTotal + winnerRuns
+                val newOversFaced = loserEntry.oversFacedTotal + loserOvers
+                val newOversBowled = loserEntry.oversBowledTotal + winnerOvers
+                val nrr = if (newOversFaced > 0 && newOversBowled > 0)
+                    (newRunsScored / newOversFaced) - (newRunsConceded / newOversBowled)
+                else 0.0
+
+                client.postgrest["tournament_teams"]
+                    .update({
+                        set("losses", loserEntry.losses + 1)
+                        set("matches_played", loserEntry.matchesPlayed + 1)
+                        set("runs_scored_total", newRunsScored)
+                        set("runs_conceded_total", newRunsConceded)
+                        set("overs_faced_total", newOversFaced)
+                        set("overs_bowled_total", newOversBowled)
+                        set("nrr", nrr)
+                    }) {
+                        filter {
+                            eq("tournament_id", tournamentId)
+                            eq("team_id", loserTeamId)
+                        }
+                    }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Points table error: ${e.message}", e)
         }
     }
 }

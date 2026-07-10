@@ -10,7 +10,10 @@ import com.crickethub.data.model.TournamentTeam
 import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.TeamRepository
 import com.crickethub.data.repository.TournamentRepository
-import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,12 +25,10 @@ data class TournamentUiState(
     val currentTournament: Tournament? = null,
     val tournamentTeams: List<TournamentTeam> = emptyList(),
     val teamDetails: List<Team> = emptyList(),
-    val allTeams: List<Team> = emptyList(),
     val fixtures: List<Match> = emptyList(),
+    val allTeams: List<Team> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null,
-    val tournamentCreated: Boolean = false,
-    val fixturesGenerated: Boolean = false
+    val error: String? = null
 )
 
 class TournamentViewModel : ViewModel() {
@@ -40,7 +41,6 @@ class TournamentViewModel : ViewModel() {
 
     init {
         loadTournaments()
-        loadAllTeams()
     }
 
     fun loadTournaments() {
@@ -50,6 +50,7 @@ class TournamentViewModel : ViewModel() {
                 val tournaments = tournamentRepository.getAllTournaments()
                 _uiState.update { it.copy(tournaments = tournaments, isLoading = false) }
             } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Load tournaments error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
@@ -72,56 +73,44 @@ class TournamentViewModel : ViewModel() {
             try {
                 val tournament = tournamentRepository.getTournamentById(tournamentId)
                 val tournamentTeams = tournamentRepository.getTournamentTeams(tournamentId)
-                val fixtures = tournamentRepository.getTournamentMatches(tournamentId)
-
-                // Team details fetch karo
+                val fixtures = tournamentRepository.getTournamentFixtures(tournamentId)
                 val teamIds = tournamentTeams.map { it.teamId }
-                val teamDetails = _uiState.value.allTeams.filter { it.id in teamIds }
+
+                // Parallel load team details — much faster
+                val teamDetails = coroutineScope {
+                    teamIds.map { teamId ->
+                        async {
+                            try {
+                                SupabaseClient.client.postgrest["teams"]
+                                    .select { filter { eq("id", teamId) } }
+                                    .decodeSingleOrNull<Team>()
+                            } catch (e: Exception) { null }
+                        }
+                    }.awaitAll().filterNotNull()
+                }
 
                 _uiState.update {
                     it.copy(
+                        isLoading = false,
                         currentTournament = tournament,
                         tournamentTeams = tournamentTeams,
                         teamDetails = teamDetails,
-                        fixtures = fixtures,
-                        isLoading = false
+                        fixtures = fixtures.sortedBy { m -> m.matchNumber ?: 0 }
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Tournament detail error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
     }
 
-    fun createTournament(name: String, selectedTeamIds: List<String>, totalOvers: Int) {
+    fun createTournament(tournament: TournamentInsert) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id ?: return@launch
-
-                // Tournament create karo
-                val tournament = tournamentRepository.createTournament(
-                    TournamentInsert(name = name, createdBy = userId)
-                )
-
-                // Teams add karo
-                selectedTeamIds.forEach { teamId ->
-                    tournamentRepository.addTeamToTournament(tournament.id, teamId)
-                }
-
-                // Fixtures generate karo
-                val selectedTeams = _uiState.value.allTeams.filter { it.id in selectedTeamIds }
-                tournamentRepository.generateFixtures(
-                    tournament.id, selectedTeams, totalOvers, userId
-                )
-
-                _uiState.update {
-                    it.copy(
-                        currentTournament = tournament,
-                        isLoading = false,
-                        tournamentCreated = true
-                    )
-                }
+                val created = tournamentRepository.createTournament(tournament)
+                _uiState.update { it.copy(currentTournament = created, isLoading = false) }
                 loadTournaments()
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "Create tournament error: ${e.message}", e)
@@ -130,7 +119,69 @@ class TournamentViewModel : ViewModel() {
         }
     }
 
-    fun resetTournamentCreated() {
-        _uiState.update { it.copy(tournamentCreated = false) }
+    fun addTeamToTournament(tournamentId: String, teamId: String) {
+        viewModelScope.launch {
+            try {
+                tournamentRepository.addTeamToTournament(tournamentId, teamId)
+                loadTournamentDetail(tournamentId)
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Add team error: ${e.message}", e)
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun removeTeamFromTournament(tournamentId: String, teamId: String) {
+        viewModelScope.launch {
+            try {
+                tournamentRepository.removeTeamFromTournament(tournamentId, teamId)
+                loadTournamentDetail(tournamentId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun generateFixtures(tournamentId: String, format: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                tournamentRepository.generateFixtures(tournamentId, format)
+                loadTournamentDetail(tournamentId)
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Generate fixtures error: ${e.message}", e)
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
+    fun updateTournamentStatus(tournamentId: String, status: String) {
+        viewModelScope.launch {
+            try {
+                SupabaseClient.client.postgrest["tournaments"]
+                    .update({ set("status", status) }) {
+                        filter { eq("id", tournamentId) }
+                    }
+                loadTournamentDetail(tournamentId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteTournament(tournamentId: String) {
+        viewModelScope.launch {
+            try {
+                SupabaseClient.client.postgrest["tournaments"]
+                    .delete { filter { eq("id", tournamentId) } }
+                loadTournaments()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
     }
 }
