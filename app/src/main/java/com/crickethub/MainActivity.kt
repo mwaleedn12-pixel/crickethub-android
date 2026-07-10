@@ -298,7 +298,6 @@ fun CricketHubApp() {
                 if (scoringEntry != null) {
                     val scoringViewModel: ScoringViewModel = viewModel(scoringEntry)
                     val scoringState by scoringViewModel.uiState.collectAsState()
-
                     var team1Name by remember { mutableStateOf("Team 1") }
                     var team2Name by remember { mutableStateOf("Team 2") }
 
@@ -405,7 +404,11 @@ fun CricketHubApp() {
                 )
             }
             composable("career") {
-                PlayerCareerScreen(onBack = { navController.popBackStack() })
+                PlayerCareerScreen(
+                    onBack = { navController.popBackStack() },
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
+                )
             }
         }
     }
