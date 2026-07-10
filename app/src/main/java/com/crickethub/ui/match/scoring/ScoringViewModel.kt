@@ -29,16 +29,12 @@ class ScoringViewModel : ViewModel() {
     private var inningsCompleteHandled = false
     private var isMatchLoaded = false
     private var currentMatchId = ""
+    private var target: Int? = null
 
     fun loadMatch(matchId: String, forceReload: Boolean = false) {
         if (isMatchLoaded && matchId == currentMatchId && !forceReload) {
-            // Screen wapas aayi — sirf flags reset karo, state preserve karo
             _uiState.update {
-                it.copy(
-                    inningsComplete = false,
-                    matchComplete = false,
-                    error = null
-                )
+                it.copy(inningsComplete = false, matchComplete = false, error = null)
             }
             return
         }
@@ -59,6 +55,11 @@ class ScoringViewModel : ViewModel() {
                     _uiState.update { it.copy(isLoading = false, matchComplete = true) }
                     return@launch
                 }
+
+                val firstInnings = allInnings.find { it.inningsNo == 1 }
+                target = if (firstInnings != null && firstInnings.status == "completed") {
+                    firstInnings.totalRuns + 1
+                } else null
 
                 val battingTeamId: String
                 val bowlingTeamId: String
@@ -150,6 +151,7 @@ class ScoringViewModel : ViewModel() {
                 when {
                     completedInnings.size >= 2 -> onMatchComplete()
                     else -> {
+                        target = null
                         _uiState.update { it.copy(inningsComplete = false) }
                         isMatchLoaded = false
                         loadMatch(matchId)
@@ -166,7 +168,6 @@ class ScoringViewModel : ViewModel() {
     fun setNonStriker(player: Player) { _uiState.update { it.copy(nonStriker = player) } }
     fun setBowler(player: Player) { _uiState.update { it.copy(currentBowler = player) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
-    fun setRetiredHurt() { _uiState.update { it.copy(striker = null) } }
 
     fun getMaxOversPerBowler(totalOvers: Int): Int = when (totalOvers) {
         5 -> 1; 10 -> 2; 20 -> 4; 50 -> 10
@@ -254,12 +255,15 @@ class ScoringViewModel : ViewModel() {
                     newBalls, newExtras, newWides, newNoBalls
                 )
 
+                val newBatsmanStats = computeBatsmanStats(updatedBalls, battingPlayers)
+                val newBowlerStats = computeBowlerStats(updatedBalls, bowlingPlayers)
+
                 _uiState.update {
                     it.copy(
                         innings = updatedInnings,
                         balls = updatedBalls,
-                        batsmanStats = computeBatsmanStats(updatedBalls, battingPlayers),
-                        bowlerStats = computeBowlerStats(updatedBalls, bowlingPlayers),
+                        batsmanStats = newBatsmanStats,
+                        bowlerStats = newBowlerStats,
                         inningsComplete = false,
                         error = null
                     )
@@ -357,7 +361,6 @@ class ScoringViewModel : ViewModel() {
                 )
 
                 val newBalls = state.balls + insertedBall
-
                 var newStriker = state.striker
                 var newNonStriker = state.nonStriker
 
@@ -388,9 +391,15 @@ class ScoringViewModel : ViewModel() {
                 }
 
                 val maxWickets = match.playersPerSide - 1
+                val currentTarget = target
+                val targetChased = currentTarget != null && newTotalRuns >= currentTarget
                 val isInningsComplete = newTotalWickets >= maxWickets ||
-                        newTotalBalls >= match.totalOvers * 6
-                if (isInningsComplete) scoringRepository.completeInnings(innings.id)
+                        newTotalBalls >= match.totalOvers * 6 ||
+                        targetChased
+
+                if (isInningsComplete) {
+                    scoringRepository.completeInnings(innings.id)
+                }
 
                 _uiState.update {
                     it.copy(
@@ -423,9 +432,7 @@ class ScoringViewModel : ViewModel() {
             val fours = playerBalls.count { it.isBoundary && !it.isSix }
             val sixes = playerBalls.count { it.isSix }
             val isOut = playerBalls.any {
-                it.isWicket &&
-                        it.wicketType != "run_out" &&
-                        it.wicketType != "retired_hurt"
+                it.isWicket && it.wicketType != "run_out" && it.wicketType != "retired_hurt"
             }
             val wicketBall = playerBalls.firstOrNull { it.isWicket }
             statsMap[player.id] = BatsmanStats(
@@ -470,31 +477,36 @@ class ScoringViewModel : ViewModel() {
         batsmanName: String, bowlerName: String, fielderName: String? = null
     ): String {
         if (isWicket) return when (wicketType) {
-            "bowled" -> "BOWLED! b $bowlerName — $batsmanName is clean bowled!"
+            "bowled" -> "BOWLED! $batsmanName b $bowlerName"
             "caught" -> if (fielderName != null) "CAUGHT! c $fielderName b $bowlerName" else "CAUGHT! b $bowlerName"
             "lbw" -> "LBW! lbw b $bowlerName"
             "run_out" -> if (fielderName != null) "RUN OUT! run out ($fielderName)" else "RUN OUT!"
-            "stumped" -> if (fielderName != null) "STUMPED! st $fielderName b $bowlerName" else "STUMPED! st Keeper b $bowlerName"
-            "hit_wicket" -> "HIT WICKET! hit wicket b $bowlerName"
+            "stumped" -> if (fielderName != null) "STUMPED! st $fielderName b $bowlerName" else "STUMPED!"
+            "hit_wicket" -> "HIT WICKET! b $bowlerName"
             "retired_out" -> "RETIRED OUT!"
+            "retired_hurt" -> "RETIRED HURT! ($batsmanName can return)"
             "obstructing" -> "OBSTRUCTING THE FIELD!"
+            "timed_out" -> "TIMED OUT!"
+            "handled_ball" -> "HANDLED THE BALL!"
+            "hit_ball_twice" -> "HIT THE BALL TWICE!"
             else -> "OUT! b $bowlerName"
         }
         if (extrasType != null) return when (extrasType) {
-            "wide" -> "Wide! ${(extrasRuns ?: 1) + runs} run(s)."
-            "no_ball" -> "No Ball! Free hit next! $runs off the bat."
-            "bye" -> "${extrasRuns ?: 1} Bye(s)!"
-            "leg_bye" -> "${extrasRuns ?: 1} Leg Bye(s)!"
-            else -> "Extras."
+            "wide" -> "Wide! ${(extrasRuns ?: 1) + runs} run(s)"
+            "no_ball" -> "No Ball! Free hit next! $runs off bat"
+            "bye" -> "${extrasRuns ?: 1} Bye(s)"
+            "leg_bye" -> "${extrasRuns ?: 1} Leg Bye(s)"
+            else -> "Extras"
         }
         return when (runs) {
-            0 -> "Dot. $batsmanName defends."
-            1 -> "$batsmanName takes a single."
+            0 -> "Dot. $batsmanName defends"
+            1 -> "$batsmanName takes a single"
             2 -> "Two runs!"
             3 -> "Three!"
             4 -> "FOUR! $batsmanName to the boundary!"
+            5 -> "Five runs!"
             6 -> "SIX! $batsmanName maximum!"
-            else -> "$runs runs."
+            else -> "$runs runs"
         }
     }
 }

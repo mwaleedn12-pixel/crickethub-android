@@ -38,6 +38,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.crickethub.data.model.Innings
+import com.crickethub.data.model.Team
 import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.ui.auth.ForgotPasswordScreen
@@ -278,12 +279,8 @@ fun CricketHubApp() {
                             popUpTo("matches")
                         }
                     },
-                    onViewScorecard = {
-                        navController.navigate("live_scorecard/$matchId")
-                    },
-                    onViewAnalytics = {
-                        navController.navigate("analytics/$matchId")
-                    },
+                    onViewScorecard = { navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { navController.navigate("analytics/$matchId") },
                     viewModel = scoringViewModel
                 )
             }
@@ -311,10 +308,10 @@ fun CricketHubApp() {
                             if (match != null) {
                                 val t1 = SupabaseClient.client.postgrest["teams"]
                                     .select { filter { eq("id", match.team1Id) } }
-                                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                                    .decodeSingleOrNull<Team>()
                                 val t2 = SupabaseClient.client.postgrest["teams"]
                                     .select { filter { eq("id", match.team2Id) } }
-                                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                                    .decodeSingleOrNull<Team>()
                                 team1Name = t1?.name ?: "Team 1"
                                 team2Name = t2?.name ?: "Team 2"
                             }
@@ -323,7 +320,14 @@ fun CricketHubApp() {
                         }
                     }
 
-                    LaunchedEffect(scoringState.balls.size, scoringState.innings?.totalRuns) {
+                    LaunchedEffect(
+                        scoringState.balls.size,
+                        scoringState.innings?.totalRuns,
+                        scoringState.innings?.totalWickets,
+                        scoringState.innings?.totalBalls,
+                        scoringState.innings?.wides,
+                        scoringState.innings?.noBalls
+                    ) {
                         if (scoringState.innings != null) {
                             liveViewModel.updateFromScoringState(scoringState, team1Name, team2Name)
                         }
@@ -407,9 +411,6 @@ fun CricketHubApp() {
     }
 }
 
-// =============================================
-// MATCH FLOW SCREEN — Complete backend check
-// =============================================
 @Composable
 fun MatchFlowScreen(
     matchId: String,
@@ -419,101 +420,58 @@ fun MatchFlowScreen(
     onGoToScoring: () -> Unit,
     onMatchComplete: () -> Unit
 ) {
-    var statusText by remember { mutableStateOf("Loading match...") }
-
     LaunchedEffect(matchId) {
         try {
             val repo = MatchRepository()
+            val match = repo.getMatchById(matchId) ?: return@LaunchedEffect
 
-            // STEP 1: Match exist karta hai?
-            val match = repo.getMatchById(matchId)
-            if (match == null) {
-                statusText = "Match not found"
-                return@LaunchedEffect
-            }
-
-            // STEP 2: Toss hua?
             if (match.tossWinnerId == null) {
-                statusText = "Going to toss..."
                 onGoToToss()
                 return@LaunchedEffect
             }
 
-            // STEP 3: Playing XI select hua?
             val xi = repo.getPlayingXI(matchId)
             val playersNeeded = match.playersPerSide
             val team1Count = xi.count { player -> player.teamId == match.team1Id }
             val team2Count = xi.count { player -> player.teamId == match.team2Id }
 
             if (team1Count < playersNeeded) {
-                statusText = "Selecting Team 1 XI..."
                 val t1 = SupabaseClient.client.postgrest["teams"]
                     .select { filter { eq("id", match.team1Id) } }
-                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                    .decodeSingleOrNull<Team>()
                 onGoToTeam1XI(match.team1Id, t1?.name ?: "Team 1", playersNeeded)
                 return@LaunchedEffect
             }
 
             if (team2Count < playersNeeded) {
-                statusText = "Selecting Team 2 XI..."
                 val t2 = SupabaseClient.client.postgrest["teams"]
                     .select { filter { eq("id", match.team2Id) } }
-                    .decodeSingleOrNull<com.crickethub.data.model.Team>()
+                    .decodeSingleOrNull<Team>()
                 onGoToTeam2XI(match.team2Id, t2?.name ?: "Team 2", playersNeeded)
                 return@LaunchedEffect
             }
 
-            // STEP 4: Innings check karo
             val allInnings = SupabaseClient.client.postgrest["innings"]
                 .select { filter { eq("match_id", matchId) } }
                 .decodeList<Innings>()
                 .sortedBy { it.inningsNo }
 
             val completedInnings = allInnings.filter { it.status == "completed" }
-            val liveInnings = allInnings.find { it.status == "live" }
 
-            // Dono innings complete — match khatam
             if (completedInnings.size >= 2) {
-                statusText = "Match complete"
                 onMatchComplete()
                 return@LaunchedEffect
             }
 
-            // 1st innings check
-            if (allInnings.isEmpty()) {
-                // Koi innings nahi — scoring shuru karo, ViewModel create karega
-                statusText = "Starting 1st innings..."
-                onGoToScoring()
-                return@LaunchedEffect
-            }
-
-            // Live innings hai — continue karo
-            if (liveInnings != null) {
-                statusText = "Continuing innings ${liveInnings.inningsNo}..."
-                onGoToScoring()
-                return@LaunchedEffect
-            }
-
-            // 1st innings complete, 2nd nahi shuru
-            if (completedInnings.size == 1 && allInnings.size == 1) {
-                statusText = "Starting 2nd innings..."
-                onGoToScoring()
-                return@LaunchedEffect
-            }
-
-            // Default — scoring pe jao
             onGoToScoring()
 
         } catch (e: Exception) {
-            statusText = "Error: ${e.message}"
             android.util.Log.e("CricketHub", "MatchFlow error: ${e.message}", e)
         }
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark),
+        modifier = Modifier.fillMaxSize().background(BackgroundDark),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(color = NeonGreen)
