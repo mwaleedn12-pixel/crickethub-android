@@ -13,6 +13,8 @@ import com.crickethub.data.repository.MatchRepository
 import com.crickethub.data.repository.ScoringRepository
 import com.crickethub.data.repository.TournamentRepository
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,80 +92,115 @@ class PostMatchViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val match = matchRepository.getMatchById(matchId) ?: return@launch
+                coroutineScope {
+                    // Parallel: match + innings
+                    val matchDeferred = async { matchRepository.getMatchById(matchId) }
+                    val allInningsDeferred = async { scoringRepository.getInningsByMatch(matchId) }
 
-                val team1 = SupabaseClient.client.postgrest["teams"]
-                    .select { filter { eq("id", match.team1Id) } }
-                    .decodeSingleOrNull<Team>()
-                val team2 = SupabaseClient.client.postgrest["teams"]
-                    .select { filter { eq("id", match.team2Id) } }
-                    .decodeSingleOrNull<Team>()
+                    val match = matchDeferred.await() ?: return@coroutineScope
+                    val allInnings = allInningsDeferred.await()
+                    val innings1 = allInnings.firstOrNull { it.inningsNo == 1 }
+                    val innings2 = allInnings.firstOrNull { it.inningsNo == 2 }
 
-                val allInnings = scoringRepository.getInningsByMatch(matchId)
-                val innings1 = allInnings.firstOrNull { it.inningsNo == 1 }
-                val innings2 = allInnings.firstOrNull { it.inningsNo == 2 }
+                    // Parallel: teams + balls
+                    val t1Deferred = async {
+                        try {
+                            SupabaseClient.client.postgrest["teams"]
+                                .select { filter { eq("id", match.team1Id) } }
+                                .decodeSingleOrNull<Team>()
+                        } catch (e: Exception) { null }
+                    }
+                    val t2Deferred = async {
+                        try {
+                            SupabaseClient.client.postgrest["teams"]
+                                .select { filter { eq("id", match.team2Id) } }
+                                .decodeSingleOrNull<Team>()
+                        } catch (e: Exception) { null }
+                    }
+                    val balls1Deferred = async {
+                        if (innings1 != null) scoringRepository.getBallsByInnings(innings1.id)
+                        else emptyList()
+                    }
+                    val balls2Deferred = async {
+                        if (innings2 != null) scoringRepository.getBallsByInnings(innings2.id)
+                        else emptyList()
+                    }
 
-                val balls1 = if (innings1 != null)
-                    scoringRepository.getBallsByInnings(innings1.id) else emptyList()
-                val balls2 = if (innings2 != null)
-                    scoringRepository.getBallsByInnings(innings2.id) else emptyList()
+                    val team1 = t1Deferred.await()
+                    val team2 = t2Deferred.await()
+                    val balls1 = balls1Deferred.await()
+                    val balls2 = balls2Deferred.await()
 
-                // Innings 1 teams
-                val inn1BattingTeamId = innings1?.battingTeamId
-                    ?: match.battingFirstId
-                    ?: match.team1Id
-                val inn1BowlingTeamId = innings1?.bowlingTeamId
-                    ?: if (inn1BattingTeamId == match.team1Id) match.team2Id else match.team1Id
-                val inn1BattingTeamName = if (inn1BattingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
-                val inn1BowlingTeamName = if (inn1BowlingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
+                    // Team name assignments
+                    val inn1BattingTeamId = innings1?.battingTeamId
+                        ?: match.battingFirstId
+                        ?: match.team1Id
+                    val inn1BowlingTeamId = innings1?.bowlingTeamId
+                        ?: if (inn1BattingTeamId == match.team1Id) match.team2Id else match.team1Id
+                    val inn1BattingTeamName = if (inn1BattingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
+                    val inn1BowlingTeamName = if (inn1BowlingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
+                    val inn2BattingTeamId = inn1BowlingTeamId
+                    val inn2BowlingTeamId = inn1BattingTeamId
+                    val inn2BattingTeamName = inn1BowlingTeamName
+                    val inn2BowlingTeamName = inn1BattingTeamName
 
-                // Innings 2 teams (opposite of innings 1)
-                val inn2BattingTeamId = inn1BowlingTeamId
-                val inn2BowlingTeamId = inn1BattingTeamId
-                val inn2BattingTeamName = inn1BowlingTeamName
-                val inn2BowlingTeamName = inn1BattingTeamName
+                    // Parallel: playing XI for all 4 combinations
+                    val inn1BatDeferred = async {
+                        scoringRepository.getPlayingXIPlayers(matchId, inn1BattingTeamId)
+                    }
+                    val inn1BowlDeferred = async {
+                        scoringRepository.getPlayingXIPlayers(matchId, inn1BowlingTeamId)
+                    }
+                    val inn2BatDeferred = async {
+                        scoringRepository.getPlayingXIPlayers(matchId, inn2BattingTeamId)
+                    }
+                    val inn2BowlDeferred = async {
+                        scoringRepository.getPlayingXIPlayers(matchId, inn2BowlingTeamId)
+                    }
 
-                val inn1BatPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn1BattingTeamId)
-                val inn1BowlPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn1BowlingTeamId)
-                val inn2BatPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn2BattingTeamId)
-                val inn2BowlPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn2BowlingTeamId)
+                    val inn1BatPlayers = inn1BatDeferred.await()
+                    val inn1BowlPlayers = inn1BowlDeferred.await()
+                    val inn2BatPlayers = inn2BatDeferred.await()
+                    val inn2BowlPlayers = inn2BowlDeferred.await()
 
-                val innings1Batting = computeBattingScorecard(balls1, inn1BatPlayers)
-                val innings1Bowling = computeBowlingScorecard(balls1, inn1BowlPlayers)
-                val innings2Batting = computeBattingScorecard(balls2, inn2BatPlayers)
-                val innings2Bowling = computeBowlingScorecard(balls2, inn2BowlPlayers)
+                    // Compute scorecards
+                    val innings1Batting = computeBattingScorecard(balls1, inn1BatPlayers)
+                    val innings1Bowling = computeBowlingScorecard(balls1, inn1BowlPlayers)
+                    val innings2Batting = computeBattingScorecard(balls2, inn2BatPlayers)
+                    val innings2Bowling = computeBowlingScorecard(balls2, inn2BowlPlayers)
 
-                val allPlayers = (inn1BatPlayers + inn1BowlPlayers + inn2BatPlayers + inn2BowlPlayers)
-                    .distinctBy { it.id }
-                val motmCandidates = computeMotmCandidates(allPlayers, balls1, balls2)
+                    val allPlayers = (inn1BatPlayers + inn1BowlPlayers + inn2BatPlayers + inn2BowlPlayers)
+                        .distinctBy { it.id }
+                    val motmCandidates = computeMotmCandidates(allPlayers, balls1, balls2)
 
-                val resultText = computeResultText(
-                    match, innings1, innings2, team1, team2,
-                    inn1BattingTeamId, inn1BattingTeamName, inn1BowlingTeamName
-                )
-
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        match = match,
-                        innings1 = innings1,
-                        innings2 = innings2,
-                        team1 = team1,
-                        team2 = team2,
-                        innings1BattingTeamName = inn1BattingTeamName,
-                        innings1BowlingTeamName = inn1BowlingTeamName,
-                        innings2BattingTeamName = inn2BattingTeamName,
-                        innings2BowlingTeamName = inn2BowlingTeamName,
-                        innings1Batting = innings1Batting,
-                        innings1Bowling = innings1Bowling,
-                        innings2Batting = innings2Batting,
-                        innings2Bowling = innings2Bowling,
-                        inn1Balls = balls1,
-                        inn2Balls = balls2,
-                        motmCandidates = motmCandidates,
-                        selectedMotm = motmCandidates.firstOrNull()?.player,
-                        resultText = resultText
+                    val resultText = computeResultText(
+                        match, innings1, innings2, team1, team2,
+                        inn1BattingTeamId, inn1BattingTeamName, inn1BowlingTeamName
                     )
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            match = match,
+                            innings1 = innings1,
+                            innings2 = innings2,
+                            team1 = team1,
+                            team2 = team2,
+                            innings1BattingTeamName = inn1BattingTeamName,
+                            innings1BowlingTeamName = inn1BowlingTeamName,
+                            innings2BattingTeamName = inn2BattingTeamName,
+                            innings2BowlingTeamName = inn2BowlingTeamName,
+                            innings1Batting = innings1Batting,
+                            innings1Bowling = innings1Bowling,
+                            innings2Batting = innings2Batting,
+                            innings2Bowling = innings2Bowling,
+                            inn1Balls = balls1,
+                            inn2Balls = balls2,
+                            motmCandidates = motmCandidates,
+                            selectedMotm = motmCandidates.firstOrNull()?.player,
+                            resultText = resultText
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "PostMatch error: ${e.message}", e)
@@ -191,6 +228,9 @@ class PostMatchViewModel : ViewModel() {
                     }) {
                         filter { eq("id", matchId) }
                     }
+
+                matchRepository.invalidateMatchCache(matchId)
+                matchRepository.invalidateMatchesCache()
 
                 if (match.tournamentId != null && innings1 != null && innings2 != null) {
                     updateTournamentPoints(match, innings1, innings2)
@@ -246,6 +286,7 @@ class PostMatchViewModel : ViewModel() {
                     loserOvers = if (loserId == battingFirstId) inn1Overs else inn2Overs
                 )
             } else {
+                // Tie — draw points
                 listOf(battingFirstId, battingSecondId).forEach { teamId ->
                     val entry = SupabaseClient.client.postgrest["tournament_teams"]
                         .select {
@@ -340,9 +381,7 @@ class PostMatchViewModel : ViewModel() {
             val wides = playerBalls.count { it.extrasType == "wide" }
             val noBalls = playerBalls.count { it.extrasType == "no_ball" }
             val maidens = playerBalls.groupBy { it.overNo }.values.count { overBalls ->
-                overBalls.count {
-                    it.extrasType != "wide" && it.extrasType != "no_ball"
-                } == 6 &&
+                overBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" } == 6 &&
                         overBalls.sumOf { it.runsOffBat + (it.extrasRuns ?: 0) } == 0
             }
             BowlerScorecard(

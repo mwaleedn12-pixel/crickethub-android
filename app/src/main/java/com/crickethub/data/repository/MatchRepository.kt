@@ -10,23 +10,45 @@ import io.github.jan.supabase.postgrest.postgrest
 class MatchRepository {
 
     private val client = SupabaseClient.client
+    private var matchesCache: List<Match>? = null
+    private val matchCache = mutableMapOf<String, Match>()
+    private val xiCache = mutableMapOf<String, List<PlayingXI>>()
 
     suspend fun getAllMatches(): List<Match> {
-        return client.postgrest["matches"]
-            .select()
-            .decodeList()
+        return matchesCache ?: run {
+            val matches = client.postgrest["matches"]
+                .select()
+                .decodeList<Match>()
+                .sortedByDescending { it.createdAt }
+            matchesCache = matches
+            matches
+        }
+    }
+
+    fun invalidateMatchesCache() {
+        matchesCache = null
+        matchCache.clear()
     }
 
     suspend fun getMatchById(matchId: String): Match? {
-        return client.postgrest["matches"]
-            .select { filter { eq("id", matchId) } }
-            .decodeSingleOrNull()
+        return matchCache.getOrPut(matchId) {
+            client.postgrest["matches"]
+                .select { filter { eq("id", matchId) } }
+                .decodeSingleOrNull<Match>() ?: return null
+        }
+    }
+
+    fun invalidateMatchCache(matchId: String) {
+        matchCache.remove(matchId)
+        matchesCache = null
     }
 
     suspend fun createMatch(match: MatchInsert): Match {
-        return client.postgrest["matches"]
+        val result = client.postgrest["matches"]
             .insert(match) { select() }
-            .decodeSingle()
+            .decodeSingle<Match>()
+        matchesCache = null
+        return result
     }
 
     suspend fun updateToss(
@@ -35,7 +57,7 @@ class MatchRepository {
         tossDecision: String,
         battingFirstId: String
     ): Match {
-        return client.postgrest["matches"]
+        val result = client.postgrest["matches"]
             .update({
                 set("toss_winner_id", tossWinnerId)
                 set("toss_decision", tossDecision)
@@ -45,17 +67,27 @@ class MatchRepository {
                 filter { eq("id", matchId) }
                 select()
             }
-            .decodeSingle()
+            .decodeSingle<Match>()
+        matchCache[matchId] = result
+        matchesCache = null
+        return result
     }
 
     suspend fun getPlayingXI(matchId: String): List<PlayingXI> {
-        return client.postgrest["playing_xi"]
-            .select { filter { eq("match_id", matchId) } }
-            .decodeList()
+        return xiCache.getOrPut(matchId) {
+            client.postgrest["playing_xi"]
+                .select { filter { eq("match_id", matchId) } }
+                .decodeList()
+        }
+    }
+
+    fun invalidateXICache(matchId: String) {
+        xiCache.remove(matchId)
     }
 
     suspend fun insertPlayingXI(players: List<PlayingXIInsert>) {
         if (players.isEmpty()) return
         client.postgrest["playing_xi"].insert(players)
+        players.firstOrNull()?.let { xiCache.remove(it.matchId) }
     }
 }
