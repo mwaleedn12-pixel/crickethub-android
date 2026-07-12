@@ -36,6 +36,7 @@ class MatchViewModel : ViewModel() {
 
     init {
         loadMatches()
+        loadTeams() // ← FIX: teams bhi load karo taake match cards mein names show hon
     }
 
     fun loadMatches() {

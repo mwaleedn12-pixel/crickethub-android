@@ -40,7 +40,14 @@ data class ScoringUiState(
     val bowlerStats: Map<String, BowlerStats> = emptyMap(),
     val inningsComplete: Boolean = false,
     val matchComplete: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val dlsEnabled: Boolean = false,
+    val dlsParScore: Int? = null,
+    val dlsTarget: Int? = null,
+    val dlsTeam1Resource: Double = 100.0,
+    val dlsOversRemaining: Double = 0.0,
+    val dlsWicketsLost: Int = 0,
+    val showDLSBanner: Boolean = false
 ) {
     val totalRuns: Int get() = innings?.totalRuns ?: 0
     val totalWickets: Int get() = innings?.totalWickets ?: 0

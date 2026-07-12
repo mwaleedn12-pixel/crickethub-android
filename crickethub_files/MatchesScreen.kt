@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Match
-import com.crickethub.ui.theme.*
 
 
 @Composable
@@ -29,7 +28,6 @@ fun MatchesScreen(
     onMatchClick: (String) -> Unit,
     onViewScorecard: (String) -> Unit,
     onViewAnalytics: (String) -> Unit,
-    onDLSCalculator: () -> Unit = {},
     viewModel: MatchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()

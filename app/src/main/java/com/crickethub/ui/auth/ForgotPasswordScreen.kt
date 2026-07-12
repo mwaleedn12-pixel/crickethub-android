@@ -20,14 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crickethub.ui.theme.*
 
-private val BackgroundDark = Color(0xFF030712)
-private val SurfaceCard = Color(0xFF111827)
-private val BorderColor = Color(0xFF1F2937)
-private val NeonGreen = Color(0xFF10B981)
-private val TextPrimary = Color(0xFFF9FAFB)
-private val TextSecondary = Color(0xFF9CA3AF)
-private val ErrorRed = Color(0xFFEF4444)
 
 @Composable
 fun ForgotPasswordScreen(

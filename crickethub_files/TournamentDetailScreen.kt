@@ -27,7 +27,6 @@ import com.crickethub.data.model.Team
 import com.crickethub.data.model.TournamentTeam
 import com.crickethub.data.repository.ScoringRepository
 import kotlinx.coroutines.launch
-import com.crickethub.ui.theme.*
 
 
 val TOURNAMENT_FORMATS = listOf(

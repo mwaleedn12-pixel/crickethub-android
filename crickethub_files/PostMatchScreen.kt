@@ -27,7 +27,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.Innings
 import com.crickethub.data.model.Player
-import com.crickethub.ui.theme.*
 
 
 @Composable

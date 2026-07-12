@@ -27,16 +27,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.BatsmanStats
 import com.crickethub.data.model.BowlerStats
+import com.crickethub.ui.theme.*
 
-private val BackgroundDark = Color(0xFF030712)
-private val SurfaceCard = Color(0xFF111827)
-private val BorderColor = Color(0xFF1F2937)
-private val NeonGreen = Color(0xFF10B981)
-private val NeonBlue = Color(0xFF3B82F6)
-private val TextPrimary = Color(0xFFF9FAFB)
-private val TextSecondary = Color(0xFF9CA3AF)
-private val ErrorRed = Color(0xFFEF4444)
-private val AmberColor = Color(0xFFF59E0B)
 
 @Composable
 fun LiveScorecardScreen(

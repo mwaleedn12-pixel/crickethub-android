@@ -29,7 +29,6 @@ import com.crickethub.data.repository.MatchRepository
 import com.crickethub.data.repository.ScoringRepository
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
-import com.crickethub.ui.theme.*
 
 @Composable
 fun AnalyticsScreen(

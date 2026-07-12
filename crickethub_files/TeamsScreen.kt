@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.TeamInsert
-import com.crickethub.ui.theme.*
 
 
 val TEAM_CATEGORIES = listOf(
