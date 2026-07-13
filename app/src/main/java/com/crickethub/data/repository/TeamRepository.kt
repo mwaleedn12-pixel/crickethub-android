@@ -68,6 +68,7 @@ class TeamRepository {
 
     suspend fun updateTeam(
         teamId: String, name: String, shortName: String?,
+        logoUrl: String? = null,
         jerseyColor: String?, category: String?, country: String?,
         city: String?, homeGround: String?, coach: String?
     ): Team {
@@ -75,6 +76,7 @@ class TeamRepository {
             .update(
                 TeamInsert(
                     name = name, shortName = shortName,
+                    logoUrl = logoUrl,
                     jerseyColor = jerseyColor, category = category,
                     country = country, city = city,
                     homeGround = homeGround, coach = coach

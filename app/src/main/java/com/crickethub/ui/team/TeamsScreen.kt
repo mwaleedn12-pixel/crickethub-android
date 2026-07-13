@@ -1,6 +1,11 @@
 package com.crickethub.ui.team
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
 import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -138,6 +143,7 @@ fun TeamsScreen(
                     items(filteredTeams) { team ->
                         TeamCard(
                             team = team,
+                            playerCount = uiState.playerCounts[team.id] ?: 0,
                             isDark = isDark,
                             onClick = { onTeamClick(team.id) },
                             onEdit = { teamToEdit = team },
@@ -154,8 +160,8 @@ fun TeamsScreen(
                 team = null,
                 isDark = isDark,
                 onDismiss = { showAddDialog = false },
-                onConfirm = { name, category, color ->
-                    viewModel.createTeam(TeamInsert(name = name, category = category, jerseyColor = color))
+                onConfirm = { insert ->
+                    viewModel.createTeam(insert)
                     showAddDialog = false
                 }
             )
@@ -166,8 +172,8 @@ fun TeamsScreen(
                 team = team,
                 isDark = isDark,
                 onDismiss = { teamToEdit = null },
-                onConfirm = { name, category, color ->
-                    viewModel.updateTeam(team.id, TeamInsert(name = name, category = category, jerseyColor = color))
+                onConfirm = { insert ->
+                    viewModel.updateTeam(team.id, insert)
                     teamToEdit = null
                 }
             )
@@ -198,6 +204,7 @@ fun TeamsScreen(
 @Composable
 fun TeamCard(
     team: Team,
+    playerCount: Int = 0,
     isDark: Boolean,
     onClick: () -> Unit,
     onEdit: () -> Unit,
@@ -221,17 +228,26 @@ fun TeamCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Team avatar
+        // Team avatar — logo if available, else initials
         Box(
             modifier = Modifier.size(48.dp).clip(CircleShape)
                 .background(Brush.radialGradient(listOf(teamColor.copy(alpha = 0.35f), teamColor.copy(alpha = 0.1f))))
                 .border(1.5.dp, teamColor.copy(alpha = 0.6f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                team.name.take(2).uppercase(),
-                color = teamColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold
-            )
+            if (!team.logoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = team.logoUrl,
+                    contentDescription = "${team.name} logo",
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Text(
+                    team.name.take(2).uppercase(),
+                    color = teamColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
 
         // Team info
@@ -242,7 +258,7 @@ fun TeamCard(
                     Text(it, color = textS, fontSize = 11.sp)
                     Text("•", color = textS, fontSize = 11.sp)
                 }
-                Text("${11} players", color = textS, fontSize = 11.sp)
+                Text("$playerCount players", color = textS, fontSize = 11.sp)
             }
         }
 
@@ -281,21 +297,36 @@ fun AddEditTeamDialog(
     team: Team?,
     isDark: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String, String?, String?) -> Unit
+    onConfirm: (TeamInsert) -> Unit,
+    viewModel: TeamViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     var name by remember { mutableStateOf(team?.name ?: "") }
+    var shortName by remember { mutableStateOf(team?.shortName ?: "") }
     var selectedCategory by remember { mutableStateOf(team?.category ?: TEAM_CATEGORIES[0]) }
     var selectedColor by remember { mutableStateOf(team?.jerseyColor ?: JERSEY_COLORS[0]) }
+    var city by remember { mutableStateOf(team?.city ?: "") }
+    var country by remember { mutableStateOf(team?.country ?: "") }
+    var homeGround by remember { mutableStateOf(team?.homeGround ?: "") }
+    var coach by remember { mutableStateOf(team?.coach ?: "") }
+    var logoUrl by remember { mutableStateOf(team?.logoUrl ?: "") }
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
     val green  = Color(0xFF34D399)
     val textP  = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
     val textS  = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
     val border = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
+    val surfBg = if (isDark) Color(0xFF0D2018) else Color.White
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = textP, unfocusedTextColor = textP,
+        focusedBorderColor = green, unfocusedBorderColor = border,
+        focusedLabelColor = green, unfocusedLabelColor = textS, cursorColor = green,
+        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = if (isDark) Color(0xFF0D2018) else Color.White,
+        containerColor = surfBg,
         title = {
             Text(
                 if (team == null) "Create Team" else "Edit Team",
@@ -303,65 +334,129 @@ fun AddEditTeamDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name, onValueChange = { name = it },
-                    label = { Text("Team Name") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = textP, unfocusedTextColor = textP,
-                        focusedBorderColor = green, unfocusedBorderColor = border,
-                        focusedLabelColor = green, unfocusedLabelColor = textS, cursorColor = green
-                    )
-                )
-
-                // Category dropdown
-                ExposedDropdownMenuBox(expanded = showCategoryDropdown, onExpandedChange = { showCategoryDropdown = it }) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.heightIn(max = 480.dp)
+            ) {
+                item {
                     OutlinedTextField(
-                        value = selectedCategory, onValueChange = {}, readOnly = true,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showCategoryDropdown) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = textP, unfocusedTextColor = textP,
-                            focusedBorderColor = green, unfocusedBorderColor = border,
-                            focusedLabelColor = green, unfocusedLabelColor = textS, cursorColor = green
-                        )
+                        value = name, onValueChange = { name = it },
+                        label = { Text("Team Name *") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors
                     )
-                    ExposedDropdownMenu(
-                        expanded = showCategoryDropdown, onDismissRequest = { showCategoryDropdown = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
-                    ) {
-                        TEAM_CATEGORIES.forEach { cat ->
-                            DropdownMenuItem(
-                                text = { Text(cat, color = textP, fontSize = 13.sp) },
-                                onClick = { selectedCategory = cat; showCategoryDropdown = false }
-                            )
+                }
+                item {
+                    OutlinedTextField(
+                        value = shortName, onValueChange = { if (it.length <= 5) shortName = it },
+                        label = { Text("Short Name (max 5 chars)") },
+                        placeholder = { Text("e.g. EXI", color = textS) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    LogoPickerField(
+                        logoUrl = logoUrl,
+                        isDark = isDark,
+                        onLogoUrlChange = { logoUrl = it },
+                        onImagePicked = { uri, url -> logoUrl = url },
+                        viewModel = viewModel
+                    )
+                }
+                item {
+                    ExposedDropdownMenuBox(expanded = showCategoryDropdown, onExpandedChange = { showCategoryDropdown = it }) {
+                        OutlinedTextField(
+                            value = selectedCategory, onValueChange = {}, readOnly = true,
+                            label = { Text("Category") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showCategoryDropdown) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                            shape = RoundedCornerShape(10.dp), colors = fieldColors
+                        )
+                        ExposedDropdownMenu(
+                            expanded = showCategoryDropdown,
+                            onDismissRequest = { showCategoryDropdown = false },
+                            modifier = Modifier.background(surfBg)
+                        ) {
+                            TEAM_CATEGORIES.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat, color = textP, fontSize = 13.sp) },
+                                    onClick = { selectedCategory = cat; showCategoryDropdown = false }
+                                )
+                            }
                         }
                     }
                 }
-
-                // Color picker
-                Text("Team Color", color = textS, fontSize = 12.sp)
-                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(JERSEY_COLORS.size) { i ->
-                        val col = JERSEY_COLORS[i]
-                        val parsedColor = try { Color(android.graphics.Color.parseColor(col)) } catch (e: Exception) { green }
-                        Box(
-                            modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(parsedColor)
-                                .border(if (selectedColor == col) 2.dp else 0.dp, green, CircleShape)
-                                .clickable { selectedColor = col }
-                        )
+                item {
+                    OutlinedTextField(
+                        value = country, onValueChange = { country = it },
+                        label = { Text("Country (optional)") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = city, onValueChange = { city = it },
+                        label = { Text("City (optional)") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = homeGround, onValueChange = { homeGround = it },
+                        label = { Text("Home Ground (optional)") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = coach, onValueChange = { coach = it },
+                        label = { Text("Coach (optional)") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors
+                    )
+                }
+                item {
+                    Text("Jersey Color", color = textS, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(JERSEY_COLORS.size) { i ->
+                            val col = JERSEY_COLORS[i]
+                            val parsedColor = try { Color(android.graphics.Color.parseColor(col)) } catch (e: Exception) { green }
+                            Box(
+                                modifier = Modifier.size(32.dp).clip(CircleShape)
+                                    .background(parsedColor)
+                                    .border(if (selectedColor == col) 2.5.dp else 0.dp, green, CircleShape)
+                                    .clickable { selectedColor = col }
+                            )
+                        }
                     }
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank()) onConfirm(name.trim(), selectedCategory, selectedColor) },
+                onClick = {
+                    if (name.isNotBlank()) onConfirm(
+                        TeamInsert(
+                            name = name.trim(),
+                            shortName = shortName.ifBlank { null },
+                            logoUrl = logoUrl.ifBlank { null },
+                            category = selectedCategory,
+                            jerseyColor = selectedColor,
+                            country = country.ifBlank { null },
+                            city = city.ifBlank { null },
+                            homeGround = homeGround.ifBlank { null },
+                            coach = coach.ifBlank { null }
+                        )
+                    )
+                },
                 enabled = name.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = green)
             ) { Text(if (team == null) "Create" else "Save", color = Color(0xFF031A0E), fontWeight = FontWeight.Bold) }
@@ -370,4 +465,145 @@ fun AddEditTeamDialog(
             TextButton(onClick = onDismiss) { Text("Cancel", color = textS) }
         }
     )
+}
+
+@Composable
+fun LogoPickerField(
+    logoUrl: String,
+    isDark: Boolean,
+    onLogoUrlChange: (String) -> Unit,
+    onImagePicked: (Uri, String) -> Unit,
+    viewModel: TeamViewModel
+) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+    val green   = Color(0xFF34D399)
+    val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
+    val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val border  = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
+    val surfBg  = if (isDark) Color(0xFF122A1E) else Color(0xFFE8FDF4)
+
+    var showUrlInput by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.uploadTeamLogo(context, it) { url ->
+                onLogoUrlChange(url)
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Team Logo", color = textS, fontSize = 12.sp)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Logo preview
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(surfBg)
+                    .border(1.dp, border, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (logoUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = "Team Logo",
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+                    )
+                } else if (uiState.isUploadingLogo) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = green, strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("🏏", fontSize = 24.sp)
+                }
+            }
+
+            // Buttons
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+                // Gallery picker
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(green.copy(alpha = if (isDark) 0.15f else 0.12f))
+                        .border(1.dp, green.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .clickable { launcher.launch("image/*") }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                            contentDescription = null,
+                            tint = green, modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            if (uiState.isUploadingLogo) "Uploading..." else "Pick from Gallery",
+                            color = green, fontSize = 12.sp, fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // URL input toggle
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Transparent)
+                        .border(1.dp, border, RoundedCornerShape(8.dp))
+                        .clickable { showUrlInput = !showUrlInput }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Paste URL instead",
+                        color = textS, fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        // URL input field (toggle)
+        if (showUrlInput) {
+            OutlinedTextField(
+                value = logoUrl,
+                onValueChange = { onLogoUrlChange(it) },
+                label = { Text("Logo URL") },
+                placeholder = { Text("https://...", color = textS) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = textP, unfocusedTextColor = textP,
+                    focusedBorderColor = green, unfocusedBorderColor = border,
+                    focusedLabelColor = green, unfocusedLabelColor = textS, cursorColor = green,
+                    focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
+                )
+            )
+        }
+
+        if (logoUrl.isNotBlank() && !uiState.isUploadingLogo) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = { onLogoUrlChange("") },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF4444))
+                ) {
+                    Text("Remove logo", fontSize = 11.sp)
+                }
+            }
+        }
+    }
 }
