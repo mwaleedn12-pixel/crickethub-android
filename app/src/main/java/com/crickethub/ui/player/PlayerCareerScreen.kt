@@ -1,8 +1,10 @@
 package com.crickethub.ui.player
 
 import androidx.compose.foundation.background
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -300,7 +302,7 @@ fun PlayerCareerScreen(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Column(modifier = Modifier.fillMaxSize().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
         // Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -327,7 +329,7 @@ fun PlayerCareerScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceCard)
+                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
                     .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                     .clickable { showPlayerPicker = true }
                     .padding(10.dp),
@@ -437,7 +439,7 @@ fun CareerProfileTab(data: CareerData) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(SurfaceCard)
+                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -483,7 +485,7 @@ fun CareerProfileTab(data: CareerData) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
                     .padding(16.dp)
             ) {
                 Text("Personal Info", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -506,7 +508,7 @@ fun CareerProfileTab(data: CareerData) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
                     .padding(16.dp)
             ) {
                 Text("Career Overview", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -603,7 +605,7 @@ fun CareerStatsCard(title: String, content: @Composable ColumnScope.() -> Unit) 
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
+            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
             .padding(16.dp)
     ) {
         Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -699,7 +701,7 @@ fun CareerAchievementsTab(data: CareerData) {
         if (achievements.isEmpty()) {
             item {
                 Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SurfaceCard).padding(32.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -716,7 +718,7 @@ fun CareerAchievementsTab(data: CareerData) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceCard)
+                        .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
                         .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -739,7 +741,7 @@ fun CareerAchievementsTab(data: CareerData) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceCard)
+                        .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
                         .border(1.dp, AmberColor.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -775,7 +777,7 @@ fun CareerHistoryTab(
         // Teams
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SurfaceCard).padding(16.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("🏏 Teams Played For", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -814,7 +816,7 @@ fun CareerHistoryTab(
         if (data.tournaments.isNotEmpty()) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SurfaceCard).padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text("🏆 Tournament History", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -844,7 +846,7 @@ fun CareerHistoryTab(
         // Match History — clickable
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SurfaceCard).padding(16.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("📋 Recent Match History", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -858,7 +860,7 @@ fun CareerHistoryTab(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(BackgroundDark)
+                                .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
                                 .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                                 .padding(12.dp)
                         ) {
