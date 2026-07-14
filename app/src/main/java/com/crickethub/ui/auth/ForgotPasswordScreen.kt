@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,10 +32,14 @@ fun ForgotPasswordScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var email by remember { mutableStateOf("") }
+    var otpCode by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmNewPassword by remember { mutableStateOf("") }
+    var showNewPassword by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.resetEmailSent) {
-        if (uiState.resetEmailSent) {
-            viewModel.clearResetEmailSent()
+    LaunchedEffect(uiState.otpSent) {
+        if (uiState.otpSent) {
+            viewModel.resetOTP()
         }
     }
 
@@ -84,7 +90,7 @@ fun ForgotPasswordScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (uiState.resetEmailSent) {
+        if (uiState.otpSent) {
             // Success state
             Box(
                 modifier = Modifier
@@ -156,7 +162,7 @@ fun ForgotPasswordScreen(
             Button(
                 onClick = {
                     if (email.isNotBlank()) {
-                        viewModel.sendPasswordReset(email.trim())
+                        viewModel.sendPasswordResetOTP(email.trim())
                     }
                 },
                 enabled = email.isNotBlank() && !uiState.isLoading,
@@ -174,7 +180,7 @@ fun ForgotPasswordScreen(
                     )
                 } else {
                     Text(
-                        "Send Reset Link",
+                        "Send OTP Code",
                         color = Color.Black,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
@@ -184,6 +190,76 @@ fun ForgotPasswordScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // OTP + New Password
+            if (uiState.otpSent) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("OTP sent to ${uiState.otpEmail}", color = TextSecondary, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = otpCode, onValueChange = { if (it.length <= 6) otpCode = it },
+                    label = { Text("6-digit OTP Code") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+                        focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = newPassword, onValueChange = { newPassword = it },
+                    label = { Text("New Password") }, singleLine = true,
+                    visualTransformation = if (showNewPassword) androidx.compose.ui.text.input.VisualTransformation.None
+                    else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    trailingIcon = { IconButton(onClick = { showNewPassword = !showNewPassword }) {
+                        Icon(if (showNewPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = TextSecondary)
+                    }},
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+                        focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = confirmNewPassword, onValueChange = { confirmNewPassword = it },
+                    label = { Text("Confirm New Password") }, singleLine = true,
+                    isError = confirmNewPassword.isNotEmpty() && newPassword != confirmNewPassword,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+                        focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                    )
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { viewModel.resetOTP() }, modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                    ) { Text("Resend") }
+                    Button(
+                        onClick = { if (newPassword == confirmNewPassword)
+                            viewModel.verifyOTPAndUpdatePassword(uiState.otpEmail, otpCode, newPassword) },
+                        enabled = otpCode.length == 6 && newPassword.length >= 6
+                                && newPassword == confirmNewPassword && !uiState.isLoading,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                        else Text("Change Password", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+            if (uiState.otpVerified) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Password changed! Please login.", color = NeonGreen, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth())
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically

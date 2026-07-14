@@ -51,6 +51,7 @@ fun SignupScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var selectedRole by remember { mutableStateOf("viewer") }
+    var otpCode by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("") }
     var showGenderDropdown by remember { mutableStateOf(false) }
@@ -255,8 +256,8 @@ fun SignupScreen(
                         onValueChange = { username = it; if (it.length >= 3) viewModel.checkUsername(it) },
                         label = "Username",
                         leadingIcon = { Icon(Icons.Default.AlternateEmail, null, tint = glowColor, modifier = Modifier.size(18.dp)) },
-                        isError = uiState.isUsernameAvailable == false,
-                        supportingText = if (uiState.isUsernameAvailable == false) "Username already taken" else null
+                        isError = uiState.usernameAvailable == false,
+                        supportingText = if (uiState.usernameAvailable == false) "Username already taken" else null
                     )
                     Spacer(modifier = Modifier.height(9.dp))
 
@@ -388,4 +389,49 @@ fun SignupScreen(
             Spacer(modifier = Modifier.height(44.dp))
         }
     }
+
+    // OTP Verification Dialog
+    if (uiState.otpSent) {
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = Color(0xFF0D2018),
+            title = { Text("Verify Your Email", color = NeonGreen, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Enter the 6-digit code sent to ${uiState.otpEmail}",
+                        color = TextSecondary, fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = otpCode,
+                        onValueChange = { if (it.length <= 6) otpCode = it },
+                        label = { Text("OTP Code") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+                            focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                        )
+                    )
+                    uiState.error?.let { Text(it, color = ErrorRed, fontSize = 12.sp) }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.verifyOTP(uiState.otpEmail, otpCode) },
+                    enabled = otpCode.length == 6 && !uiState.isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                ) {
+                    if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                    else Text("Verify", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.resetOTP() }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
 }

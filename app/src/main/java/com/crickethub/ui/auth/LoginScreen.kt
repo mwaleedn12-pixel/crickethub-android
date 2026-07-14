@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
 import com.crickethub.ui.theme.*
 
 @Composable
@@ -46,6 +47,7 @@ fun LoginScreen(
     viewModel: AuthViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -77,27 +79,27 @@ fun LoginScreen(
     // Drift animations — bottom to top full screen
     val drift1 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(35000, easing = LinearEasing)), label = "d1"
+        animationSpec = infiniteRepeatable(tween(27000, easing = LinearEasing)), label = "d1"
     )
     val drift2 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(45000, easing = LinearEasing), initialStartOffset = StartOffset(2000)), label = "d2"
+        animationSpec = infiniteRepeatable(tween(25000, easing = LinearEasing), initialStartOffset = StartOffset(2000)), label = "d2"
     )
     val drift3 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(55000, easing = LinearEasing), initialStartOffset = StartOffset(4500)), label = "d3"
+        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing), initialStartOffset = StartOffset(4500)), label = "d3"
     )
     val drift4 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(40000, easing = LinearEasing), initialStartOffset = StartOffset(1000)), label = "d4"
+        animationSpec = infiniteRepeatable(tween(22000, easing = LinearEasing), initialStartOffset = StartOffset(1000)), label = "d4"
     )
     val drift5 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(50000, easing = LinearEasing), initialStartOffset = StartOffset(3500)), label = "d5"
+        animationSpec = infiniteRepeatable(tween(27000, easing = LinearEasing), initialStartOffset = StartOffset(3500)), label = "d5"
     )
     val drift6 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(32000, easing = LinearEasing), initialStartOffset = StartOffset(5500)), label = "d6"
+        animationSpec = infiniteRepeatable(tween(19000, easing = LinearEasing), initialStartOffset = StartOffset(5500)), label = "d6"
     )
 
     val isDark = isSystemInDarkTheme()
@@ -480,6 +482,27 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Google button
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = borderC)
+                Text("OR", color = textS, fontSize = 11.sp)
+                HorizontalDivider(modifier = Modifier.weight(1f), color = borderC)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { viewModel.signInWithGoogle(context) },
+                enabled = !uiState.isLoading,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, borderC)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text("Continue with Google", color = textP, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Text("Don't have an account? ", color = textS, fontSize = 14.sp)
                 Text("Sign up", color = glowColor, fontSize = 14.sp, fontWeight = FontWeight.Bold,

@@ -41,6 +41,8 @@ import androidx.navigation.navArgument
 import com.crickethub.data.model.Innings
 import com.crickethub.data.model.Team
 import com.crickethub.data.remote.SupabaseClient
+import androidx.compose.runtime.produceState
+import io.github.jan.supabase.auth.auth
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.ui.auth.ForgotPasswordScreen
 import com.crickethub.ui.auth.LoginScreen
@@ -91,13 +93,18 @@ fun CricketHubApp() {
     val showBottomBar = currentRoute in listOf("teams", "matches", "tournaments", "career")
     val scope = rememberCoroutineScope()
 
-    // Warmup Supabase connection on start
+    // Session check — if logged in go to matches
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                SupabaseClient.client.auth.currentUserOrNull()
+                val user = SupabaseClient.client.auth.currentUserOrNull()
+                if (user != null) {
+                    navController.navigate("matches") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
             } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Warmup error: ${e.message}")
+                android.util.Log.e("CricketHub", "Session: ${e.message}")
             }
         }
     }
