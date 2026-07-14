@@ -1,6 +1,8 @@
 package com.crickethub.ui.match.live
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,7 +43,8 @@ fun LiveScorecardScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Scorecard", "Commentary", "Overs", "Partnership", "MVP", "Summary")
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
+Column(modifier = Modifier.fillMaxSize()) {
 
         // Header
         Row(
@@ -206,6 +209,7 @@ fun LiveScorecardScreen(
         }
     }
 }
+} // CricketAnimatedBackground
 
 // ── SCORECARD TAB ────────────────────────────────────────────
 
@@ -240,7 +244,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         // Batsmen
         val battedList = uiState.batsmanStats.values.filter { it.balls > 0 || it.isOut }
         items(battedList) { stats ->
-            Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
+            Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -272,7 +276,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         if (didNotBat.isNotEmpty()) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().background(BackgroundDark)
+                    modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text("Did Not Bat", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -308,7 +312,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         if (fow.isNotEmpty()) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().background(BackgroundDark)
+                    modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text("Fall of Wickets", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -343,7 +347,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         // Bowlers
         val bowlingList = uiState.bowlerStats.values.toList()
         items(bowlingList) { stats ->
-            Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
+            Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically

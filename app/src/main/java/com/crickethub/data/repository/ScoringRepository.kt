@@ -20,12 +20,11 @@ class ScoringRepository {
     private val playersCache = mutableMapOf<String, List<Player>>()
 
     suspend fun getInningsByMatch(matchId: String): List<Innings> {
-        return inningsCache.getOrPut(matchId) {
-            client.postgrest["innings"]
-                .select { filter { eq("match_id", matchId) } }
-                .decodeList<Innings>()
-                .sortedBy { it.inningsNo }
-        }
+        val fresh = client.postgrest["innings"]
+            .select { filter { eq("match_id", matchId) } }
+            .decodeList<Innings>().sortedBy { it.inningsNo }
+        inningsCache[matchId] = fresh
+        return fresh
     }
 
     fun invalidateInningsCache(matchId: String) {
@@ -33,12 +32,11 @@ class ScoringRepository {
     }
 
     suspend fun getBallsByInnings(inningsId: String): List<Ball> {
-        return ballsCache.getOrPut(inningsId) {
-            client.postgrest["balls"]
-                .select { filter { eq("innings_id", inningsId) } }
-                .decodeList<Ball>()
-                .sortedWith(compareBy({ it.overNo }, { it.ballNo }))
-        }
+        val fresh = client.postgrest["balls"]
+            .select { filter { eq("innings_id", inningsId) } }
+            .decodeList<Ball>().sortedWith(compareBy({ it.overNo }, { it.ballNo }))
+        ballsCache[inningsId] = fresh
+        return fresh
     }
 
     fun invalidateBallsCache(inningsId: String) {
@@ -72,6 +70,13 @@ class ScoringRepository {
     }
 
     suspend fun createInnings(innings: InningsInsert): Innings {
+        val existing = try {
+            client.postgrest["innings"].select { filter {
+                eq("match_id", innings.matchId)
+                eq("innings_no", innings.inningsNo)
+            }}.decodeSingleOrNull<Innings>()
+        } catch (e: Exception) { null }
+        if (existing != null) return existing
         val result = client.postgrest["innings"]
             .insert(innings) { select() }
             .decodeSingle<Innings>()

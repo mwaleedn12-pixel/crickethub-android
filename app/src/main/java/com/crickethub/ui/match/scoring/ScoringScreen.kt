@@ -2,6 +2,8 @@ package com.crickethub.ui.match.scoring
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,7 +55,7 @@ fun ScoringScreen(
     var showDLSDialog by remember { mutableStateOf(false) }
     var isFreeHit by remember { mutableStateOf(false) }
 
-    LaunchedEffect(matchId) { viewModel.loadMatch(matchId) }
+    LaunchedEffect(matchId) { viewModel.resumeMatch(matchId) }
 
     LaunchedEffect(uiState.inningsComplete) {
         if (uiState.inningsComplete) {
@@ -100,7 +102,7 @@ fun ScoringScreen(
         context.startActivity(Intent.createChooser(intent, "Share Score"))
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
 
             // ── TOP BAR ──────────────────────────────────────────────
@@ -806,8 +808,8 @@ fun ScoringButtons(
     Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(0, 1, 2, 3, 4, 5, 6).forEach { runs ->
-                val bgColor = when (runs) { 4 -> NeonBlue.copy(alpha = 0.8f); 6 -> NeonGreen.copy(alpha = 0.8f); 5 -> PurpleColor.copy(alpha = 0.8f); else -> SurfaceCard }
-                val textColor = when (runs) { 4, 5, 6 -> Color.White; 0 -> TextSecondary; else -> TextPrimary }
+                val bgColor = when (runs) { 4 -> NeonBlue.copy(alpha = 0.8f); 6 -> NeonGreen.copy(alpha = 0.8f); 5 -> PurpleColor.copy(alpha = 0.8f); else -> Color(0xFF1A3828) }
+                val textColor = when (runs) { 4, 5, 6 -> Color.White; 0 -> Color(0xFF6EE7B7); else -> Color(0xFFECFDF5) }
                 Button(
                     onClick = { onRuns(runs) }, enabled = !isLoading,
                     modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp),

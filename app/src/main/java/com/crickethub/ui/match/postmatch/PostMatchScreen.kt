@@ -1,6 +1,8 @@
 package com.crickethub.ui.match.postmatch
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -54,128 +56,128 @@ fun PostMatchScreen(
         if (uiState.matchSaved) onGoToMatches()
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(BackgroundDark)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
-            }
-            Text(
-                "Match Summary",
-                fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                color = TextPrimary, modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = {
-                val shareText = buildString {
-                    appendLine("🏏 Match Result")
-                    appendLine(uiState.resultText)
-                    uiState.innings1?.let {
-                        appendLine("${uiState.innings1BattingTeamName}: ${it.totalRuns}/${it.totalWickets} (${it.totalBalls / 6}.${it.totalBalls % 6} ov)")
-                    }
-                    uiState.innings2?.let {
-                        appendLine("${uiState.innings2BattingTeamName}: ${it.totalRuns}/${it.totalWickets} (${it.totalBalls / 6}.${it.totalBalls % 6} ov)")
-                    }
-                    uiState.selectedMotm?.let { appendLine("POTM: ${it.fullName}") }
-                }
-                clipboardManager.setText(AnnotatedString(shareText))
-            }) {
-                Icon(Icons.Default.Share, contentDescription = "Share", tint = NeonGreen)
-            }
-        }
-
-        // Result banner
-        if (uiState.resultText.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(NeonGreen.copy(alpha = 0.15f))
-                    .padding(12.dp),
-                contentAlignment = Alignment.Center
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                }
                 Text(
-                    uiState.resultText,
-                    color = NeonGreen, fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
+                    "Match Summary",
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    color = TextPrimary, modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = {
+                    val shareText = buildString {
+                        appendLine("🏏 Match Result")
+                        appendLine(uiState.resultText)
+                        uiState.innings1?.let {
+                            appendLine("${uiState.innings1BattingTeamName}: ${it.totalRuns}/${it.totalWickets} (${it.totalBalls / 6}.${it.totalBalls % 6} ov)")
+                        }
+                        uiState.innings2?.let {
+                            appendLine("${uiState.innings2BattingTeamName}: ${it.totalRuns}/${it.totalWickets} (${it.totalBalls / 6}.${it.totalBalls % 6} ov)")
+                        }
+                        uiState.selectedMotm?.let { appendLine("POTM: ${it.fullName}") }
+                    }
+                    clipboardManager.setText(AnnotatedString(shareText))
+                }) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = NeonGreen)
+                }
             }
-        }
 
-        // Tabs
-        ScrollableTabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = SurfaceCard,
-            contentColor = NeonGreen,
-            edgePadding = 0.dp
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = {
-                        Text(
-                            tab, fontSize = 12.sp,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == index) NeonGreen else TextSecondary
+            // Result banner
+            if (uiState.resultText.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(NeonGreen.copy(alpha = 0.15f))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        uiState.resultText,
+                        color = NeonGreen, fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Tabs
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = SurfaceCard,
+                contentColor = NeonGreen,
+                edgePadding = 0.dp
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                tab, fontSize = 12.sp,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == index) NeonGreen else TextSecondary
+                            )
+                        }
+                    )
+                }
+            }
+
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else {
+                Box(modifier = Modifier.weight(1f)) {
+                    when (selectedTab) {
+                        0 -> PMResultTab(uiState)
+                        1 -> PMInningsTab(
+                            battingTeamName = uiState.innings1BattingTeamName,
+                            bowlingTeamName = uiState.innings1BowlingTeamName,
+                            innings = uiState.innings1,
+                            batting = uiState.innings1Batting,
+                            bowling = uiState.innings1Bowling,
+                            bowlerMap = uiState.innings1Bowling.associate { it.player.id to it.player.fullName }
                         )
+                        2 -> PMInningsTab(
+                            battingTeamName = uiState.innings2BattingTeamName,
+                            bowlingTeamName = uiState.innings2BowlingTeamName,
+                            innings = uiState.innings2,
+                            batting = uiState.innings2Batting,
+                            bowling = uiState.innings2Bowling,
+                            bowlerMap = uiState.innings2Bowling.associate { it.player.id to it.player.fullName }
+                        )
+                        3 -> PMCommentaryTab(uiState)
+                        4 -> PMOversTab(uiState)
+                        5 -> PMAnalyticsTab(uiState)
+                        6 -> PMPotmTab(uiState, onSelectMotm = { viewModel.selectMotm(it) })
                     }
-                )
-            }
-        }
-
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
-            }
-        } else {
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedTab) {
-                    0 -> PMResultTab(uiState)
-                    1 -> PMInningsTab(
-                        battingTeamName = uiState.innings1BattingTeamName,
-                        bowlingTeamName = uiState.innings1BowlingTeamName,
-                        innings = uiState.innings1,
-                        batting = uiState.innings1Batting,
-                        bowling = uiState.innings1Bowling,
-                        bowlerMap = uiState.innings1Bowling.associate { it.player.id to it.player.fullName }
-                    )
-                    2 -> PMInningsTab(
-                        battingTeamName = uiState.innings2BattingTeamName,
-                        bowlingTeamName = uiState.innings2BowlingTeamName,
-                        innings = uiState.innings2,
-                        batting = uiState.innings2Batting,
-                        bowling = uiState.innings2Bowling,
-                        bowlerMap = uiState.innings2Bowling.associate { it.player.id to it.player.fullName }
-                    )
-                    3 -> PMCommentaryTab(uiState)
-                    4 -> PMOversTab(uiState)
-                    5 -> PMAnalyticsTab(uiState)
-                    6 -> PMPotmTab(uiState, onSelectMotm = { viewModel.selectMotm(it) })
                 }
-            }
 
-            // Save button
-            Button(
-                onClick = { viewModel.saveMatchResult(matchId) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
-            ) {
-                Text(
-                    "Save & Complete Match",
-                    color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 15.sp
-                )
+                // Save button
+                Button(
+                    onClick = { viewModel.saveMatchResult(matchId) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                ) {
+                    Text(
+                        "Save & Complete Match",
+                        color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 15.sp
+                    )
+                }
             }
         }
     }
-}
+} // CricketAnimatedBackground
 
 // ── RESULT TAB ───────────────────────────────────────────────
 

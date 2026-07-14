@@ -3,6 +3,8 @@ package com.crickethub.ui.match.analytics
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -91,7 +93,8 @@ fun AnalyticsScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
+Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -137,6 +140,7 @@ fun AnalyticsScreen(
         }
     }
 }
+} // CricketAnimatedBackground
 
 // ── BATTING TAB ──────────────────────────────────────────────
 
@@ -308,7 +312,7 @@ fun BattingAnalyticsTab(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(BackgroundDark)
+                                    .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
                                     .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                                     .padding(8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
@@ -577,7 +581,7 @@ fun SummaryAnalyticsTab(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(BackgroundDark)
+                            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
                             .padding(12.dp)
                     ) {
                         Text(name, color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -1015,7 +1019,7 @@ fun StatBox(label: String, value: String, color: Color, modifier: Modifier = Mod
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(BackgroundDark)
+            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
             .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally

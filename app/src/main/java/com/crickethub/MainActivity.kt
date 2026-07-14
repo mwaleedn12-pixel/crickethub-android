@@ -224,12 +224,30 @@ fun CricketHubApp() {
                 CreateMatchScreen(
                     onBack = { navController.popBackStack() },
                     onMatchCreated = { matchId ->
-                        navController.navigate("match_flow/$matchId") {
-                            popUpTo("matches")
+                        navController.navigate("toss/$matchId") {
+                            popUpTo("matches") { inclusive = false }
                         }
                     }
                 )
             }
+            composable(
+                route = "playing_xi_flow/{matchId}",
+                arguments = listOf(navArgument("matchId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+                PlayingXIFlowScreen(
+                    matchId = matchId,
+                    onGoToTeamXI = { teamId, teamName, playersPerSide ->
+                        navController.navigate("playing_xi/$matchId/$teamId/$teamName/$playersPerSide")
+                    },
+                    onGoToScoring = {
+                        navController.navigate("scoring/$matchId") {
+                            popUpTo("matches") { inclusive = false }
+                        }
+                    }
+                )
+            }
+
             composable(
                 route = "match_flow/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -272,7 +290,7 @@ fun CricketHubApp() {
                 TossScreen(
                     matchId = matchId,
                     onTossComplete = { id ->
-                        navController.navigate("match_flow/$id") {
+                        navController.navigate("playing_xi_flow/$id") {
                             popUpTo("toss/$id") { inclusive = true }
                         }
                     }
@@ -298,8 +316,8 @@ fun CricketHubApp() {
                     playersPerSide = playersPerSide,
                     onBack = { navController.popBackStack() },
                     onXISaved = {
-                        navController.navigate("match_flow/$matchId") {
-                            popUpTo("match_flow/$matchId") { inclusive = true }
+                        navController.navigate("playing_xi_flow/$matchId") {
+                            popUpTo("playing_xi_flow/$matchId") { inclusive = true }
                         }
                     }
                 )
@@ -313,13 +331,11 @@ fun CricketHubApp() {
                 ScoringScreen(
                     matchId = matchId,
                     onBack = {
-                        navController.navigate("matches") {
-                            popUpTo("matches") { inclusive = true }
-                        }
+                        navController.popBackStack("matches", false)
                     },
                     onInningsComplete = {
                         navController.navigate("post_match/$matchId") {
-                            popUpTo("matches")
+                            popUpTo("matches") { inclusive = false }
                         }
                     },
                     onViewScorecard = { navController.navigate("live_scorecard/$matchId") },
@@ -463,6 +479,45 @@ fun CricketHubApp() {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun PlayingXIFlowScreen(
+    matchId: String,
+    onGoToTeamXI: (String, String, Int) -> Unit,
+    onGoToScoring: () -> Unit
+) {
+    LaunchedEffect(matchId) {
+        try {
+            val repo = MatchRepository()
+            val match = repo.getMatchById(matchId) ?: return@LaunchedEffect
+            val xi = repo.getPlayingXI(matchId)
+            val needed = match.playersPerSide
+            val t1Count = xi.count { it.teamId == match.team1Id }
+            val t2Count = xi.count { it.teamId == match.team2Id }
+            if (t1Count < needed) {
+                val t1 = SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", match.team1Id) } }
+                    .decodeSingleOrNull<Team>()
+                onGoToTeamXI(match.team1Id, t1?.name ?: "Team 1", needed)
+                return@LaunchedEffect
+            }
+            if (t2Count < needed) {
+                val t2 = SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", match.team2Id) } }
+                    .decodeSingleOrNull<Team>()
+                onGoToTeamXI(match.team2Id, t2?.name ?: "Team 2", needed)
+                return@LaunchedEffect
+            }
+            onGoToScoring()
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "PlayingXIFlow error: ${e.message}", e)
+        }
+    }
+    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark),
+        contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = NeonGreen)
     }
 }
 

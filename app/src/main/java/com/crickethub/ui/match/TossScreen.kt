@@ -37,6 +37,12 @@ fun TossScreen(
     }
 
     // Sirf tab check karo jab match actually load ho jaye
+    LaunchedEffect(uiState.currentMatch?.tossWinnerId) {
+        if (uiState.currentMatch?.tossWinnerId != null) {
+            onTossComplete(matchId)
+        }
+    }
+
     LaunchedEffect(uiState.currentMatch, uiState.isLoading) {
         val match = uiState.currentMatch
         // Loading khatam ho, match load ho gaya, aur toss already hai
@@ -166,7 +172,6 @@ fun TossScreen(
                     val winner = tossWinnerId ?: return@Button
                     val decision = tossDecision ?: return@Button
                     viewModel.recordToss(matchId, winner, decision)
-                    onTossComplete(matchId)
                 },
                 enabled = tossWinnerId != null && tossDecision != null,
                 modifier = Modifier
