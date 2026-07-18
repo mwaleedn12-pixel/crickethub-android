@@ -113,7 +113,9 @@ class LiveScorecardViewModel : ViewModel() {
             try {
                 val match = matchRepository.getMatchById(matchId) ?: return@launch
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
-                val currentInnings = allInnings.find { it.status == "live" }
+                val currentInnings = allInnings
+                    .filter { it.status == "live" }
+                    .maxByOrNull { it.totalBalls * 10000 + it.totalRuns }
                     ?: allInnings.lastOrNull()
                     ?: return@launch
 

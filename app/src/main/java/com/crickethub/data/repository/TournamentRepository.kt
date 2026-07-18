@@ -7,6 +7,7 @@ import com.crickethub.data.model.TournamentInsert
 import com.crickethub.data.model.TournamentTeam
 import com.crickethub.data.model.TournamentTeamInsert
 import com.crickethub.data.remote.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 
 class TournamentRepository {
@@ -26,8 +27,9 @@ class TournamentRepository {
     }
 
     suspend fun createTournament(tournament: TournamentInsert): Tournament {
+        val userId = client.auth.currentUserOrNull()?.id
         return client.postgrest["tournaments"]
-            .insert(tournament) { select() }
+            .insert(tournament.copy(userId = userId)) { select() }
             .decodeSingle()
     }
 
@@ -119,11 +121,13 @@ class TournamentRepository {
             }
         }
 
+        val userId = client.auth.currentUserOrNull()?.id
         pairs.forEachIndexed { index, (team1Id, team2Id) ->
             try {
                 client.postgrest["matches"]
                     .insert(
                         MatchInsert(
+                            userId = userId,
                             team1Id = team1Id,
                             team2Id = team2Id,
                             matchType = "T20",

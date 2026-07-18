@@ -6,6 +6,7 @@ import com.crickethub.data.model.PlayerInsert
 import com.crickethub.data.model.PlayerStats
 import com.crickethub.data.model.PlayerUpdate
 import com.crickethub.data.remote.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -30,8 +31,9 @@ class PlayerRepository {
     }
 
     suspend fun createPlayer(player: PlayerInsert): Player {
+        val userId = client.auth.currentUserOrNull()?.id
         val result = client.postgrest["players"]
-            .insert(player) { select() }
+            .insert(player.copy(userId = userId)) { select() }
             .decodeSingle<Player>()
         playersCache.remove(player.teamId)
         return result

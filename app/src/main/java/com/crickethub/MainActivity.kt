@@ -64,9 +64,12 @@ import com.crickethub.ui.theme.CricketHubTheme
 import com.crickethub.ui.tournament.CreateTournamentScreen
 import com.crickethub.ui.tournament.TournamentDetailScreen
 import com.crickethub.ui.tournament.TournamentsScreen
+import com.crickethub.ui.join.JoinWithCodeScreen
+import com.crickethub.ui.team.TeamStatsScreen
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.MainScope
 
 private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
@@ -209,9 +212,24 @@ fun CricketHubApp() {
             }
             composable("teams") {
                 TeamsScreen(
-                    onTeamClick = { teamId -> navController.navigate("players/$teamId") }
+                    onTeamClick = { teamId -> navController.navigate("players/$teamId") },
+                    onTeamStats = { teamId, teamName ->
+                        navController.navigate("team_stats/$teamId/${java.net.URLEncoder.encode(teamName, "UTF-8")}")
+                    }
                 )
             }
+            composable(
+                route = "team_stats/{teamId}/{teamName}",
+                arguments = listOf(
+                    navArgument("teamId") { type = NavType.StringType },
+                    navArgument("teamName") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
+                val teamName = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("teamName") ?: "", "UTF-8")
+                TeamStatsScreen(teamId = teamId, teamName = teamName, onBack = { navController.popBackStack() })
+            }
+
             composable(
                 route = "players/{teamId}",
                 arguments = listOf(navArgument("teamId") { type = NavType.StringType })
@@ -323,12 +341,59 @@ fun CricketHubApp() {
                     playersPerSide = playersPerSide,
                     onBack = { navController.popBackStack() },
                     onXISaved = {
-                        navController.navigate("playing_xi_flow/$matchId") {
-                            popUpTo("playing_xi_flow/$matchId") { inclusive = true }
+                        // Check if team2 needs XI, otherwise go to scoring
+                        kotlinx.coroutines.MainScope().launch {
+                            try {
+                                val repo = com.crickethub.data.repository.MatchRepository()
+                                val match = repo.getMatchById(matchId)
+                                if (match != null) {
+                                    val xi = SupabaseClient.client.postgrest["playing_xi"]
+                                        .select { filter { eq("match_id", matchId) } }
+                                        .decodeList<com.crickethub.data.model.PlayingXI>()
+                                    val needed = match.playersPerSide
+                                    val t1Count = xi.count { it.teamId == match.team1Id }
+                                    val t2Count = xi.count { it.teamId == match.team2Id }
+                                    android.util.Log.d("CricketHub", "After XI save: t1=$t1Count t2=$t2Count needed=$needed")
+                                    when {
+                                        t1Count < needed -> {
+                                            val t1 = SupabaseClient.client.postgrest["teams"]
+                                                .select { filter { eq("id", match.team1Id) } }
+                                                .decodeSingleOrNull<Team>()
+                                            navController.navigate("playing_xi/$matchId/${match.team1Id}/${t1?.name ?: "Team 1"}/$needed") {
+                                                popUpTo("playing_xi_flow/$matchId") { inclusive = false }
+                                            }
+                                        }
+                                        t2Count < needed -> {
+                                            val t2 = SupabaseClient.client.postgrest["teams"]
+                                                .select { filter { eq("id", match.team2Id) } }
+                                                .decodeSingleOrNull<Team>()
+                                            navController.navigate("playing_xi/$matchId/${match.team2Id}/${t2?.name ?: "Team 2"}/$needed") {
+                                                popUpTo("playing_xi_flow/$matchId") { inclusive = false }
+                                            }
+                                        }
+                                        else -> {
+                                            navController.navigate("scoring/$matchId") {
+                                                popUpTo("matches") { inclusive = false }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("CricketHub", "XI save nav error: ${e.message}", e)
+                            }
                         }
                     }
                 )
             }
+            composable("join") {
+                JoinWithCodeScreen(
+                    onBack = { navController.popBackStack() },
+                    onJoinMatch = { matchId, _ -> navController.navigate("scoring/$matchId") },
+                    onJoinTeam = { navController.navigate("teams") },
+                    onJoinTournament = { navController.navigate("tournaments") }
+                )
+            }
+
             composable(
                 route = "scoring/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })

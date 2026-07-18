@@ -41,6 +41,8 @@ fun PlayingXIScreen(
     val scope = rememberCoroutineScope()
     var players by remember { mutableStateOf<List<Player>>(emptyList()) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var captainId by remember { mutableStateOf<String?>(null) }
+    var keeperId by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -49,20 +51,17 @@ fun PlayingXIScreen(
     LaunchedEffect(teamId) {
         try {
             val repo = PlayerRepository()
-            players = repo.getPlayersByTeam(teamId)
-            isLoading = false
+            val cached = repo.getPlayersByTeam(teamId)
+            players = cached
         } catch (e: Exception) {
             error = e.message
+        } finally {
             isLoading = false
         }
     }
 
-    LaunchedEffect(saveSuccess) {
-        if (saveSuccess) onXISaved()
-    }
-
     val selectedCount = selectedIds.size
-    val canSave = selectedCount == playersPerSide
+    val canSave = selectedCount == playersPerSide && captainId != null && keeperId != null
 
     Column(
         modifier = Modifier
@@ -138,20 +137,36 @@ fun PlayingXIScreen(
                     val isSelected = player.id in selectedIds
                     val canSelect = isSelected || selectedCount < playersPerSide
 
+                    val isCaptain = captainId == player.id
+                    val isKeeper = keeperId == player.id
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (isSelected) NeonGreen.copy(alpha = 0.1f) else SurfaceCard
+                                when {
+                                    isCaptain -> AmberColor.copy(alpha = 0.12f)
+                                    isKeeper -> NeonBlue.copy(alpha = 0.12f)
+                                    isSelected -> NeonGreen.copy(alpha = 0.1f)
+                                    else -> SurfaceCard
+                                }
                             )
                             .border(
                                 1.dp,
-                                if (isSelected) NeonGreen else BorderColor,
+                                when {
+                                    isCaptain -> AmberColor
+                                    isKeeper -> NeonBlue
+                                    isSelected -> NeonGreen
+                                    else -> BorderColor
+                                },
                                 RoundedCornerShape(12.dp)
                             )
                             .clickable(enabled = canSelect) {
                                 selectedIds = if (isSelected) {
+                                    // Deselect - also remove captain/keeper
+                                    if (captainId == player.id) captainId = null
+                                    if (keeperId == player.id) keeperId = null
                                     selectedIds - player.id
                                 } else {
                                     selectedIds + player.id
@@ -161,57 +176,92 @@ fun PlayingXIScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isSelected) NeonGreen.copy(alpha = 0.3f)
-                                        else NeonBlue.copy(alpha = 0.2f)
+                                        when {
+                                            isCaptain -> AmberColor.copy(alpha = 0.3f)
+                                            isKeeper -> NeonBlue.copy(alpha = 0.3f)
+                                            isSelected -> NeonGreen.copy(alpha = 0.3f)
+                                            else -> NeonBlue.copy(alpha = 0.2f)
+                                        }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     player.jerseyNo?.toString() ?: "-",
-                                    color = if (isSelected) NeonGreen else NeonBlue,
+                                    color = when {
+                                        isCaptain -> AmberColor
+                                        isKeeper -> NeonBlue
+                                        isSelected -> NeonGreen
+                                        else -> NeonBlue
+                                    },
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(
-                                    player.fullName,
-                                    color = TextPrimary,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold
-                                    else FontWeight.Normal,
-                                    fontSize = 15.sp
-                                )
-                                player.role?.let {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        it.replace("_", " ")
-                                            .replaceFirstChar { c -> c.uppercase() },
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
+                                        player.fullName,
+                                        color = TextPrimary,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        fontSize = 15.sp
                                     )
+                                    if (isCaptain) {
+                                        Text("C", color = AmberColor, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                            modifier = Modifier
+                                                .background(AmberColor.copy(0.2f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 1.dp))
+                                    }
+                                    if (isKeeper) {
+                                        Text("WK", color = NeonBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                            modifier = Modifier
+                                                .background(NeonBlue.copy(0.2f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 1.dp))
+                                    }
+                                }
+                                player.role?.let {
+                                    Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() },
+                                        color = TextSecondary, fontSize = 12.sp)
                                 }
                             }
                         }
+                        // C and WK buttons (only when selected)
                         if (isSelected) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(NeonGreen),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // Captain button
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isCaptain) AmberColor else AmberColor.copy(0.15f))
+                                        .clickable {
+                                            captainId = if (isCaptain) null else player.id
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("C", color = if (isCaptain) Color.Black else AmberColor,
+                                        fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                                // WK button
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isKeeper) NeonBlue else NeonBlue.copy(0.15f))
+                                        .clickable {
+                                            keeperId = if (isKeeper) null else player.id
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("WK", color = if (isKeeper) Color.Black else NeonBlue,
+                                        fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                }
                             }
                         }
                     }
@@ -229,11 +279,14 @@ fun PlayingXIScreen(
                                     matchId = matchId,
                                     playerId = playerId,
                                     teamId = teamId,
-                                    battingOrder = index + 1
+                                    battingOrder = index + 1,
+                                    isCaptain = playerId == captainId,
+                                    isWicketKeeper = playerId == keeperId
                                 )
                             }
                             repo.insertPlayingXI(playingXI)
                             saveSuccess = true
+                            onXISaved()
                         } catch (e: Exception) {
                             error = "Save failed: ${e.message}"
                         } finally {
@@ -261,7 +314,12 @@ fun PlayingXIScreen(
                 } else {
                     Text(
                         if (canSave) "Save Playing $playersPerSide"
-                        else "Select ${playersPerSide - selectedCount} more",
+                        else when {
+                            selectedCount < playersPerSide -> "Select ${playersPerSide - selectedCount} more"
+                            captainId == null -> "Select Captain (C)"
+                            keeperId == null -> "Select Wicket Keeper (WK)"
+                            else -> "Confirm XI"
+                        },
                         color = if (canSave) Color.Black else TextSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp

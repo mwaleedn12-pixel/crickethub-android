@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
@@ -52,6 +53,7 @@ val JERSEY_COLORS = listOf(
 @Composable
 fun TeamsScreen(
     onTeamClick: (String) -> Unit,
+    onTeamStats: (String, String) -> Unit = { _, _ -> },
     viewModel: TeamViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -147,7 +149,8 @@ fun TeamsScreen(
                             isDark = isDark,
                             onClick = { onTeamClick(team.id) },
                             onEdit = { teamToEdit = team },
-                            onDelete = { teamToDelete = team }
+                            onDelete = { teamToDelete = team },
+                            onStats = { onTeamStats(team.id, team.name) }
                         )
                     }
                 }
@@ -208,7 +211,8 @@ fun TeamCard(
     isDark: Boolean,
     onClick: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onStats: () -> Unit = {}
 ) {
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
@@ -279,6 +283,14 @@ fun TeamCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+            }
+            Box(
+                modifier = Modifier.size(34.dp).clip(CircleShape)
+                    .background(Color(0xFF60A5FA).copy(alpha = if (isDark) 0.15f else 0.1f))
+                    .clickable { onStats() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.BarChart, null, tint = Color(0xFF60A5FA), modifier = Modifier.size(16.dp))
             }
         }
 

@@ -35,6 +35,7 @@ data class Player(
 
 @Serializable
 data class PlayerInsert(
+    @SerialName("user_id") val userId: String? = null,
     @SerialName("team_id") val teamId: String,
     @SerialName("full_name") val fullName: String,
     val nickname: String? = null,
@@ -114,5 +115,5 @@ val LEFT_HAND_BOWLING_STYLES = listOf(
 )
 
 val PLAYER_ROLES = listOf(
-    "Batsman", "Bowler", "All-rounder", "Wicket Keeper"
+    "batsman", "bowler", "allrounder", "wicketkeeper"
 )

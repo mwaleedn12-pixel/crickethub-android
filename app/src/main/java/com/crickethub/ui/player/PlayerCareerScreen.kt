@@ -464,7 +464,7 @@ fun CareerProfileTab(data: CareerData) {
                 player.role?.let { role ->
                     val roleColor = when (role.lowercase()) {
                         "batsman" -> NeonBlue; "bowler" -> ErrorRed
-                        "all-rounder" -> NeonGreen; "wicket keeper" -> AmberColor
+                        "allrounder", "all-rounder" -> NeonGreen; "wicketkeeper", "wicket keeper" -> AmberColor
                         else -> TextSecondary
                     }
                     Box(

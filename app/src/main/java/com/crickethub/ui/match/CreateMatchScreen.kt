@@ -25,6 +25,7 @@ import com.crickethub.data.model.MATCH_TYPES
 import com.crickethub.data.model.MatchInsert
 import com.crickethub.data.model.Team
 import com.crickethub.ui.theme.*
+import com.crickethub.ui.components.DatePickerField
 
 
 @Composable
@@ -191,10 +192,11 @@ fun CreateMatchScreen(
                         }
                         item {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = matchDate, onValueChange = { matchDate = it },
-                                    label = { Text("Date (YYYY-MM-DD)") }, singleLine = true,
-                                    modifier = Modifier.weight(1f), colors = fieldColors
+                                DatePickerField(
+                                    value = matchDate,
+                                    onValueChange = { matchDate = it },
+                                    label = "Match Date",
+                                    modifier = Modifier.weight(1f)
                                 )
                                 OutlinedTextField(
                                     value = matchTime, onValueChange = { matchTime = it },

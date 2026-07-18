@@ -43,6 +43,16 @@ fun ScoringScreen(
     viewModel: ScoringViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var resumeKey by remember { mutableStateOf(0) }
+
+    // Detect when we return to this screen
+    val navBackStackEntry = androidx.navigation.compose.currentBackStackEntryAsState()
+    androidx.compose.runtime.LaunchedEffect(navBackStackEntry.value) {
+        val currentRoute = navBackStackEntry.value?.destination?.route
+        if (currentRoute?.startsWith("scoring/") == true) {
+            resumeKey++
+        }
+    }
     val context = LocalContext.current
 
     var showWicketDialog by remember { mutableStateOf(false) }
@@ -55,7 +65,16 @@ fun ScoringScreen(
     var showDLSDialog by remember { mutableStateOf(false) }
     var isFreeHit by remember { mutableStateOf(false) }
 
-    LaunchedEffect(matchId) { viewModel.resumeMatch(matchId) }
+    LaunchedEffect(matchId, resumeKey) { viewModel.resumeMatch(matchId) }
+
+    // Re-run resumeMatch every time screen becomes visible
+    DisposableEffect(Unit) {
+        onDispose { }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(resumeKey) {
+        if (resumeKey > 0) viewModel.resumeMatch(matchId)
+    }
 
     LaunchedEffect(uiState.inningsComplete) {
         if (uiState.inningsComplete) {
@@ -316,7 +335,9 @@ fun ScoringScreen(
             PlayerSelectDialog(
                 title = "Select Bowler (Max ${viewModel.getMaxOversPerBowler(totalOvers)} overs)",
                 players = uiState.bowlingTeamPlayers.filter { player ->
-                    player.id != lastBowlerId && viewModel.canBowlerBowl(player.id, totalOvers)
+                    player.id != lastBowlerId &&
+                            viewModel.canBowlerBowl(player.id, totalOvers) &&
+                            player.role?.lowercase() !in listOf("wicketkeeper", "wicket keeper", "wicket_keeper")
                 },
                 onPlayerSelected = { viewModel.setBowler(it); showSelectBowler = false },
                 onDismiss = { showSelectBowler = false }
@@ -324,16 +345,22 @@ fun ScoringScreen(
         }
 
         if (showWicketDialog) {
+            val keeper = uiState.bowlingTeamPlayers.firstOrNull {
+                it.role?.lowercase() in listOf("wicketkeeper", "wicket keeper", "wicket_keeper")
+            }
             WicketDialog(
                 onDismiss = { showWicketDialog = false },
-                onConfirm = { wicketType, runs, fielderName ->
-                    viewModel.recordBall(runsOffBat = runs, isWicket = true, wicketType = wicketType, fielderName = fielderName)
+                onConfirm = { wicketType, runs, fielderName, nonStrikerOut ->
+                    viewModel.recordBall(runsOffBat = runs, isWicket = true, wicketType = wicketType,
+                        fielderName = fielderName, nonStrikerOut = nonStrikerOut)
                     showWicketDialog = false
                 },
                 onRetiredHurt = {
                     viewModel.recordBall(runsOffBat = 0, isWicket = true, wicketType = "retired_hurt")
                     showWicketDialog = false
-                }
+                },
+                keeperName = keeper?.fullName,
+                bowlingTeamPlayers = uiState.bowlingTeamPlayers
             )
         }
 
@@ -889,11 +916,26 @@ fun PlayerSelectDialog(title: String, players: List<Player>, onPlayerSelected: (
 // ── WICKET DIALOG ─────────────────────────────────────────────────────────────
 
 @Composable
-fun WicketDialog(onDismiss: () -> Unit, onConfirm: (String, Int, String?) -> Unit, onRetiredHurt: () -> Unit) {
+@OptIn(ExperimentalMaterial3Api::class)
+fun WicketDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, Int, String?, Boolean) -> Unit,
+    onRetiredHurt: () -> Unit,
+    keeperName: String? = null,
+    bowlingTeamPlayers: List<com.crickethub.data.model.Player> = emptyList()
+) {
     var selectedType by remember { mutableStateOf<String?>(null) }
     var runsBeforeWicket by remember { mutableStateOf(0) }
     var fielderName by remember { mutableStateOf("") }
+    var nonStrikerOut by remember { mutableStateOf(false) }
+    var dropExpanded by remember { mutableStateOf(false) }
     val showFielderInput = selectedType in listOf("caught", "run_out", "stumped")
+
+    // Auto-fill keeper for stumped
+    androidx.compose.runtime.LaunchedEffect(selectedType) {
+        if (selectedType == "stumped" && keeperName != null) fielderName = keeperName
+        else if (selectedType != "stumped") fielderName = ""
+    }
     val wicketTypes = listOf(
         "bowled" to "Bowled", "caught" to "Caught", "lbw" to "LBW", "run_out" to "Run Out",
         "stumped" to "Stumped", "hit_wicket" to "Hit Wicket", "retired_out" to "Retired Out",
@@ -928,18 +970,68 @@ fun WicketDialog(onDismiss: () -> Unit, onConfirm: (String, Int, String?) -> Uni
                         }
                     }
                 }
+                if (selectedType == "run_out") {
+                    item {
+                        Text("Who got run out?", color = TextSecondary, fontSize = 12.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { nonStrikerOut = false }, modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (!nonStrikerOut) ErrorRed else SurfaceCard)
+                            ) { Text("Striker", color = if (!nonStrikerOut) Color.White else TextSecondary, fontSize = 12.sp) }
+                            Button(onClick = { nonStrikerOut = true }, modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (nonStrikerOut) ErrorRed else SurfaceCard)
+                            ) { Text("Non-Striker", color = if (nonStrikerOut) Color.White else TextSecondary, fontSize = 12.sp) }
+                        }
+                    }
+                }
                 if (showFielderInput) {
                     item {
-                        OutlinedTextField(
-                            value = fielderName, onValueChange = { fielderName = it },
-                            label = { Text(when (selectedType) { "caught" -> "Caught by"; "run_out" -> "Run out by"; "stumped" -> "Stumped by (keeper)"; else -> "Fielder name" }) },
-                            singleLine = true, modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                                focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderColor,
-                                cursorColor = ErrorRed, focusedLabelColor = ErrorRed, unfocusedLabelColor = TextSecondary
+                        if (selectedType == "stumped") {
+                            OutlinedTextField(value = fielderName, onValueChange = {}, readOnly = true,
+                                label = { Text("Stumped by (Keeper) ✓") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                                    focusedBorderColor = NeonGreen, unfocusedBorderColor = NeonGreen,
+                                    focusedLabelColor = NeonGreen, unfocusedLabelColor = NeonGreen
+                                )
                             )
-                        )
+                        } else if (bowlingTeamPlayers.isNotEmpty()) {
+                            ExposedDropdownMenuBox(expanded = dropExpanded, onExpandedChange = { dropExpanded = it }) {
+                                OutlinedTextField(
+                                    value = fielderName, onValueChange = {}, readOnly = true,
+                                    label = { Text(if (selectedType == "caught") "Caught by *" else "Run out by *") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropExpanded) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    isError = fielderName.isBlank(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                                        focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderColor,
+                                        focusedLabelColor = ErrorRed, unfocusedLabelColor = TextSecondary
+                                    )
+                                )
+                                ExposedDropdownMenu(expanded = dropExpanded, onDismissRequest = { dropExpanded = false },
+                                    modifier = Modifier.background(SurfaceCard)) {
+                                    bowlingTeamPlayers.forEach { player ->
+                                        DropdownMenuItem(
+                                            text = { Text(player.fullName, color = TextPrimary) },
+                                            onClick = { fielderName = player.fullName; dropExpanded = false }
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            OutlinedTextField(value = fielderName, onValueChange = { fielderName = it },
+                                label = { Text(if (selectedType == "caught") "Caught by *" else "Run out by *") },
+                                singleLine = true, isError = fielderName.isBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                                    focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderColor,
+                                    focusedLabelColor = ErrorRed, unfocusedLabelColor = TextSecondary
+                                )
+                            )
+                        }
                     }
                 }
                 item {
@@ -969,8 +1061,15 @@ fun WicketDialog(onDismiss: () -> Unit, onConfirm: (String, Int, String?) -> Uni
         },
         confirmButton = {
             Button(
-                onClick = { selectedType?.let { onConfirm(it, runsBeforeWicket, fielderName.ifBlank { null }) } },
-                enabled = selectedType != null, colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                onClick = { selectedType?.let { type ->
+                    val needsFielder = type in listOf("caught", "run_out", "stumped")
+                    if (!needsFielder || fielderName.isNotBlank()) {
+                        onConfirm(type, runsBeforeWicket, fielderName.ifBlank { null }, nonStrikerOut)
+                    }
+                }},
+                enabled = selectedType != null &&
+                        (selectedType !in listOf("caught", "run_out", "stumped") || fielderName.isNotBlank()),
+                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
             ) { Text("Confirm", color = Color.White) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }

@@ -10,9 +10,9 @@ data class PlayingXI(
     @SerialName("player_id") val playerId: String = "",
     @SerialName("team_id") val teamId: String = "",
     @SerialName("batting_order") val battingOrder: Int? = null,
-    @SerialName("is_captain") val isCaptain: Boolean = false,
-    @SerialName("is_vice_captain") val isViceCaptain: Boolean = false,
-    @SerialName("is_wicket_keeper") val isWicketKeeper: Boolean = false,
+    @SerialName("is_captain") val isCaptain: Boolean? = false,
+    @SerialName("is_vice_captain") val isViceCaptain: Boolean? = false,
+    @SerialName("is_wicket_keeper") val isWicketKeeper: Boolean? = false,
     @SerialName("created_at") val createdAt: String? = null
 )
 
@@ -22,6 +22,6 @@ data class PlayingXIInsert(
     @SerialName("player_id") val playerId: String,
     @SerialName("team_id") val teamId: String,
     @SerialName("batting_order") val battingOrder: Int? = null,
-    @SerialName("is_captain") val isCaptain: Boolean = false,
+    @SerialName("is_captain") val isCaptain: Boolean? = false,
     @SerialName("is_wicket_keeper") val isWicketKeeper: Boolean = false
 )

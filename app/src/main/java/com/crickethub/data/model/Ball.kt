@@ -23,6 +23,7 @@ data class Ball(
     @SerialName("is_six") val isSix: Boolean = false,
     @SerialName("innings_phase") val inningsPhase: String? = null,
     val commentary: String? = null,
+    @SerialName("dismissed_batsman_id") val dismissedBatsmanId: String? = null,
     @SerialName("created_at") val createdAt: String? = null
 )
 
@@ -44,5 +45,6 @@ data class BallInsert(
     @SerialName("is_boundary") val isBoundary: Boolean = false,
     @SerialName("is_six") val isSix: Boolean = false,
     @SerialName("innings_phase") val inningsPhase: String? = null,
-    val commentary: String? = null
+    val commentary: String? = null,
+    @SerialName("dismissed_batsman_id") val dismissedBatsmanId: String? = null
 )

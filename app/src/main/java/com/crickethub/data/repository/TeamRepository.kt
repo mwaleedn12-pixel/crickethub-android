@@ -3,6 +3,7 @@ package com.crickethub.data.repository
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.TeamInsert
 import com.crickethub.data.remote.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 
 class TeamRepository {
@@ -43,9 +44,11 @@ class TeamRepository {
 
     suspend fun createTeam(team: TeamInsert): Team {
         val joinCode = generateJoinCode()
+        val userId = client.auth.currentUserOrNull()?.id
         val result = client.postgrest["teams"]
             .insert(
                 TeamInsert(
+                    userId = userId,
                     name = team.name,
                     shortName = team.shortName,
                     logoUrl = team.logoUrl,
@@ -62,7 +65,7 @@ class TeamRepository {
                 )
             ) { select() }
             .decodeSingle<Team>()
-        teamsCache = null // invalidate
+        teamsCache = null
         return result
     }
 

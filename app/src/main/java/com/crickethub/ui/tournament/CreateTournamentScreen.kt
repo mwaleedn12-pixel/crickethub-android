@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.TournamentInsert
 import com.crickethub.ui.theme.*
+import com.crickethub.ui.components.DatePickerField
 
 
 @Composable
@@ -203,17 +204,23 @@ fun CreateTournamentScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = startDate, onValueChange = { startDate = it },
-                        label = { Text("Start Date (YYYY-MM-DD)") },
-                        singleLine = true, modifier = Modifier.weight(1f),
-                        colors = fieldColors
+                    DatePickerField(
+                        value = startDate,
+                        onValueChange = { startDate = it },
+                        label = "Start Date",
+                        modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
-                        value = endDate, onValueChange = { endDate = it },
-                        label = { Text("End Date (YYYY-MM-DD)") },
-                        singleLine = true, modifier = Modifier.weight(1f),
-                        colors = fieldColors
+                    DatePickerField(
+                        value = endDate,
+                        onValueChange = { endDate = it },
+                        label = "End Date",
+                        minDate = if (startDate.isNotBlank()) {
+                            try {
+                                java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                                    .parse(startDate)?.time
+                            } catch (e: Exception) { null }
+                        } else null,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }

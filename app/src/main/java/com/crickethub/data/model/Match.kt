@@ -47,6 +47,7 @@ data class Match(
 
 @Serializable
 data class MatchInsert(
+    @SerialName("user_id") val userId: String? = null,
     val title: String? = null,
     @SerialName("match_type") val matchType: String = "T20",
     @SerialName("tournament_id") val tournamentId: String? = null,

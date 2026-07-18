@@ -79,27 +79,27 @@ fun LoginScreen(
     // Drift animations — bottom to top full screen
     val drift1 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(27000, easing = LinearEasing)), label = "d1"
+        animationSpec = infiniteRepeatable(tween(50000, easing = LinearEasing)), label = "d1"
     )
     val drift2 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(25000, easing = LinearEasing), initialStartOffset = StartOffset(2000)), label = "d2"
+        animationSpec = infiniteRepeatable(tween(48000, easing = LinearEasing), initialStartOffset = StartOffset(2000)), label = "d2"
     )
     val drift3 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing), initialStartOffset = StartOffset(4500)), label = "d3"
+        animationSpec = infiniteRepeatable(tween(58000, easing = LinearEasing), initialStartOffset = StartOffset(4500)), label = "d3"
     )
     val drift4 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(22000, easing = LinearEasing), initialStartOffset = StartOffset(1000)), label = "d4"
+        animationSpec = infiniteRepeatable(tween(40000, easing = LinearEasing), initialStartOffset = StartOffset(1000)), label = "d4"
     )
     val drift5 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(27000, easing = LinearEasing), initialStartOffset = StartOffset(3500)), label = "d5"
+        animationSpec = infiniteRepeatable(tween(50000, easing = LinearEasing), initialStartOffset = StartOffset(3500)), label = "d5"
     )
     val drift6 by inf.animateFloat(
         initialValue = 1.1f, targetValue = -0.15f,
-        animationSpec = infiniteRepeatable(tween(19000, easing = LinearEasing), initialStartOffset = StartOffset(5500)), label = "d6"
+        animationSpec = infiniteRepeatable(tween(35000, easing = LinearEasing), initialStartOffset = StartOffset(5500)), label = "d6"
     )
 
     val isDark = isSystemInDarkTheme()

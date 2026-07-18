@@ -27,6 +27,7 @@ data class Tournament(
 
 @Serializable
 data class TournamentInsert(
+    @SerialName("user_id") val userId: String? = null,
     val name: String,
     val description: String? = null,
     val format: String? = null,

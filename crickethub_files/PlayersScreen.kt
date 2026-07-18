@@ -71,8 +71,8 @@ fun PlayersScreen(
                 ) {
                     val batsmen = uiState.players.count { it.role?.lowercase() == "batsman" }
                     val bowlers = uiState.players.count { it.role?.lowercase() == "bowler" }
-                    val allRounders = uiState.players.count { it.role?.lowercase() == "all-rounder" }
-                    val keepers = uiState.players.count { it.role?.lowercase() == "wicket keeper" }
+                    val allRounders = uiState.players.count { it.role?.lowercase() == "allrounder" }
+                    val keepers = uiState.players.count { it.role?.lowercase() == "wicketkeeper" }
                     PlayerStatPill("🏏 $batsmen", "Bat")
                     PlayerStatPill("🎳 $bowlers", "Bowl")
                     PlayerStatPill("⚡ $allRounders", "AR")

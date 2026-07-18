@@ -31,6 +31,7 @@ import com.crickethub.data.model.Player
 import com.crickethub.data.model.PlayerInsert
 import com.crickethub.data.model.RIGHT_HAND_BOWLING_STYLES
 import com.crickethub.ui.theme.*
+import com.crickethub.ui.components.DatePickerField
 
 
 @Composable
@@ -325,10 +326,11 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    OutlinedTextField(
-                        value = dateOfBirth, onValueChange = { dateOfBirth = it },
-                        label = { Text("DOB (YYYY-MM-DD)") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth(), colors = fieldColors
+                    DatePickerField(
+                        value = dateOfBirth,
+                        onValueChange = { dateOfBirth = it },
+                        label = "Date of Birth",
+                        maxDate = System.currentTimeMillis()
                     )
                 }
                 item {

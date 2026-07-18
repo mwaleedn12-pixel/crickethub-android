@@ -87,7 +87,20 @@ class MatchRepository {
 
     suspend fun insertPlayingXI(players: List<PlayingXIInsert>) {
         if (players.isEmpty()) return
+        val matchId = players.first().matchId
+        val teamId = players.first().teamId
+        // Delete existing XI for this team in this match first
+        try {
+            client.postgrest["playing_xi"].delete {
+                filter {
+                    eq("match_id", matchId)
+                    eq("team_id", teamId)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "Delete XI warning: ${e.message}")
+        }
         client.postgrest["playing_xi"].insert(players)
-        players.firstOrNull()?.let { xiCache.remove(it.matchId) }
+        xiCache.remove(matchId)
     }
 }

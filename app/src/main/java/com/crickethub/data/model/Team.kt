@@ -25,6 +25,7 @@ data class Team(
 
 @Serializable
 data class TeamInsert(
+    @SerialName("user_id") val userId: String? = null,
     val name: String,
     @SerialName("short_name") val shortName: String? = null,
     @SerialName("logo_url") val logoUrl: String? = null,
