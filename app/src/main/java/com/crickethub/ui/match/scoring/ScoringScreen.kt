@@ -46,13 +46,13 @@ fun ScoringScreen(
     var resumeKey by remember { mutableStateOf(0) }
 
     // Detect when we return to this screen
-    val navBackStackEntry = androidx.navigation.compose.currentBackStackEntryAsState()
-    androidx.compose.runtime.LaunchedEffect(navBackStackEntry.value) {
-        val currentRoute = navBackStackEntry.value?.destination?.route
-        if (currentRoute?.startsWith("scoring/") == true) {
-            resumeKey++
-        }
-    }
+    // navBackStackEntry removed
+
+
+
+
+
+
     val context = LocalContext.current
 
     var showWicketDialog by remember { mutableStateOf(false) }
@@ -67,13 +67,16 @@ fun ScoringScreen(
 
     LaunchedEffect(matchId, resumeKey) { viewModel.resumeMatch(matchId) }
 
-    // Re-run resumeMatch every time screen becomes visible
-    DisposableEffect(Unit) {
-        onDispose { }
-    }
-
-    androidx.compose.runtime.LaunchedEffect(resumeKey) {
-        if (resumeKey > 0) viewModel.resumeMatch(matchId)
+    // Re-run resumeMatch every time screen becomes visible again
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                resumeKey++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(uiState.inningsComplete) {
@@ -840,8 +843,9 @@ fun ScoringButtons(
                 Button(
                     onClick = { onRuns(runs) }, enabled = !isLoading,
                     modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = bgColor, contentColor = textColor, disabledContainerColor = bgColor.copy(alpha = 0.4f))
-                ) { Text(if (runs == 0) "•" else runs.toString(), fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                    colors = ButtonDefaults.buttonColors(containerColor = bgColor, contentColor = textColor, disabledContainerColor = bgColor.copy(alpha = 0.4f)),
+                    contentPadding = PaddingValues(0.dp)
+                ) { Text(runs.toString(), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White) }
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
