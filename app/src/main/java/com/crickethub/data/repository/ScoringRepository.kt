@@ -34,7 +34,10 @@ class ScoringRepository {
     suspend fun getBallsByInnings(inningsId: String): List<Ball> {
         val fresh = client.postgrest["balls"]
             .select { filter { eq("innings_id", inningsId) } }
-            .decodeList<Ball>().sortedWith(compareBy({ it.overNo }, { it.ballNo }))
+            // Order by creation time - the true sequence balls were bowled. Sorting by
+            // over/ball breaks when positions are corrupt, and puts wides/no-balls
+            // (ball_no = 0) before legal balls in the same over.
+            .decodeList<Ball>().sortedBy { it.createdAt ?: "" }
         ballsCache[inningsId] = fresh
         return fresh
     }

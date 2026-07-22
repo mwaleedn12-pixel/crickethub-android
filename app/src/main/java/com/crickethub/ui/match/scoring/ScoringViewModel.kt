@@ -533,26 +533,53 @@ class ScoringViewModel : ViewModel() {
     fun recordBall(runsOffBat: Int, extrasType: String? = null, extrasRuns: Int? = null,
                    isWicket: Boolean = false, wicketType: String? = null, fielderName: String? = null,
                    nonStrikerOut: Boolean = false) {
+        // Guard AND claim in one step - set the flag before reading any state so a
+        // second rapid tap can't slip through and double-count the ball (this was the
+        // cause of total_balls drift: two taps both read the same totalBalls, both +1).
         if (isProcessingBall) return
+        isProcessingBall = true
         val currentState = _uiState.value
         if (undoStack.size >= 20) undoStack.removeFirst()
         undoStack.addLast(currentState)
         val state = _uiState.value
-        val innings = state.innings ?: return
-        val striker = state.striker ?: return
-        val bowler = state.currentBowler ?: return
-        val match = state.match ?: return
-        isProcessingBall = true
+        val innings = state.innings ?: run { isProcessingBall = false; return }
+        val striker = state.striker ?: run { isProcessingBall = false; return }
+        val bowler = state.currentBowler ?: run { isProcessingBall = false; return }
+        val match = state.match ?: run { isProcessingBall = false; return }
         viewModelScope.launch {
             try {
                 val isWide = extrasType == "wide"; val isNoBall = extrasType == "no_ball"
                 val isBye = extrasType == "bye"; val isLegBye = extrasType == "leg_bye"
                 val isRetiredHurt = wicketType == "retired_hurt"
                 val isLegal = !isWide && !isNoBall
-                val overNo = innings.totalBalls / 6; val ballNo = innings.totalBalls % 6 + 1
+                // Derive position from the ACTUAL legal balls already in state, not the
+                // stored total_balls counter. The counter can desync (a failed resume,
+                // an interrupted write) and since over/ball are computed from it, a
+                // desync would misplace every future ball. The ball list is truth.
+                val legalBallsSoFar = state.balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                val overNo = legalBallsSoFar / 6; val ballNo = legalBallsSoFar % 6 + 1
                 val phase = when { overNo < match.powerplayOvers -> "powerplay"; overNo < (match.totalOvers * 0.75).toInt() -> "middle"; else -> "death" }
-                val totalRunsThisBall = when { isWide -> (extrasRuns ?: 1) + runsOffBat; isNoBall -> 1 + runsOffBat + (extrasRuns ?: 0); else -> runsOffBat + (extrasRuns ?: 0) }
-                val extrasToSave = when { isWide -> (extrasRuns ?: 1) + runsOffBat; isNoBall -> (extrasRuns ?: 0) + 1; isBye || isLegBye -> extrasRuns ?: 0; else -> 0 }
+                // Normalise no-ball input: runs off a no-ball belong to the BATSMAN.
+                // The dialog may historically pass them as extrasRuns; treat either source
+                // as bat-runs so nb+4 credits the striker 4 and a boundary.
+                val noBallBatRuns = if (isNoBall) (if (runsOffBat > 0) runsOffBat else (extrasRuns ?: 0)) else runsOffBat
+                // Wide: extrasRuns = runs the batsmen RAN (0 for a plain wide). Penalty +1.
+                val wideRan = if (isWide) (extrasRuns ?: 0) else 0
+
+                val totalRunsThisBall = when {
+                    isWide   -> 1 + wideRan                 // 1 penalty + runs ran
+                    isNoBall -> 1 + noBallBatRuns           // 1 penalty + runs off bat
+                    else     -> runsOffBat + (extrasRuns ?: 0)
+                }
+                // extras_total counts only the PENALTY+ran portion, not bat-runs on a no-ball.
+                val extrasToSave = when {
+                    isWide   -> 1 + wideRan                 // whole wide is extras
+                    isNoBall -> 1                            // only the penalty is an extra
+                    isBye || isLegBye -> extrasRuns ?: 0
+                    else     -> 0
+                }
+                // What the batsman actually faced/scored on this delivery
+                val batRunsForStriker = when { isNoBall -> noBallBatRuns; isWide -> 0; isBye || isLegBye -> 0; else -> runsOffBat }
                 // The striker always FACES the ball. On a non-striker run-out the wicket
                 // belongs to the non-striker, but the delivery + any runs are the striker's.
                 // dismissedBatsmanId names the victim without stealing the striker's ball.
@@ -562,14 +589,16 @@ class ScoringViewModel : ViewModel() {
                     inningsId = innings.id, overNo = overNo, ballNo = if (isLegal) ballNo else 0, deliveryNo = null,
                     batsmanId = striker.id,
                     nonStrikerId = state.nonStriker?.id, bowlerId = bowler.id,
-                    runsOffBat = runsOffBat, extrasRuns = if (extrasToSave > 0) extrasToSave else null,
+                    runsOffBat = batRunsForStriker, extrasRuns = if (extrasToSave > 0) extrasToSave else null,
                     extrasType = extrasType, isWicket = isWicket, wicketType = wicketType, fielderName = fielderName,
                     dismissedBatsmanId = dismissedBatsmanId,
-                    isBoundary = runsOffBat == 4, isSix = runsOffBat == 6, inningsPhase = phase,
+                    isBoundary = batRunsForStriker == 4, isSix = batRunsForStriker == 6, inningsPhase = phase,
                     commentary = generateCommentary(runsOffBat, extrasType, extrasRuns, isWicket, wicketType,
                         if (runOutNonStriker) (state.nonStriker?.fullName ?: striker.fullName) else striker.fullName,
                         bowler.fullName, fielderName)))
-                val newTotalBalls = if (isLegal) innings.totalBalls + 1 else innings.totalBalls
+                // Stored counter is always exactly (legal balls so far + this one if legal).
+                // Never "previous stored + 1", so a desynced counter self-heals on the next ball.
+                val newTotalBalls = if (isLegal) legalBallsSoFar + 1 else legalBallsSoFar
                 val newTotalRuns = innings.totalRuns + totalRunsThisBall
                 val newTotalWickets = if (isWicket && !isRetiredHurt) innings.totalWickets + 1 else innings.totalWickets
                 val updatedInnings = scoringRepository.updateInnings(innings.id, newTotalRuns, newTotalWickets, newTotalBalls,
@@ -578,7 +607,14 @@ class ScoringViewModel : ViewModel() {
                 ballStack.addLast(insertedBall)
                 var newStriker: Player? = striker; var newNonStriker: Player? = state.nonStriker
                 if (!isWicket) {
-                    val changeStrike = when { isWide -> ((extrasRuns ?: 1) + runsOffBat) % 2 == 1; isNoBall -> runsOffBat % 2 == 1; isBye || isLegBye -> (extrasRuns ?: 0) % 2 == 1; else -> runsOffBat % 2 == 1 }
+                    // Strike flips on ODD runs: wide -> runs ran; no-ball -> bat runs;
+                    // bye/leg-bye -> runs ran; normal -> runs off bat.
+                    val changeStrike = when {
+                        isWide   -> wideRan % 2 == 1
+                        isNoBall -> noBallBatRuns % 2 == 1
+                        isBye || isLegBye -> (extrasRuns ?: 0) % 2 == 1
+                        else     -> runsOffBat % 2 == 1
+                    }
                     if (changeStrike) { val t = newStriker; newStriker = newNonStriker; newNonStriker = t }
                 } else {
                     if (runOutNonStriker) {
