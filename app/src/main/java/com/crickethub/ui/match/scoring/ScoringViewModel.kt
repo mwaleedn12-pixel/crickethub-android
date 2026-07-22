@@ -91,11 +91,6 @@ class ScoringViewModel : ViewModel() {
     }
 
     // ── Restore players from balls ────────────────────────────────────────────
-    // Returns: Pair(striker, nonStriker, bowler)
-    // If 2 active batters found -> return both (no input needed)
-    // If 1 active batter found -> return 1 (input needed for other)
-    // If 0 found -> both null (input needed)
-    // Same for bowler: found -> return, not found -> null (input needed)
     private fun restorePlayersFromBalls(
         balls: List<Ball>,
         battingPlayers: List<Player>,
@@ -106,26 +101,20 @@ class ScoringViewModel : ViewModel() {
 
         val lastBall = balls.last()
 
-        // Who is already out (retired_hurt can come back, so not counted)
         val outBatsmanIds = balls
             .filter { it.isWicket && it.wicketType != "retired_hurt" }
             .map { it.batsmanId }
             .toSet()
 
-        // Pair at the crease when the last ball was bowled
         var striker: Player? = battingPlayers.find { it.id == lastBall.batsmanId }
         var nonStriker: Player? = lastBall.nonStrikerId
             ?.let { nsId -> battingPlayers.find { it.id == nsId } }
 
-        // If a wicket fell on the last ball, that end is genuinely empty and
-        // MUST be asked for. Track it so the fallback below never refills it.
         var strikerClearedByWicket = false
         var nonStrikerClearedByWicket = false
 
-        // Replay what recordBall() does after a delivery
         if (lastBall.isWicket) {
             when {
-                // batsmanId stores whoever was dismissed
                 lastBall.batsmanId == nonStriker?.id -> {
                     nonStriker = null; nonStrikerClearedByWicket = true
                 }
@@ -134,8 +123,6 @@ class ScoringViewModel : ViewModel() {
                 }
             }
         } else {
-            // Strike rotates on odd runs. For a wide, extrasRuns already
-            // contains the penalty + runs, so read parity off the stored value.
             val strikeChanged = when (lastBall.extrasType) {
                 "wide" -> (lastBall.extrasRuns ?: 1) % 2 == 1
                 "no_ball" -> lastBall.runsOffBat % 2 == 1
@@ -147,9 +134,6 @@ class ScoringViewModel : ViewModel() {
             }
         }
 
-        // Over finished? Ends swap, and a new bowler must be chosen.
-        // Prefer innings.totalBalls (what the header shows as e.g. 4.3). Counting the
-        // balls list can disagree with it and wrongly report the over as finished.
         val legalBalls = inningsLegalBalls
             ?: balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
         val overComplete = legalBalls > 0 && legalBalls % 6 == 0
@@ -157,14 +141,9 @@ class ScoringViewModel : ViewModel() {
             val tmp = striker; striker = nonStriker; nonStriker = tmp
         }
 
-        // Anyone dismissed earlier is not available -> screen asks for a replacement
         if (striker?.id?.let { it in outBatsmanIds } == true) striker = null
         if (nonStriker?.id?.let { it in outBatsmanIds } == true) nonStriker = null
 
-        // Fallback: an end can still be null because the ball row never stored
-        // nonStrikerId, not because anyone is out. If a not-out batsman has been
-        // batting in this innings, put him back rather than prompting.
-        // Skipped for an end a wicket just emptied.
         val notOutBatsmen = balls
             .flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) }
             .distinct()
@@ -178,7 +157,6 @@ class ScoringViewModel : ViewModel() {
             nonStriker = notOutBatsmen.firstOrNull { it.id != striker?.id }
         }
 
-        // Mid-over: same bowler carries on. Over complete: null, so the user picks.
         val bowler = if (overComplete) {
             null
         } else {
@@ -192,11 +170,6 @@ class ScoringViewModel : ViewModel() {
     }
 
     // ── Crease restore (notebook checklist) ───────────────────────────────────
-    // Rules, in order:
-    //   1. batter OUT      -> that end is empty, ask for a batter
-    //   2. batter NOT OUT  -> keep him, no input
-    //   3. over COMPLETE   -> ask for bowler
-    //   4. over INCOMPLETE -> keep same bowler, no input
     private data class Crease(
         val striker: Player?,
         val nonStriker: Player?,
@@ -216,20 +189,17 @@ class ScoringViewModel : ViewModel() {
         val reason = StringBuilder()
         val lastBall = balls.last()
 
-        // Step 1 — who is out (retired_hurt may return, so not counted as out)
         val outIds = balls
             .filter { it.isWicket && it.wicketType != "retired_hurt" }
             .map { it.batsmanId }
             .toSet()
 
-        // Step 2 — pair at the crease when the last ball was bowled
         var striker: Player? = battingPlayers.find { it.id == lastBall.batsmanId }
         var nonStriker: Player? = lastBall.nonStrikerId
             ?.let { id -> battingPlayers.find { it.id == id } }
         var strikerEmptiedByWicket = false
         var nonStrikerEmptiedByWicket = false
 
-        // Step 3 — replay what happened AFTER that ball
         if (lastBall.isWicket && lastBall.wicketType != "retired_hurt") {
             if (lastBall.batsmanId == nonStriker?.id) {
                 nonStriker = null; nonStrikerEmptiedByWicket = true
@@ -241,8 +211,6 @@ class ScoringViewModel : ViewModel() {
             striker = null; strikerEmptiedByWicket = true
             reason.append("retired hurt; ")
         } else {
-            // odd runs rotate strike. For a wide, extrasRuns already holds
-            // penalty + runs, so read parity off the stored value.
             val rotated = when (lastBall.extrasType) {
                 "wide" -> (lastBall.extrasRuns ?: 1) % 2 == 1
                 "no_ball" -> lastBall.runsOffBat % 2 == 1
@@ -255,19 +223,14 @@ class ScoringViewModel : ViewModel() {
             }
         }
 
-        // Step 4 — over complete? innings.totalBalls is the authority
-        // (ScoringUiState renders currentOver/currentBall from this same value)
         val overComplete = inningsLegalBalls > 0 && inningsLegalBalls % 6 == 0
         if (overComplete && striker != null) {
             val t = striker; striker = nonStriker; nonStriker = t
         }
 
-        // Step 5 — drop anyone dismissed earlier
         if (striker?.id?.let { it in outIds } == true) { striker = null; strikerEmptiedByWicket = true }
         if (nonStriker?.id?.let { it in outIds } == true) { nonStriker = null; nonStrikerEmptiedByWicket = true }
 
-        // Step 6 — an end may still be empty only because the row never stored
-        // nonStrikerId. That is a data gap, not a dismissal: refill it.
         val notOut = balls
             .flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) }
             .distinct()
@@ -286,7 +249,6 @@ class ScoringViewModel : ViewModel() {
         }
         if (striker != null && striker.id == nonStriker?.id) nonStriker = null
 
-        // Step 7 — bowler: complete over means ask, otherwise carry on
         var bowler: Player? = null
         if (overComplete) {
             reason.append("over complete -> ask bowler; ")
@@ -308,7 +270,6 @@ class ScoringViewModel : ViewModel() {
             android.util.Log.d("CricketHub", "resumeMatch: already restored, keeping current state")
             return
         }
-        // Instantly restore last known state so the screen is never blank on re-entry
         val cached = getSavedState(matchId)
         if (cached != null && cached.balls.isNotEmpty()) {
             _uiState.value = cached.copy(isLoading = false, error = null)
@@ -326,7 +287,6 @@ class ScoringViewModel : ViewModel() {
                     ?: allInnings.maxByOrNull { it.inningsNo }
 
                 if (liveInnings == null) {
-                    // Naya match — create first innings
                     val battingFirstId = match.battingFirstId ?: match.team1Id
                     val bowlingFirstId = if (battingFirstId == match.team1Id) match.team2Id else match.team1Id
                     val newInnings = scoringRepository.createInnings(
@@ -343,14 +303,12 @@ class ScoringViewModel : ViewModel() {
                     return@launch
                 }
 
-                // Existing live innings — restore everything from DB
                 val balls = scoringRepository.getBallsByInnings(liveInnings.id)
                 val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, liveInnings.battingTeamId)
                 val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, liveInnings.bowlingTeamId)
                 val batsmanStats = computeBatsmanStats(balls, battingPlayers)
                 val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
 
-                // Restore striker/nonStriker/bowler using the checklist
                 val crease = restoreCrease(
                     balls = balls,
                     inningsLegalBalls = liveInnings.totalBalls,
@@ -362,11 +320,9 @@ class ScoringViewModel : ViewModel() {
                 val nonStriker = crease.nonStriker
                 val currentBowler = crease.bowler
                 android.util.Log.d("CricketHub", "RESUME: balls=${balls.size} striker=${striker?.fullName} nonStriker=${nonStriker?.fullName} bowler=${currentBowler?.fullName}")
-                // Sync stack with DB balls
                 ballStack.clear()
                 balls.forEach { ball -> ballStack.addLast(ball) }
 
-                // Restore target
                 val firstInnings = allInnings.find { it.inningsNo == 1 }
                 if (liveInnings.inningsNo == 2 && firstInnings != null) {
                     target = firstInnings.totalRuns + 1
@@ -435,9 +391,6 @@ class ScoringViewModel : ViewModel() {
                     completedInnings.size == 1 -> { val first = completedInnings.first(); battingTeamId = first.bowlingTeamId; bowlingTeamId = first.battingTeamId }
                     else -> { _uiState.update { it.copy(isLoading = false) }; return@launch }
                 }
-                // ONE restore path. loadMatch used to duplicate the restore logic below,
-                // which meant two different code paths could rebuild the crease and only
-                // one of them had the correct rules. Live innings -> always use resumeMatch.
                 if (currentInnings != null) {
                     resumeMatch(matchId)
                     return@launch
@@ -536,28 +489,22 @@ class ScoringViewModel : ViewModel() {
                 _uiState.update { it.copy(isLoading = true) }
                 val lastBall = balls.last()
 
-                // Delete from DB
                 scoringRepository.deleteLastBall(lastBall.id)
 
-                // Pop from stack
                 if (ballStack.isNotEmpty()) ballStack.removeLast()
 
-                // Recalculate everything from remaining balls
                 val newBalls = balls.dropLast(1)
                 val batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers)
                 val bowlerStats = computeBowlerStats(newBalls, state.bowlingTeamPlayers)
 
-                // Restore players from remaining balls
                 val (striker, nonStriker, bowler) = restorePlayersFromBalls(
                     newBalls, state.battingTeamPlayers, state.bowlingTeamPlayers
                 )
 
-                // Recalculate innings totals
                 val totalRuns = newBalls.sumOf { it.runsOffBat + (it.extrasRuns ?: 0) }
                 val totalWickets = newBalls.count { it.isWicket && it.wicketType != "retired_hurt" }
                 val totalLegalBalls = newBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
 
-                // Update innings in DB
                 val updatedInnings = scoringRepository.updateInnings(
                     innings.id, totalRuns, totalWickets, totalLegalBalls,
                     newBalls.sumOf { if (it.extrasRuns != null) it.extrasRuns else 0 },
@@ -587,7 +534,6 @@ class ScoringViewModel : ViewModel() {
                    isWicket: Boolean = false, wicketType: String? = null, fielderName: String? = null,
                    nonStrikerOut: Boolean = false) {
         if (isProcessingBall) return
-        // Push current state to undo stack before recording
         val currentState = _uiState.value
         if (undoStack.size >= 20) undoStack.removeFirst()
         undoStack.addLast(currentState)
@@ -607,15 +553,21 @@ class ScoringViewModel : ViewModel() {
                 val phase = when { overNo < match.powerplayOvers -> "powerplay"; overNo < (match.totalOvers * 0.75).toInt() -> "middle"; else -> "death" }
                 val totalRunsThisBall = when { isWide -> (extrasRuns ?: 1) + runsOffBat; isNoBall -> 1 + runsOffBat + (extrasRuns ?: 0); else -> runsOffBat + (extrasRuns ?: 0) }
                 val extrasToSave = when { isWide -> (extrasRuns ?: 1) + runsOffBat; isNoBall -> (extrasRuns ?: 0) + 1; isBye || isLegBye -> extrasRuns ?: 0; else -> 0 }
+                // The striker always FACES the ball. On a non-striker run-out the wicket
+                // belongs to the non-striker, but the delivery + any runs are the striker's.
+                // dismissedBatsmanId names the victim without stealing the striker's ball.
+                val runOutNonStriker = wicketType == "run_out" && nonStrikerOut
+                val dismissedBatsmanId = if (runOutNonStriker) state.nonStriker?.id else null
                 val insertedBall = scoringRepository.insertBall(BallInsert(
                     inningsId = innings.id, overNo = overNo, ballNo = if (isLegal) ballNo else 0, deliveryNo = null,
-                    batsmanId = if (wicketType == "run_out" && nonStrikerOut) (state.nonStriker?.id ?: striker.id) else striker.id,
+                    batsmanId = striker.id,
                     nonStrikerId = state.nonStriker?.id, bowlerId = bowler.id,
                     runsOffBat = runsOffBat, extrasRuns = if (extrasToSave > 0) extrasToSave else null,
                     extrasType = extrasType, isWicket = isWicket, wicketType = wicketType, fielderName = fielderName,
+                    dismissedBatsmanId = dismissedBatsmanId,
                     isBoundary = runsOffBat == 4, isSix = runsOffBat == 6, inningsPhase = phase,
                     commentary = generateCommentary(runsOffBat, extrasType, extrasRuns, isWicket, wicketType,
-                        if (wicketType == "run_out" && nonStrikerOut) (state.nonStriker?.fullName ?: striker.fullName) else striker.fullName,
+                        if (runOutNonStriker) (state.nonStriker?.fullName ?: striker.fullName) else striker.fullName,
                         bowler.fullName, fielderName)))
                 val newTotalBalls = if (isLegal) innings.totalBalls + 1 else innings.totalBalls
                 val newTotalRuns = innings.totalRuns + totalRunsThisBall
@@ -623,14 +575,13 @@ class ScoringViewModel : ViewModel() {
                 val updatedInnings = scoringRepository.updateInnings(innings.id, newTotalRuns, newTotalWickets, newTotalBalls,
                     innings.extrasTotal + extrasToSave, if (isWide) innings.wides + 1 else innings.wides, if (isNoBall) innings.noBalls + 1 else innings.noBalls)
                 val newBalls = state.balls + insertedBall
-                ballStack.addLast(insertedBall)  // Push to undo stack
+                ballStack.addLast(insertedBall)
                 var newStriker: Player? = striker; var newNonStriker: Player? = state.nonStriker
                 if (!isWicket) {
                     val changeStrike = when { isWide -> ((extrasRuns ?: 1) + runsOffBat) % 2 == 1; isNoBall -> runsOffBat % 2 == 1; isBye || isLegBye -> (extrasRuns ?: 0) % 2 == 1; else -> runsOffBat % 2 == 1 }
                     if (changeStrike) { val t = newStriker; newStriker = newNonStriker; newNonStriker = t }
                 } else {
-                    // Run out non-striker: striker stays, non-striker goes out
-                    if (wicketType == "run_out" && nonStrikerOut) {
+                    if (runOutNonStriker) {
                         newNonStriker = null
                     } else {
                         newStriker = null
@@ -655,20 +606,22 @@ class ScoringViewModel : ViewModel() {
     // ── Stats ─────────────────────────────────────────────────────────────────
     private fun computeBatsmanStats(balls: List<Ball>, players: List<Player>): Map<String, BatsmanStats> {
         return players.associate { player ->
-            // Normal balls faced by this player as striker
             val pb = balls.filter { it.batsmanId == player.id }
-            // Run out as non-striker - batsmanId has the player who got out
-            val wicketBall = pb.firstOrNull { it.isWicket }
-            val isOut = pb.any { it.isWicket && it.wicketType != "retired_hurt" }
+            // A run-out can dismiss the non-striker; that ball carries dismissedBatsmanId
+            // instead of batsmanId. Count both so the victim shows out.
+            val dismissalBall = balls.firstOrNull {
+                it.isWicket && (it.batsmanId == player.id || it.dismissedBatsmanId == player.id)
+            }
+            val isOut = dismissalBall != null && dismissalBall.wicketType != "retired_hurt"
             player.id to BatsmanStats(player = player,
                 runs = pb.sumOf { it.runsOffBat },
                 balls = pb.count { it.extrasType != "wide" },
                 fours = pb.count { it.isBoundary && !it.isSix },
                 sixes = pb.count { it.isSix },
                 isOut = isOut,
-                dismissalType = wicketBall?.wicketType,
-                fielderName = wicketBall?.fielderName,
-                bowlerOnWicket = wicketBall?.bowlerId)
+                dismissalType = dismissalBall?.wicketType,
+                fielderName = dismissalBall?.fielderName,
+                bowlerOnWicket = dismissalBall?.bowlerId)
         }
     }
     private fun computeBowlerStats(balls: List<Ball>, players: List<Player>): Map<String, BowlerStats> {

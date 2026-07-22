@@ -177,7 +177,8 @@ fun MatchesScreen(
                             onViewScorecard = { onViewScorecard(match.id) },
                             onViewAnalytics = { onViewAnalytics(match.id) },
                             onAbandon = { viewModel.abandonMatch(match.id) },
-                            onCancel = { viewModel.cancelMatch(match.id) }
+                            onCancel = { viewModel.cancelMatch(match.id) },
+                            onDelete = { viewModel.deleteMatch(match.id) }
                         )
                     }
                 }
@@ -196,8 +197,10 @@ fun MatchCard(
     onViewScorecard: () -> Unit,
     onViewAnalytics: () -> Unit,
     onAbandon: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
 
     val green   = Color(0xFF34D399)
@@ -308,6 +311,25 @@ fun MatchCard(
                             DropdownMenuItem(
                                 text = { Text("❌ Cancel Match", color = Color(0xFFEF4444), fontSize = 13.sp) },
                                 onClick = { onCancel(); showMoreMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("🗑️ Delete Match", color = Color(0xFFEF4444), fontSize = 13.sp) },
+                                onClick = { showMoreMenu = false; showDeleteConfirm = true }
+                            )
+                        }
+                        if (showDeleteConfirm) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteConfirm = false },
+                                title = { Text("Delete match?") },
+                                text = { Text("This permanently removes the match and all its scoring data. This cannot be undone.") },
+                                confirmButton = {
+                                    TextButton(onClick = { showDeleteConfirm = false; onDelete() }) {
+                                        Text("Delete", color = Color(0xFFEF4444))
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Keep") }
+                                }
                             )
                         }
                     }

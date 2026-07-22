@@ -71,6 +71,46 @@ class TournamentRepository {
         }
     }
 
+    // Deletes a tournament and EVERYTHING under it (Version B - full wipe).
+    // Order matters because of FK rules in the schema:
+    //   player_awards -> tournaments is NO ACTION, so those rows must go first or
+    //     the tournament delete is rejected.
+    //   matches -> tournaments is SET NULL, so deleting the tournament alone would
+    //     orphan the matches; we delete each fixture explicitly instead.
+    //   Everything under a match (innings, balls, playing_xi, player_awards,
+    //     match_notifications) and tournament_teams is CASCADE, so those go
+    //     automatically when their parent row is removed.
+    suspend fun deleteTournament(tournamentId: String) {
+        val matchRepository = MatchRepository()
+
+        // 1. player_awards tied to the tournament (NO ACTION -> must clear first)
+        try {
+            client.postgrest["player_awards"].delete { filter { eq("tournament_id", tournamentId) } }
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "deleteTournament awards: ${e.message}")
+        }
+
+        // 2. every fixture — deleteMatch cascades each match's own children
+        val fixtures = try {
+            client.postgrest["matches"]
+                .select { filter { eq("tournament_id", tournamentId) } }
+                .decodeList<Match>()
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "deleteTournament fixtures fetch: ${e.message}")
+            emptyList()
+        }
+        for (m in fixtures) {
+            try {
+                matchRepository.deleteMatch(m.id)
+            } catch (e: Exception) {
+                android.util.Log.w("CricketHub", "deleteTournament match ${m.id}: ${e.message}")
+            }
+        }
+
+        // 3. the tournament itself (tournament_teams cascades away with it)
+        client.postgrest["tournaments"].delete { filter { eq("id", tournamentId) } }
+    }
+
     suspend fun removeTeamFromTournament(tournamentId: String, teamId: String) {
         client.postgrest["tournament_teams"]
             .delete {

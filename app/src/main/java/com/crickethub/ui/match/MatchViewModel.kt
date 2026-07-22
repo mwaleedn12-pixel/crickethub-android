@@ -39,6 +39,19 @@ class MatchViewModel : ViewModel() {
         loadTeams() // ← FIX: teams bhi load karo taake match cards mein names show hon
     }
 
+    fun deleteMatch(matchId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                matchRepository.deleteMatch(matchId)
+                val matches = matchRepository.getAllMatches()
+                _uiState.update { it.copy(matches = matches, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
     fun loadMatches() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }

@@ -328,12 +328,14 @@ class PostMatchViewModel : ViewModel() {
             val ballsFaced = playerBalls.count { it.extrasType != "wide" }
             val fours = playerBalls.count { it.isBoundary && !it.isSix }
             val sixes = playerBalls.count { it.isSix }
-            val isOut = playerBalls.any {
-                it.isWicket &&
-                        it.wicketType != "run_out" &&
-                        it.wicketType != "retired_hurt"
+            // A dismissal ball names the victim in batsmanId, OR in dismissedBatsmanId
+            // when the non-striker is run out. Run-outs count as out (previous code
+            // wrongly excluded them, so run-out victims always showed not-out).
+            val dismissalBall = balls.firstOrNull {
+                it.isWicket && (it.batsmanId == player.id || it.dismissedBatsmanId == player.id)
             }
-            val wicketBall = playerBalls.firstOrNull { it.isWicket }
+            val isOut = dismissalBall != null && dismissalBall.wicketType != "retired_hurt"
+            val wicketBall = dismissalBall
             val sr = if (ballsFaced > 0) (runs.toDouble() / ballsFaced) * 100 else 0.0
             BatsmanScorecard(
                 player = player,

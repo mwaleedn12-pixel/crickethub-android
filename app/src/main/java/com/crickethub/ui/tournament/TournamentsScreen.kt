@@ -100,7 +100,9 @@ fun TournamentsScreen(
                         TournamentCard(
                             tournament = tournament,
                             isDark = isDark,
-                            onClick = { onTournamentClick(tournament.id) }
+                            onClick = { onTournamentClick(tournament.id) },
+                            onCancel = { viewModel.cancelTournament(tournament.id) },
+                            onDelete = { viewModel.deleteTournament(tournament.id) }
                         )
                     }
                 }
@@ -113,8 +115,27 @@ fun TournamentsScreen(
 fun TournamentCard(
     tournament: Tournament,
     isDark: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete tournament?") },
+            text = { Text("This permanently removes the tournament, its fixtures, and all their scoring data. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete() }) {
+                    Text("Delete", color = Color(0xFFEF4444))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Keep") }
+            }
+        )
+    }
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
     val surface = if (isDark) Color(0xFF0D2018) else Color(0xFFFFFFFF)
@@ -166,6 +187,28 @@ fun TournamentCard(
                         (tournament.status ?: "upcoming").replaceFirstChar { it.uppercase() },
                         color = statusColor, fontSize = 10.sp, fontWeight = FontWeight.Bold
                     )
+                }
+                // ⋮ overflow menu
+                Box {
+                    Box(
+                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
+                            .clickable { showMenu = true },
+                        contentAlignment = Alignment.Center
+                    ) { Text("\u22EE", color = textS, fontSize = 18.sp) }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("\uD83C\uDFF3\uFE0F Cancel Tournament", color = gold, fontSize = 13.sp) },
+                            onClick = { showMenu = false; onCancel() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("\uD83D\uDDD1\uFE0F Delete Tournament", color = Color(0xFFEF4444), fontSize = 13.sp) },
+                            onClick = { showMenu = false; showDeleteConfirm = true }
+                        )
+                    }
                 }
             }
 

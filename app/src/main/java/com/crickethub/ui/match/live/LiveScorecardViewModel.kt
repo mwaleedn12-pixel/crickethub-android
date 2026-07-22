@@ -244,10 +244,13 @@ class LiveScorecardViewModel : ViewModel() {
             val ballsFaced = playerBalls.count { it.extrasType != "wide" }
             val fours = playerBalls.count { it.isBoundary && !it.isSix }
             val sixes = playerBalls.count { it.isSix }
-            val isOut = playerBalls.any {
-                it.isWicket && it.wicketType != "run_out" && it.wicketType != "retired_hurt"
+            // Include run-outs, and match the victim by batsmanId OR dismissedBatsmanId
+            // (non-striker run-out stores the victim in dismissedBatsmanId).
+            val dismissalBall = balls.firstOrNull {
+                it.isWicket && (it.batsmanId == player.id || it.dismissedBatsmanId == player.id)
             }
-            val wicketBall = playerBalls.firstOrNull { it.isWicket }
+            val isOut = dismissalBall != null && dismissalBall.wicketType != "retired_hurt"
+            val wicketBall = dismissalBall
             statsMap[player.id] = BatsmanStats(
                 player = player, runs = runs, balls = ballsFaced,
                 fours = fours, sixes = sixes, isOut = isOut,

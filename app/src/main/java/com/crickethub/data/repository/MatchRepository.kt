@@ -1,6 +1,7 @@
 package com.crickethub.data.repository
 
 import com.crickethub.data.model.Match
+import com.crickethub.data.model.Innings
 import com.crickethub.data.model.MatchInsert
 import com.crickethub.data.model.PlayingXI
 import com.crickethub.data.model.PlayingXIInsert
@@ -83,6 +84,16 @@ class MatchRepository {
 
     fun invalidateXICache(matchId: String) {
         xiCache.remove(matchId)
+    }
+
+    // Deletes a match. All children (innings, balls, playing_xi, player_awards,
+    // match_notifications) are ON DELETE CASCADE in the database, so removing the
+    // match row removes them automatically.
+    suspend fun deleteMatch(matchId: String) {
+        client.postgrest["matches"].delete { filter { eq("id", matchId) } }
+        invalidateMatchCache(matchId)
+        invalidateMatchesCache()
+        invalidateXICache(matchId)
     }
 
     suspend fun insertPlayingXI(players: List<PlayingXIInsert>) {

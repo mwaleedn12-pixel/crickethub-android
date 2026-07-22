@@ -169,14 +169,29 @@ class TournamentViewModel : ViewModel() {
         }
     }
 
-    fun deleteTournament(tournamentId: String) {
+    fun cancelTournament(tournamentId: String) {
         viewModelScope.launch {
+            _uiState.update { it.copy(error = null) }
             try {
                 SupabaseClient.client.postgrest["tournaments"]
-                    .delete { filter { eq("id", tournamentId) } }
+                    .update({ set("status", "cancelled") }) { filter { eq("id", tournamentId) } }
                 loadTournaments()
             } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Cancel tournament error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteTournament(tournamentId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                tournamentRepository.deleteTournament(tournamentId)
+                loadTournaments()
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Delete tournament error: ${e.message}", e)
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
     }
