@@ -21,6 +21,8 @@ data class BowlerStats(
     val wickets: Int = 0,
     val wides: Int = 0,
     val noBalls: Int = 0,
+    val maidens: Int = 0,
+    val dotBalls: Int = 0,
     val overs: String = "0.0"
 ) {
     val economy: Double get() = if (balls > 0) (runs.toDouble() / balls) * 6 else 0.0
@@ -40,6 +42,8 @@ data class ScoringUiState(
     val bowlerStats: Map<String, BowlerStats> = emptyMap(),
     val inningsComplete: Boolean = false,
     val matchComplete: Boolean = false,
+    // Super over: true when a super over just tied and the user must choose what next
+    val showSuperOverDecision: Boolean = false,
     val error: String? = null,
     val dlsEnabled: Boolean = false,
     val dlsParScore: Int? = null,

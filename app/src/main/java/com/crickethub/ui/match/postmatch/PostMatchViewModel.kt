@@ -173,9 +173,16 @@ class PostMatchViewModel : ViewModel() {
                         .distinctBy { it.id }
                     val motmCandidates = computeMotmCandidates(allPlayers, balls1, balls2)
 
-                    val resultText = computeResultText(
+                    // If the match was decided by an explicit user action (boundary count,
+                    // declared tie, abandoned...) the stored result_text is authoritative -
+                    // recomputing from innings would overwrite it with "Match tied".
+                    val storedResult = match.resultText
+                    val decidedExplicitly = !storedResult.isNullOrBlank() &&
+                            match.resultType in listOf("boundary_count", "abandoned", "cancelled", "no_result")
+                    val resultText = if (decidedExplicitly) storedResult else computeResultText(
                         match, innings1, innings2, team1, team2,
-                        inn1BattingTeamId, inn1BattingTeamName, inn1BowlingTeamName
+                        inn1BattingTeamId, inn1BattingTeamName, inn1BowlingTeamName,
+                        allInnings
                     )
 
                     _uiState.update {
@@ -472,7 +479,8 @@ class PostMatchViewModel : ViewModel() {
         team2: Team?,
         inn1BattingTeamId: String,
         inn1BattingTeamName: String,
-        inn1BowlingTeamName: String
+        inn1BowlingTeamName: String,
+        allInnings: List<Innings> = emptyList()
     ): String {
         if (innings1 == null) return "Match result pending"
         if (innings2 == null) return "$inn1BattingTeamName scored ${innings1.totalRuns}/${innings1.totalWickets}"
@@ -486,7 +494,37 @@ class PostMatchViewModel : ViewModel() {
                 val margin = innings1.totalRuns - innings2.totalRuns
                 "$inn1BattingTeamName won by $margin runs"
             }
-            else -> "Match tied"
+            else -> {
+                // Main match level -> decide on the super over(s) if any were played.
+                val so = allInnings.filter { it.inningsNo >= 3 && it.status == "completed" }
+                    .sortedBy { it.inningsNo }
+                if (so.size < 2) return "Match tied"
+                // Last completed PAIR decides it (a later pair supersedes an earlier tie)
+                val lastPairStart = if (so.size % 2 == 0) so.size - 2 else so.size - 1
+                val bat = so.getOrNull(lastPairStart)
+                val chase = so.getOrNull(lastPairStart + 1)
+                if (bat == null || chase == null) return "Match tied"
+                // In the super over, the team batting FIRST is inn2's batting team.
+                val batTeamName = if (bat.battingTeamId == inn1BattingTeamId)
+                    inn1BattingTeamName else inn1BowlingTeamName
+                val chaseTeamName = if (chase.battingTeamId == inn1BattingTeamId)
+                    inn1BattingTeamName else inn1BowlingTeamName
+                // Which super over decided it: innings 3&4 = 1st, 5&6 = 2nd, etc.
+                val soNumber = (bat.inningsNo - 1) / 2
+                val ordinal = when (soNumber) {
+                    1 -> "Super Over"
+                    2 -> "2nd Super Over"
+                    3 -> "3rd Super Over"
+                    else -> "${soNumber}th Super Over"
+                }
+                when {
+                    chase.totalRuns > bat.totalRuns ->
+                        "Match tied ($chaseTeamName won the $ordinal)"
+                    bat.totalRuns > chase.totalRuns ->
+                        "Match tied ($batTeamName won the $ordinal)"
+                    else -> "Match tied ($ordinal also tied)"
+                }
+            }
         }
     }
 }

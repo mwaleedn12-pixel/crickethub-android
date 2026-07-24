@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 class ScoringViewModel : ViewModel() {
     private val scoringRepository = ScoringRepository()
@@ -47,6 +48,10 @@ class ScoringViewModel : ViewModel() {
     private var isProcessingBall = false
     private var inningsCompleteHandled = false
     private var isMatchLoaded = false
+    // Set synchronously while a restore is running. force=true bypasses the
+    // "already restored" guard, so without this two resumeMatch calls can overlap
+    // and BOTH try to create innings 1 -> duplicate key error.
+    private var isRestoring = false
     private var currentMatchId = ""
     private var target: Int? = null
     private var dlsTeam1Score: Int = 0
@@ -270,9 +275,23 @@ class ScoringViewModel : ViewModel() {
             android.util.Log.d("CricketHub", "resumeMatch: already restored, keeping current state")
             return
         }
-        val cached = getSavedState(matchId)
+        if (isRestoring) {
+            android.util.Log.d("CricketHub", "resumeMatch: restore already in flight, ignored")
+            return
+        }
+        isRestoring = true
+        // On a FORCED reload (innings transition) never restore the cache - it holds the
+        // PREVIOUS innings and would flash its score/players onto the new innings.
+        val cached = if (force) null else getSavedState(matchId)
         if (cached != null && cached.balls.isNotEmpty()) {
             _uiState.value = cached.copy(isLoading = false, error = null)
+        }
+        if (force) {
+            // clear the finished innings so the new one loads onto a clean slate
+            _uiState.update { it.copy(innings = null, balls = emptyList(),
+                striker = null, nonStriker = null, currentBowler = null,
+                batsmanStats = emptyMap(), bowlerStats = emptyMap(),
+                inningsComplete = false, matchComplete = false) }
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = it.balls.isEmpty(), error = null) }
@@ -289,9 +308,18 @@ class ScoringViewModel : ViewModel() {
                 if (liveInnings == null) {
                     val battingFirstId = match.battingFirstId ?: match.team1Id
                     val bowlingFirstId = if (battingFirstId == match.team1Id) match.team2Id else match.team1Id
-                    val newInnings = scoringRepository.createInnings(
-                        InningsInsert(matchId = matchId, inningsNo = 1,
-                            battingTeamId = battingFirstId, bowlingTeamId = bowlingFirstId))
+                    // Another concurrent restore may have just created innings 1.
+                    // If the insert collides, re-read and use the existing row.
+                    val newInnings = try {
+                        scoringRepository.createInnings(
+                            InningsInsert(matchId = matchId, inningsNo = 1,
+                                battingTeamId = battingFirstId, bowlingTeamId = bowlingFirstId))
+                    } catch (dup: Exception) {
+                        android.util.Log.w("CricketHub", "innings 1 already exists, reusing: ${dup.message}")
+                        scoringRepository.invalidateInningsCache(matchId)
+                        scoringRepository.getInningsByMatch(matchId).firstOrNull { it.inningsNo == 1 }
+                            ?: throw dup
+                    }
                     val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, battingFirstId)
                     val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, bowlingFirstId)
                     isMatchLoaded = true; currentMatchId = matchId
@@ -344,6 +372,8 @@ class ScoringViewModel : ViewModel() {
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "resumeMatch error: ${e.message}", e)
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
+            } finally {
+                isRestoring = false
             }
         }
     }
@@ -360,20 +390,75 @@ class ScoringViewModel : ViewModel() {
             try {
                 val match = matchRepository.getMatchById(matchId) ?: return@launch
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
+                // Same fallback as resumeMatch: a newly created innings may carry the DB
+                // default status ("pending") rather than "live". Treat any non-completed
+                // innings as the current one, otherwise a new super over is invisible here
+                // and "Play Again" appears to do nothing.
                 val currentInnings = allInnings.find { it.status == "live" }
+                    ?: allInnings.filter { it.status != "completed" }.maxByOrNull { it.inningsNo }
                 val completedInnings = allInnings.filter { it.status == "completed" }
-                if (completedInnings.size >= 2) {
-                    val inn1 = allInnings.find { it.inningsNo == 1 }
-                    val inn2 = allInnings.find { it.inningsNo == 2 }
-                    val tied = inn1 != null && inn2 != null && inn1.totalRuns == inn2.totalRuns
+                // FAST PATH: a live innings exists -> resumeMatch handles it. Skip the
+                // redundant target/team analysis below AND its duplicate fetches. This
+                // removes one full match+innings+balls+players round-trip per transition.
+                if (currentInnings != null) {
+                    // set chase target for 2nd innings / super-over chase before delegating
+                    val firstInn = allInnings.find { it.inningsNo == 1 }
+                    val prevOdd = allInnings.find { it.inningsNo == currentInnings.inningsNo - 1 }
+                    target = when {
+                        currentInnings.inningsNo == 2 && firstInn != null -> firstInn.totalRuns + 1
+                        currentInnings.inningsNo >= 4 && currentInnings.inningsNo % 2 == 0 && prevOdd != null -> prevOdd.totalRuns + 1
+                        else -> null
+                    }
+                    // force = true: loadMatch has just decided this innings must load.
+                    // Without force, resumeMatch's "already restored" guard sees
+                    // isMatchLoaded (set moments ago) and returns, leaving the screen
+                    // stuck on the finished innings.
+                    resumeMatch(matchId, force = true)
+                    return@launch
+                }
+                // If there's a live innings (main or super over), fall through and load it.
+                // Only decide match-complete when NOTHING is live. Super-over creation and
+                // repeat/tie decisions are owned by checkAndStartNextInnings, not here.
+                if (completedInnings.size >= 2 && currentInnings == null) {
                     val superOverInnings = allInnings.filter { it.inningsNo >= 3 }
+                    // A super over is live? set its chase target and fall through to load it.
                     val superOverLive = superOverInnings.find { it.status == "live" }
-                    val superOverComplete = superOverInnings.filter { it.status == "completed" }
-                    when {
-                        superOverLive != null -> { if (superOverLive.inningsNo == 4) target = allInnings.find { it.inningsNo == 3 }?.totalRuns?.plus(1) }
-                        superOverComplete.size >= 2 -> { _uiState.update { it.copy(isLoading = false, matchComplete = true) }; return@launch }
-                        tied && match.superOverEnabled -> { _uiState.update { it.copy(isLoading = false, matchComplete = true) }; return@launch }
-                        else -> { _uiState.update { it.copy(isLoading = false, matchComplete = true) }; return@launch }
+                    if (superOverLive != null) {
+                        if (superOverLive.inningsNo % 2 == 0) {
+                            // even = chase; target = previous (odd) super-over innings + 1
+                            target = allInnings.find { it.inningsNo == superOverLive.inningsNo - 1 }?.totalRuns?.plus(1)
+                        }
+                        // fall through - currentInnings is null here, so let the normal
+                        // live-innings path below pick it up via resumeMatch.
+                    } else {
+                        // Nothing live and 2+ complete. Before declaring the match over,
+                        // check whether a super over is still owed. This must happen HERE
+                        // too, not only on the inningsComplete event - otherwise backing
+                        // out and reopening at the end of innings 2 shows "match complete"
+                        // and the super over can never start.
+                        val soInnings = allInnings.filter { it.inningsNo >= 3 }
+                        val lastNo = allInnings.maxOfOrNull { it.inningsNo } ?: 0
+                        val needsSuperOver = when {
+                            // main match tied, super over enabled, none created yet
+                            soInnings.isEmpty() -> {
+                                val i1 = allInnings.find { it.inningsNo == 1 }
+                                val i2 = allInnings.find { it.inningsNo == 2 }
+                                i1 != null && i2 != null && i1.totalRuns == i2.totalRuns && match.superOverEnabled
+                            }
+                            // an odd super-over innings finished but its chase never started
+                            lastNo % 2 == 1 -> true
+                            else -> false
+                        }
+                        if (needsSuperOver) {
+                            android.util.Log.d("CricketHub", "loadMatch: super over owed, starting it")
+                            inningsCompleteHandled = false
+                            checkAndStartNextInnings(matchId) {
+                                _uiState.update { it.copy(isLoading = false, matchComplete = true) }
+                            }
+                            return@launch
+                        }
+                        _uiState.update { it.copy(isLoading = false, matchComplete = true) }
+                        return@launch
                     }
                 }
                 val firstInnings = allInnings.find { it.inningsNo == 1 }
@@ -392,7 +477,7 @@ class ScoringViewModel : ViewModel() {
                     else -> { _uiState.update { it.copy(isLoading = false) }; return@launch }
                 }
                 if (currentInnings != null) {
-                    resumeMatch(matchId)
+                    resumeMatch(matchId, force = true)
                     return@launch
                 }
 
@@ -417,7 +502,7 @@ class ScoringViewModel : ViewModel() {
         }
     }
 
-    // ── Next Innings ──────────────────────────────────────────────────────────
+    // ── Next Innings (incl. super over) ───────────────────────────────────────
     fun checkAndStartNextInnings(matchId: String, onMatchComplete: () -> Unit) {
         if (inningsCompleteHandled) return
         inningsCompleteHandled = true
@@ -425,23 +510,174 @@ class ScoringViewModel : ViewModel() {
             try {
                 val match = matchRepository.getMatchById(matchId) ?: return@launch
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
-                val completedInnings = allInnings.filter { it.status == "completed" }
-                when {
-                    completedInnings.size >= 4 -> onMatchComplete()
-                    completedInnings.size == 3 -> {
-                        val superInn1 = allInnings.find { it.inningsNo == 3 }
-                        if (superInn1 != null) { target = superInn1.totalRuns + 1; _uiState.update { it.copy(inningsComplete = false, matchComplete = false) }; isMatchLoaded = false; inningsCompleteHandled = false; loadMatch(matchId) } else onMatchComplete()
+                val completed = allInnings.filter { it.status == "completed" }
+
+                val inn1 = allInnings.find { it.inningsNo == 1 }
+                val inn2 = allInnings.find { it.inningsNo == 2 }
+                val mainTied = inn1 != null && inn2 != null && inn1.totalRuns == inn2.totalRuns
+                android.util.Log.d("CricketHub", "NEXT_INNINGS: completed=${completed.size} " +
+                        "inn1=${inn1?.totalRuns} inn2=${inn2?.totalRuns} tied=$mainTied " +
+                        "superEnabled=${match.superOverEnabled} allInnings=${allInnings.map { "${it.inningsNo}:${it.status}" }}")
+
+                // Helper: start an innings (create if missing) and reload.
+                suspend fun startInnings(no: Int, battingTeamId: String, bowlingTeamId: String, chaseTarget: Int?) {
+                    if (allInnings.find { it.inningsNo == no } == null) {
+                        scoringRepository.createInnings(InningsInsert(matchId, no, battingTeamId, bowlingTeamId))
                     }
-                    completedInnings.size >= 2 -> {
-                        val inn1 = allInnings.find { it.inningsNo == 1 }; val inn2 = allInnings.find { it.inningsNo == 2 }
-                        if (inn1 != null && inn2 != null && inn2.totalRuns == inn1.totalRuns && match.superOverEnabled) {
-                            if (allInnings.find { it.inningsNo == 3 } == null) { scoringRepository.createInnings(InningsInsert(matchId, 3, inn2.battingTeamId, inn2.bowlingTeamId)); target = null; _uiState.update { it.copy(inningsComplete = false, matchComplete = false) }; isMatchLoaded = false; inningsCompleteHandled = false; loadMatch(matchId) } else onMatchComplete()
-                        } else onMatchComplete()
-                    }
-                    completedInnings.size == 1 -> { target = completedInnings.first().totalRuns + 1; _uiState.update { it.copy(inningsComplete = false) }; isMatchLoaded = false; inningsCompleteHandled = false; loadMatch(matchId) }
-                    else -> { isMatchLoaded = false; inningsCompleteHandled = false; loadMatch(matchId) }
+                    target = chaseTarget
+                    _uiState.update { it.copy(inningsComplete = false, matchComplete = false) }
+                    isMatchLoaded = false; inningsCompleteHandled = false
+                    loadMatch(matchId)
                 }
-            } catch (e: Exception) { inningsCompleteHandled = false; _uiState.update { it.copy(error = e.message) } }
+
+                // ---- MAIN MATCH (innings 1 & 2) ----
+                if (completed.size == 1) {
+                    // start 2nd innings, chasing 1st
+                    val first = completed.first()
+                    startInnings(2, first.bowlingTeamId, first.battingTeamId, first.totalRuns + 1)
+                    return@launch
+                }
+                if (completed.size == 2) {
+                    if (mainTied && match.superOverEnabled) {
+                        // Super over 1: team that batted SECOND bats first (innings 3).
+                        startInnings(3, inn2!!.battingTeamId, inn2.bowlingTeamId, null)
+                    } else {
+                        inningsCompleteHandled = false
+                        onMatchComplete()  // decided on runs
+                    }
+                    return@launch
+                }
+
+                // ---- SUPER OVERS (innings >= 3, in pairs: odd = bat, even = chase) ----
+                if (completed.size >= 3) {
+                    val lastNo = completed.maxOf { it.inningsNo }
+                    if (lastNo % 2 == 1) {
+                        // an ODD super-over innings just completed -> start its chase
+                        val batInn = allInnings.find { it.inningsNo == lastNo }!!
+                        startInnings(lastNo + 1, batInn.bowlingTeamId, batInn.battingTeamId, batInn.totalRuns + 1)
+                        return@launch
+                    } else {
+                        // an EVEN (chase) innings completed -> compare the pair
+                        val bat = allInnings.find { it.inningsNo == lastNo - 1 }
+                        val chase = allInnings.find { it.inningsNo == lastNo }
+                        val soTied = bat != null && chase != null && bat.totalRuns == chase.totalRuns
+                        if (soTied) {
+                            // Tie -> ask the user: repeat / declare tie / boundary count.
+                            inningsCompleteHandled = false
+                            _uiState.update { it.copy(showSuperOverDecision = true, inningsComplete = false) }
+                        } else {
+                            inningsCompleteHandled = false
+                            onMatchComplete()  // higher score wins
+                        }
+                        return@launch
+                    }
+                }
+
+                // fallback: nothing completed yet
+                isMatchLoaded = false; inningsCompleteHandled = false; loadMatch(matchId)
+            } catch (e: Exception) {
+                inningsCompleteHandled = false
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    // User chose to play another super over after a tie.
+    fun startAnotherSuperOver(matchId: String) {
+        viewModelScope.launch {
+            try {
+                val allInnings = scoringRepository.getInningsByMatch(matchId)
+                val lastNo = allInnings.maxOfOrNull { it.inningsNo } ?: 2
+                val prevChase = allInnings.find { it.inningsNo == lastNo }
+                // Next super over: same batting order rule - team that batted second in
+                // the PREVIOUS super over (the chaser) bats first now.
+                val nextNo = lastNo + 1
+                if (prevChase == null) {
+                    android.util.Log.e("CricketHub", "startAnotherSuperOver: no previous innings found")
+                    _uiState.update { it.copy(showSuperOverDecision = false, error = "Could not start super over") }
+                    return@launch
+                }
+                val created = try {
+                    scoringRepository.createInnings(
+                        InningsInsert(matchId, nextNo, prevChase.battingTeamId, prevChase.bowlingTeamId))
+                } catch (dup: Exception) {
+                    android.util.Log.w("CricketHub", "super over $nextNo exists, reusing: ${dup.message}")
+                    scoringRepository.invalidateInningsCache(matchId)
+                    scoringRepository.getInningsByMatch(matchId).firstOrNull { it.inningsNo == nextNo }
+                        ?: throw dup
+                }
+                android.util.Log.d("CricketHub", "startAnotherSuperOver: created innings $nextNo id=${created.id}")
+                scoringRepository.invalidateInningsCache(matchId)
+                clearSavedState(matchId)
+                target = null
+                _uiState.update { it.copy(showSuperOverDecision = false, inningsComplete = false,
+                    matchComplete = false, innings = null, balls = emptyList(),
+                    striker = null, nonStriker = null, currentBowler = null,
+                    batsmanStats = emptyMap(), bowlerStats = emptyMap()) }
+                isMatchLoaded = false; inningsCompleteHandled = false
+                loadMatch(matchId, forceReload = true)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    // User chose to declare it a tie - no further play.
+    fun resolveSuperOverAsComplete() {
+        _uiState.update { it.copy(showSuperOverDecision = false, matchComplete = true) }
+    }
+
+    // Decide the match on total boundaries (4s + 6s) across the WHOLE match.
+    // Stores the winner on the match so post-match can report it.
+    fun resolveByBoundaryCount(matchId: String) {
+        viewModelScope.launch {
+            try {
+                val allInnings = scoringRepository.getInningsByMatch(matchId)
+                val match = matchRepository.getMatchById(matchId)
+                var team1Boundaries = 0
+                var team2Boundaries = 0
+                for (inn in allInnings) {
+                    val balls = scoringRepository.getBallsByInnings(inn.id)
+                    val b = balls.count { it.isBoundary || it.isSix }
+                    if (inn.battingTeamId == match?.team1Id) team1Boundaries += b else team2Boundaries += b
+                }
+                android.util.Log.d("CricketHub", "BOUNDARY COUNT: t1=$team1Boundaries t2=$team2Boundaries")
+                // Fetch team names so the result reads "Team A won on boundary count".
+                suspend fun teamName(id: String?): String = try {
+                    com.crickethub.data.remote.SupabaseClient.client.postgrest["teams"]
+                        .select { filter { eq("id", id ?: "") } }
+                        .decodeSingleOrNull<com.crickethub.data.model.Team>()?.name ?: "Team"
+                } catch (e: Exception) { "Team" }
+                val t1Name = teamName(match?.team1Id)
+                val t2Name = teamName(match?.team2Id)
+                // How many super overs were played (pairs of innings from 3 upward)
+                val soCount = allInnings.count { it.inningsNo >= 3 } / 2
+                val soLabel = when {
+                    soCount >= 2 -> "after $soCount Super Overs"
+                    soCount == 1 -> "after the Super Over"
+                    else -> ""
+                }
+                val resultText = when {
+                    team1Boundaries > team2Boundaries ->
+                        "Match tied - $t1Name won on boundary count ($team1Boundaries vs $team2Boundaries) $soLabel".trim()
+                    team2Boundaries > team1Boundaries ->
+                        "Match tied - $t2Name won on boundary count ($team2Boundaries vs $team1Boundaries) $soLabel".trim()
+                    else -> "Match tied (boundaries level $team1Boundaries-$team2Boundaries)"
+                }
+                try {
+                    com.crickethub.data.remote.SupabaseClient.client
+                        .postgrest["matches"].update({
+                        set("result_text", resultText)
+                        set("result_type", "boundary_count")
+                    }) { filter { eq("id", matchId) } }
+                    matchRepository.invalidateMatchCache(matchId)
+                } catch (e: Exception) {
+                    android.util.Log.w("CricketHub", "boundary result save: ${e.message}")
+                }
+                _uiState.update { it.copy(showSuperOverDecision = false, matchComplete = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(showSuperOverDecision = false, error = e.message, matchComplete = true) }
+            }
         }
     }
 
@@ -625,9 +861,12 @@ class ScoringViewModel : ViewModel() {
                 }
                 val isOverEnd = newTotalBalls % 6 == 0 && newTotalBalls > 0 && isLegal
                 if (isOverEnd && newStriker != null) { val t = newStriker; newStriker = newNonStriker; newNonStriker = t }
-                val maxOvers = if (innings.inningsNo >= 3) 1 else match.totalOvers
+                val isSuperOver = innings.inningsNo >= 3
+                val maxOvers = if (isSuperOver) 1 else match.totalOvers
+                // Super over: 2 wickets ends the innings. Main match: all out = players-1.
+                val maxWickets = if (isSuperOver) 2 else match.playersPerSide - 1
                 val targetChased = target != null && newTotalRuns >= target!!
-                val isInningsComplete = newTotalWickets >= match.playersPerSide - 1 || newTotalBalls >= maxOvers * 6 || targetChased
+                val isInningsComplete = newTotalWickets >= maxWickets || newTotalBalls >= maxOvers * 6 || targetChased
                 if (isInningsComplete) scoringRepository.completeInnings(innings.id)
                 _uiState.update { it.copy(innings = updatedInnings, balls = newBalls,
                     striker = newStriker, nonStriker = newNonStriker,
@@ -666,10 +905,26 @@ class ScoringViewModel : ViewModel() {
             val pb = balls.filter { it.bowlerId == player.id }
             if (pb.isEmpty()) return@forEach
             val legal = pb.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+            // Dot ball: a legal delivery that conceded nothing (no bat runs, no extras).
+            val dots = pb.count {
+                it.extrasType != "wide" && it.extrasType != "no_ball" &&
+                        it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0
+            }
+            // Maiden: a COMPLETED over (6 legal balls) by this bowler conceding 0 runs.
+            // Wides/no-balls in the over mean runs were conceded, so it can't be a maiden.
+            val maidens = pb.groupBy { it.overNo }.count { (_, overBalls) ->
+                val legalInOver = overBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                val conceded = overBalls.sumOf {
+                    if (it.extrasType in listOf("bye", "leg_bye")) 0
+                    else it.runsOffBat + (it.extrasRuns ?: 0)
+                }
+                legalInOver == 6 && conceded == 0
+            }
             map[player.id] = BowlerStats(player = player, balls = legal,
                 runs = pb.sumOf { if (it.extrasType in listOf("bye", "leg_bye")) 0 else it.runsOffBat + (it.extrasRuns ?: 0) },
                 wickets = pb.count { it.isWicket && it.wicketType !in listOf("run_out", "obstructing", "handled_ball", "timed_out", "retired_hurt", "retired_out") },
                 overs = "${legal / 6}.${legal % 6}",
+                maidens = maidens, dotBalls = dots,
                 wides = pb.count { it.extrasType == "wide" }, noBalls = pb.count { it.extrasType == "no_ball" })
         }
         return map

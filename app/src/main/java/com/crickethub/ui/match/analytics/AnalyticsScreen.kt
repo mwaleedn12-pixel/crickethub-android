@@ -94,52 +94,52 @@ fun AnalyticsScreen(
     }
 
     CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
-Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                }
+                Text("Analytics", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             }
-            Text("Analytics", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-        }
 
-        ScrollableTabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = SurfaceCard,
-            contentColor = NeonGreen,
-            edgePadding = 0.dp
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = {
-                        Text(
-                            tab, fontSize = 13.sp,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == index) NeonGreen else TextSecondary
-                        )
-                    }
-                )
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = SurfaceCard,
+                contentColor = NeonGreen,
+                edgePadding = 0.dp
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                tab, fontSize = 13.sp,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == index) NeonGreen else TextSecondary
+                            )
+                        }
+                    )
+                }
             }
-        }
 
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
-            }
-        } else {
-            when (selectedTab) {
-                0 -> BattingAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
-                1 -> BowlingAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
-                2 -> TeamAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
-                3 -> SummaryAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else {
+                when (selectedTab) {
+                    0 -> BattingAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
+                    1 -> BowlingAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
+                    2 -> TeamAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
+                    3 -> SummaryAnalyticsTab(inn1Balls, inn2Balls, inn1BattingTeamName, inn2BattingTeamName, totalOvers)
+                }
             }
         }
     }
-}
 } // CricketAnimatedBackground
 
 // ── BATTING TAB ──────────────────────────────────────────────
@@ -270,8 +270,9 @@ fun BattingAnalyticsTab(
             AnalyticsCard("Dot Ball Analysis") {
                 listOf(inn1Balls to inn1Name, inn2Balls to inn2Name).forEach { (balls, name) ->
                     if (balls.isEmpty()) return@forEach
-                    val legalBalls = balls.filter { it.extrasType != "wide" }
-                    val dotBalls = legalBalls.count { it.runsOffBat == 0 && it.extrasRuns == null }
+                    val legalBalls = balls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                    // Dot = legal ball conceding nothing. extrasRuns may be 0 (not null).
+                    val dotBalls = legalBalls.count { it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0 }
                     val dotPct = if (legalBalls.isNotEmpty()) dotBalls * 100.0 / legalBalls.size else 0.0
 
                     Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -570,8 +571,9 @@ fun SummaryAnalyticsTab(
                     val rr = if (legalBalls > 0) runs * 6.0 / legalBalls else 0.0
                     val fours = balls.count { it.isBoundary && !it.isSix }
                     val sixes = balls.count { it.isSix }
-                    val dotBalls = balls.filter { it.extrasType != "wide" }.count {
-                        it.runsOffBat == 0 && it.extrasRuns == null
+                    val dotBalls = balls.count {
+                        it.extrasType != "wide" && it.extrasType != "no_ball" &&
+                                it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0
                     }
                     val extras = balls.sumOf { it.extrasRuns ?: 0 } +
                             balls.count { it.extrasType == "wide" } +

@@ -824,7 +824,12 @@ fun computeInningsStats(balls: List<Ball>): InningsQuickStats {
     val sixes = balls.count { it.isSix }
     val legal = balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
     val rr = if (legal > 0) runs * 6.0 / legal else 0.0
-    val dots = balls.filter { it.extrasType != "wide" }.count { it.runsOffBat == 0 && it.extrasRuns == null }
+    // Dot ball: a LEGAL delivery conceding nothing. Must exclude no-balls (they always
+    // concede the penalty) and treat extrasRuns 0 the same as null.
+    val dots = balls.count {
+        it.extrasType != "wide" && it.extrasType != "no_ball" &&
+                it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0
+    }
     val extras = balls.sumOf { it.extrasRuns ?: 0 } + balls.count { it.extrasType == "wide" } + balls.count { it.extrasType == "no_ball" }
     val batRuns = balls.sumOf { it.runsOffBat }
     val bdryRuns = (fours * 4) + (sixes * 6)

@@ -83,6 +83,10 @@ fun ScoringScreen(
 
     LaunchedEffect(uiState.inningsComplete) {
         if (uiState.inningsComplete) {
+            // Small settle so the final ball's DB write lands before we read innings
+            // state to decide the next one. Without it the transition can read a
+            // not-yet-committed innings and appear to hang on the loading spinner.
+            kotlinx.coroutines.delay(300)
             viewModel.checkAndStartNextInnings(matchId) { onInningsComplete() }
         }
     }
@@ -368,6 +372,32 @@ fun ScoringScreen(
                     },
                     onPlayerSelected = { viewModel.setBowler(it); showSelectBowler = false },
                     onDismiss = { showSelectBowler = false }
+                )
+            }
+
+            if (uiState.showSuperOverDecision) {
+                AlertDialog(
+                    onDismissRequest = { },
+                    containerColor = SurfaceCard,
+                    title = { Text("Super Over Tied!", color = AmberColor, fontWeight = FontWeight.Bold) },
+                    text = { Text("The super over ended level. How do you want to resolve it?",
+                        color = TextSecondary, fontSize = 14.sp) },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.startAnotherSuperOver(matchId) }) {
+                            Text("Play Another", color = NeonGreen, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        Row {
+                            TextButton(onClick = { viewModel.resolveSuperOverAsComplete() }) {
+                                Text("Declare Tie", color = TextSecondary)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = { viewModel.resolveByBoundaryCount(matchId) }) {
+                                Text("Boundary Count", color = NeonBlue)
+                            }
+                        }
+                    }
                 )
             }
 
@@ -733,7 +763,13 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("CRR: ${"%.2f".format(uiState.runRate)}", color = TextSecondary, fontSize = 13.sp)
-                    match?.let { Text("${it.totalOvers} overs", color = TextSecondary, fontSize = 12.sp) }
+                    // Super over (innings 3+) is always 1 over - don't show the match's total.
+                    val isSuperOver = (uiState.innings?.inningsNo ?: 1) >= 3
+                    if (isSuperOver) {
+                        Text("SUPER OVER", color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        match?.let { Text("${it.totalOvers} overs", color = TextSecondary, fontSize = 12.sp) }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     TextButton(onClick = onShare, colors = ButtonDefaults.textButtonColors(contentColor = NeonGreen)) {
                         Text("📤 Share", fontSize = 12.sp)
@@ -858,7 +894,7 @@ fun CurrentBowlerRow(
         Text(bowler?.fullName ?: "Select Bowler", color = if (bowler != null) TextPrimary else TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         bowler?.let { b ->
             bowlerStats[b.id]?.let { stats ->
-                Text("${stats.overs} M:0 R:${stats.runs} W:${stats.wickets} Eco:${"%.1f".format(stats.economy)}", color = TextSecondary, fontSize = 11.sp)
+                Text("${stats.overs} M:${stats.maidens} R:${stats.runs} W:${stats.wickets} Eco:${"%.1f".format(stats.economy)}", color = TextSecondary, fontSize = 11.sp)
             }
         }
     }

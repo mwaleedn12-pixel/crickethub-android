@@ -277,9 +277,24 @@ class LiveScorecardViewModel : ViewModel() {
                     "timed_out", "retired_hurt", "retired_out"
                 )
             }
+            // Dot ball: legal delivery conceding nothing.
+            val dots = playerBalls.count {
+                it.extrasType != "wide" && it.extrasType != "no_ball" &&
+                        it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0
+            }
+            // Maiden: completed 6-legal-ball over conceding 0 runs.
+            val maidens = playerBalls.groupBy { it.overNo }.count { (_, overBalls) ->
+                val legalInOver = overBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                val conceded = overBalls.sumOf {
+                    if (it.extrasType in listOf("bye", "leg_bye")) 0
+                    else it.runsOffBat + (it.extrasRuns ?: 0)
+                }
+                legalInOver == 6 && conceded == 0
+            }
             statsMap[player.id] = BowlerStats(
                 player = player, balls = legalBalls, runs = runs, wickets = wickets,
                 overs = "${legalBalls / 6}.${legalBalls % 6}",
+                maidens = maidens, dotBalls = dots,
                 wides = playerBalls.count { it.extrasType == "wide" },
                 noBalls = playerBalls.count { it.extrasType == "no_ball" }
             )

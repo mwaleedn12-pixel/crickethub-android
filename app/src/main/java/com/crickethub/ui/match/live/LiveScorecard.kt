@@ -44,171 +44,171 @@ fun LiveScorecardScreen(
     val tabs = listOf("Scorecard", "Commentary", "Overs", "Partnership", "MVP", "Summary")
 
     CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
-Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
 
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "${uiState.battingTeamName} vs ${uiState.bowlingTeamName}",
-                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    uiState.matchStatus,
-                    fontSize = 11.sp,
-                    color = when (uiState.matchStatus) {
-                        "LIVE" -> NeonGreen
-                        "COMPLETED" -> TextSecondary
-                        else -> AmberColor
-                    }
-                )
-            }
-            if (uiState.matchStatus == "LIVE") {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(ErrorRed)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text("● LIVE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-            IconButton(onClick = {
-                val shareText = buildString {
-                    appendLine("🏏 ${uiState.battingTeamName} vs ${uiState.bowlingTeamName}")
-                    appendLine("${uiState.totalRuns}/${uiState.totalWickets} (${uiState.currentOver}.${uiState.currentBall} ov)")
-                    appendLine("CRR: ${"%.2f".format(uiState.currentRunRate)}")
-                    uiState.target?.let { appendLine("Target: $it | RRR: ${"%.2f".format(uiState.requiredRunRate ?: 0.0)}") }
-                }
-                clipboardManager.setText(AnnotatedString(shareText))
-            }) {
-                Icon(Icons.Default.Share, contentDescription = "Share", tint = NeonGreen)
-            }
-        }
-
-        // Score box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(SurfaceCard)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                }
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "${uiState.totalRuns}/${uiState.totalWickets}",
-                        fontSize = 32.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                        "${uiState.battingTeamName} vs ${uiState.bowlingTeamName}",
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        "(${uiState.currentOver}.${uiState.currentBall} ov)",
-                        color = TextSecondary, fontSize = 13.sp
+                        uiState.matchStatus,
+                        fontSize = 11.sp,
+                        color = when (uiState.matchStatus) {
+                            "LIVE" -> NeonGreen
+                            "COMPLETED" -> TextSecondary
+                            else -> AmberColor
+                        }
                     )
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("CRR", color = TextSecondary, fontSize = 11.sp)
-                    Text(
-                        "${"%.2f".format(uiState.currentRunRate)}",
-                        color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold
-                    )
-                }
-                if (uiState.target != null) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "Need ${uiState.target!! - uiState.totalRuns} off ${uiState.ballsLeft}b",
-                            color = AmberColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "RRR: ${"%.2f".format(uiState.requiredRunRate ?: 0.0)}",
-                            color = if ((uiState.requiredRunRate ?: 0.0) > uiState.currentRunRate) ErrorRed else NeonGreen,
-                            fontSize = 12.sp
-                        )
-                        Text("T: ${uiState.target}", color = TextSecondary, fontSize = 11.sp)
-                    }
-                }
-            }
-        }
-
-        // This over
-        if (uiState.last6Balls.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("This over:", color = TextSecondary, fontSize = 12.sp)
-                uiState.last6Balls.forEach { ball ->
-                    val (bgColor, textColor) = when (ball) {
-                        "W" -> ErrorRed to Color.White
-                        "4" -> NeonBlue to Color.White
-                        "6" -> NeonGreen to Color.Black
-                        "Wd", "Nb" -> AmberColor to Color.Black
-                        "0" -> SurfaceCard to TextSecondary
-                        else -> SurfaceCard to TextPrimary
-                    }
+                if (uiState.matchStatus == "LIVE") {
                     Box(
                         modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(bgColor)
-                            .border(1.dp, BorderColor, CircleShape),
-                        contentAlignment = Alignment.Center
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(ErrorRed)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text(ball, color = textColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("● LIVE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                IconButton(onClick = {
+                    val shareText = buildString {
+                        appendLine("🏏 ${uiState.battingTeamName} vs ${uiState.bowlingTeamName}")
+                        appendLine("${uiState.totalRuns}/${uiState.totalWickets} (${uiState.currentOver}.${uiState.currentBall} ov)")
+                        appendLine("CRR: ${"%.2f".format(uiState.currentRunRate)}")
+                        uiState.target?.let { appendLine("Target: $it | RRR: ${"%.2f".format(uiState.requiredRunRate ?: 0.0)}") }
+                    }
+                    clipboardManager.setText(AnnotatedString(shareText))
+                }) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = NeonGreen)
+                }
+            }
+
+            // Score box
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceCard)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "${uiState.totalRuns}/${uiState.totalWickets}",
+                            fontSize = 32.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                        )
+                        Text(
+                            "(${uiState.currentOver}.${uiState.currentBall} ov)",
+                            color = TextSecondary, fontSize = 13.sp
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("CRR", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            "${"%.2f".format(uiState.currentRunRate)}",
+                            color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (uiState.target != null) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "Need ${uiState.target!! - uiState.totalRuns} off ${uiState.ballsLeft}b",
+                                color = AmberColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "RRR: ${"%.2f".format(uiState.requiredRunRate ?: 0.0)}",
+                                color = if ((uiState.requiredRunRate ?: 0.0) > uiState.currentRunRate) ErrorRed else NeonGreen,
+                                fontSize = 12.sp
+                            )
+                            Text("T: ${uiState.target}", color = TextSecondary, fontSize = 11.sp)
+                        }
                     }
                 }
             }
-        }
 
-        // Tabs
-        ScrollableTabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = SurfaceCard,
-            contentColor = NeonGreen,
-            edgePadding = 0.dp
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = {
-                        Text(
-                            tab, fontSize = 12.sp,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == index) NeonGreen else TextSecondary
-                        )
+            // This over
+            if (uiState.last6Balls.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("This over:", color = TextSecondary, fontSize = 12.sp)
+                    uiState.last6Balls.forEach { ball ->
+                        val (bgColor, textColor) = when (ball) {
+                            "W" -> ErrorRed to Color.White
+                            "4" -> NeonBlue to Color.White
+                            "6" -> NeonGreen to Color.Black
+                            "Wd", "Nb" -> AmberColor to Color.Black
+                            "0" -> SurfaceCard to TextSecondary
+                            else -> SurfaceCard to TextPrimary
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(bgColor)
+                                .border(1.dp, BorderColor, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(ball, color = textColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
-                )
+                }
             }
-        }
 
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
+            // Tabs
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = SurfaceCard,
+                contentColor = NeonGreen,
+                edgePadding = 0.dp
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                tab, fontSize = 12.sp,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == index) NeonGreen else TextSecondary
+                            )
+                        }
+                    )
+                }
             }
-        } else {
-            when (selectedTab) {
-                0 -> LiveScorecardTab(uiState)
-                1 -> LiveCommentaryTab(uiState)
-                2 -> LiveOversTab(uiState)
-                3 -> LivePartnershipTab(uiState)
-                4 -> LiveMvpTab(uiState)
-                5 -> LiveSummaryTab(uiState)
+
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else {
+                when (selectedTab) {
+                    0 -> LiveScorecardTab(uiState)
+                    1 -> LiveCommentaryTab(uiState)
+                    2 -> LiveOversTab(uiState)
+                    3 -> LivePartnershipTab(uiState)
+                    4 -> LiveMvpTab(uiState)
+                    5 -> LiveSummaryTab(uiState)
+                }
             }
         }
     }
-}
 } // CricketAnimatedBackground
 
 // ── SCORECARD TAB ────────────────────────────────────────────
@@ -354,7 +354,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
                 ) {
                     Text(stats.player.fullName, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     Text(stats.overs, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("0", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.maidens}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
                     Text("${stats.runs}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
                     Text(
                         "${stats.wickets}",
