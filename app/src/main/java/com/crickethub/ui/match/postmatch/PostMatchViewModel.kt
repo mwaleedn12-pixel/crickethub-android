@@ -14,6 +14,7 @@ import com.crickethub.data.repository.ScoringRepository
 import com.crickethub.data.repository.TournamentRepository
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,29 +56,73 @@ data class MotmCandidate(
     val catches: Int
 )
 
+/**
+ * One innings of the match, main or super over. Replaces the old fixed
+ * innings1 / innings2 field pairs so that inningsNo >= 3 shows up everywhere.
+ */
+data class InningsCard(
+    val innings: Innings,
+    val battingTeamName: String,
+    val bowlingTeamName: String,
+    val batting: List<BatsmanScorecard>,
+    val bowling: List<BowlerScorecard>,
+    val balls: List<Ball>,
+    val label: String,
+    val shortLabel: String
+) {
+    val isSuperOver: Boolean get() = innings.inningsNo >= 3
+    val oversText: String get() = "${innings.totalBalls / 6}.${innings.totalBalls % 6}"
+    val scoreText: String get() = "${innings.totalRuns}/${innings.totalWickets}"
+    /** Bowler id -> name, for dismissal lines. */
+    val bowlerMap: Map<String, String> get() = bowling.associate { it.player.id to it.player.fullName }
+}
+
+/** inningsNo 1,2 -> "1st/2nd Innings"; 3,4 -> "Super Over"; 5,6 -> "2nd Super Over"; ... */
+fun inningsLabel(inningsNo: Int): String = when (inningsNo) {
+    1 -> "1st Innings"
+    2 -> "2nd Innings"
+    else -> when (val so = (inningsNo - 1) / 2) {
+        1 -> "Super Over"
+        2 -> "2nd Super Over"
+        3 -> "3rd Super Over"
+        else -> "${so}th Super Over"
+    }
+}
+
+/** Short form for the tab row. */
+fun inningsShortLabel(inningsNo: Int): String = when (inningsNo) {
+    1 -> "1st Inn"
+    2 -> "2nd Inn"
+    else -> {
+        val so = (inningsNo - 1) / 2
+        if (so <= 1) "SO" else "SO $so"
+    }
+}
+
 data class PostMatchUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val match: Match? = null,
+    // Main innings kept as named fields: result text, tournament points and the
+    // save path all need them directly.
     val innings1: Innings? = null,
     val innings2: Innings? = null,
     val team1: Team? = null,
     val team2: Team? = null,
     val innings1BattingTeamName: String = "",
     val innings1BowlingTeamName: String = "",
-    val innings1Batting: List<BatsmanScorecard> = emptyList(),
-    val innings1Bowling: List<BowlerScorecard> = emptyList(),
     val innings2BattingTeamName: String = "",
     val innings2BowlingTeamName: String = "",
-    val innings2Batting: List<BatsmanScorecard> = emptyList(),
-    val innings2Bowling: List<BowlerScorecard> = emptyList(),
-    val inn1Balls: List<Ball> = emptyList(),
-    val inn2Balls: List<Ball> = emptyList(),
+    // Every innings including super overs, ordered by inningsNo.
+    val inningsCards: List<InningsCard> = emptyList(),
     val motmCandidates: List<MotmCandidate> = emptyList(),
     val selectedMotm: Player? = null,
     val resultText: String = "",
     val matchSaved: Boolean = false
-)
+) {
+    val mainInningsCards: List<InningsCard> get() = inningsCards.filter { !it.isSuperOver }
+    val superOverCards: List<InningsCard> get() = inningsCards.filter { it.isSuperOver }
+}
 
 class PostMatchViewModel : ViewModel() {
 
@@ -98,11 +143,11 @@ class PostMatchViewModel : ViewModel() {
                     val allInningsDeferred = async { scoringRepository.getInningsByMatch(matchId) }
 
                     val match = matchDeferred.await() ?: return@coroutineScope
-                    val allInnings = allInningsDeferred.await()
+                    val allInnings = allInningsDeferred.await().sortedBy { it.inningsNo }
                     val innings1 = allInnings.firstOrNull { it.inningsNo == 1 }
                     val innings2 = allInnings.firstOrNull { it.inningsNo == 2 }
 
-                    // Parallel: teams + balls
+                    // Parallel: teams + balls for EVERY innings (super overs included)
                     val t1Deferred = async {
                         try {
                             SupabaseClient.client.postgrest["teams"]
@@ -117,61 +162,67 @@ class PostMatchViewModel : ViewModel() {
                                 .decodeSingleOrNull<Team>()
                         } catch (e: Exception) { null }
                     }
-                    val balls1Deferred = async {
-                        if (innings1 != null) scoringRepository.getBallsByInnings(innings1.id)
-                        else emptyList()
-                    }
-                    val balls2Deferred = async {
-                        if (innings2 != null) scoringRepository.getBallsByInnings(innings2.id)
-                        else emptyList()
+                    val ballsDeferred = allInnings.map { inn ->
+                        async { inn.id to scoringRepository.getBallsByInnings(inn.id) }
                     }
 
                     val team1 = t1Deferred.await()
                     val team2 = t2Deferred.await()
-                    val balls1 = balls1Deferred.await()
-                    val balls2 = balls2Deferred.await()
+                    val ballsByInnings: Map<String, List<Ball>> = ballsDeferred.awaitAll().toMap()
 
-                    // Team name assignments
+                    // Team name assignments for the MAIN innings (these drive result text)
                     val inn1BattingTeamId = innings1?.battingTeamId
                         ?: match.battingFirstId
                         ?: match.team1Id
                     val inn1BowlingTeamId = innings1?.bowlingTeamId
                         ?: if (inn1BattingTeamId == match.team1Id) match.team2Id else match.team1Id
-                    val inn1BattingTeamName = if (inn1BattingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
-                    val inn1BowlingTeamName = if (inn1BowlingTeamId == match.team1Id) team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
-                    val inn2BattingTeamId = inn1BowlingTeamId
-                    val inn2BowlingTeamId = inn1BattingTeamId
+
+                    fun nameOf(teamId: String?): String =
+                        if (teamId == match.team1Id) team1?.name ?: "Team 1"
+                        else team2?.name ?: "Team 2"
+
+                    val inn1BattingTeamName = nameOf(inn1BattingTeamId)
+                    val inn1BowlingTeamName = nameOf(inn1BowlingTeamId)
                     val inn2BattingTeamName = inn1BowlingTeamName
                     val inn2BowlingTeamName = inn1BattingTeamName
 
-                    // Parallel: playing XI for all 4 combinations
-                    val inn1BatDeferred = async {
-                        scoringRepository.getPlayingXIPlayers(matchId, inn1BattingTeamId)
+                    // Playing XI fetched ONCE per team, not once per innings.
+                    val xiT1Deferred = async {
+                        scoringRepository.getPlayingXIPlayers(matchId, match.team1Id)
                     }
-                    val inn1BowlDeferred = async {
-                        scoringRepository.getPlayingXIPlayers(matchId, inn1BowlingTeamId)
+                    val xiT2Deferred = async {
+                        scoringRepository.getPlayingXIPlayers(matchId, match.team2Id)
                     }
-                    val inn2BatDeferred = async {
-                        scoringRepository.getPlayingXIPlayers(matchId, inn2BattingTeamId)
-                    }
-                    val inn2BowlDeferred = async {
-                        scoringRepository.getPlayingXIPlayers(matchId, inn2BowlingTeamId)
+                    val xiByTeam = mapOf(
+                        match.team1Id to xiT1Deferred.await(),
+                        match.team2Id to xiT2Deferred.await()
+                    )
+
+                    // Every innings row (super overs included) stores its own
+                    // batting/bowling team ids, so read them directly — no inference.
+                    val inningsCards = allInnings.map { inn ->
+                        val battingId = inn.battingTeamId
+                        val bowlingId = inn.bowlingTeamId
+                        val balls = ballsByInnings[inn.id].orEmpty()
+                        val batPlayers = xiByTeam[battingId].orEmpty()
+                        val bowlPlayers = xiByTeam[bowlingId].orEmpty()
+                        InningsCard(
+                            innings = inn,
+                            battingTeamName = nameOf(battingId),
+                            bowlingTeamName = nameOf(bowlingId),
+                            batting = computeBattingScorecard(balls, batPlayers),
+                            bowling = computeBowlingScorecard(balls, bowlPlayers),
+                            balls = balls,
+                            label = inningsLabel(inn.inningsNo),
+                            shortLabel = inningsShortLabel(inn.inningsNo)
+                        )
                     }
 
-                    val inn1BatPlayers = inn1BatDeferred.await()
-                    val inn1BowlPlayers = inn1BowlDeferred.await()
-                    val inn2BatPlayers = inn2BatDeferred.await()
-                    val inn2BowlPlayers = inn2BowlDeferred.await()
-
-                    // Compute scorecards
-                    val innings1Batting = computeBattingScorecard(balls1, inn1BatPlayers)
-                    val innings1Bowling = computeBowlingScorecard(balls1, inn1BowlPlayers)
-                    val innings2Batting = computeBattingScorecard(balls2, inn2BatPlayers)
-                    val innings2Bowling = computeBowlingScorecard(balls2, inn2BowlPlayers)
-
-                    val allPlayers = (inn1BatPlayers + inn1BowlPlayers + inn2BatPlayers + inn2BowlPlayers)
-                        .distinctBy { it.id }
-                    val motmCandidates = computeMotmCandidates(allPlayers, balls1, balls2)
+                    val allPlayers = xiByTeam.values.flatten().distinctBy { it.id }
+                    // MOTM / Impact is scored on the main innings only — a 3-ball super
+                    // over cameo shouldn't outrank a match-winning fifty.
+                    val mainBalls = inningsCards.filter { !it.isSuperOver }.flatMap { it.balls }
+                    val motmCandidates = computeMotmCandidates(allPlayers, mainBalls)
 
                     // If the match was decided by an explicit user action (boundary count,
                     // declared tie, abandoned...) the stored result_text is authoritative -
@@ -197,12 +248,7 @@ class PostMatchViewModel : ViewModel() {
                             innings1BowlingTeamName = inn1BowlingTeamName,
                             innings2BattingTeamName = inn2BattingTeamName,
                             innings2BowlingTeamName = inn2BowlingTeamName,
-                            innings1Batting = innings1Batting,
-                            innings1Bowling = innings1Bowling,
-                            innings2Batting = innings2Batting,
-                            innings2Bowling = innings2Bowling,
-                            inn1Balls = balls1,
-                            inn2Balls = balls2,
+                            inningsCards = inningsCards,
                             motmCandidates = motmCandidates,
                             selectedMotm = motmCandidates.firstOrNull()?.player,
                             resultText = resultText
@@ -408,10 +454,8 @@ class PostMatchViewModel : ViewModel() {
 
     private fun computeMotmCandidates(
         allPlayers: List<Player>,
-        balls1: List<Ball>,
-        balls2: List<Ball>
+        allBalls: List<Ball>
     ): List<MotmCandidate> {
-        val allBalls = balls1 + balls2
         return allPlayers.mapNotNull { player ->
             val battingBalls = allBalls.filter { it.batsmanId == player.id }
             val bowlingBalls = allBalls.filter { it.bowlerId == player.id }
