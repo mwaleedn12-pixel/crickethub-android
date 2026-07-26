@@ -21,6 +21,42 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * Row in the player_awards table. Columns confirmed from Supabase:
+ * id, player_id, match_id, tournament_id, award_type, award_name, created_at.
+ * award_type is a stable key ("player_of_match" / "best_batter" / "best_bowler"
+ * / "best_partnership"); award_name is the display label.
+ */
+@Serializable
+data class PlayerAward(
+    val id: String = "",
+    @SerialName("player_id") val playerId: String,
+    @SerialName("match_id") val matchId: String,
+    @SerialName("tournament_id") val tournamentId: String? = null,
+    @SerialName("award_type") val awardType: String,
+    @SerialName("award_name") val awardName: String,
+    @SerialName("created_at") val createdAt: String? = null
+)
+
+/** Insert payload — id and created_at are left to DB defaults. */
+@Serializable
+data class PlayerAwardInsert(
+    @SerialName("player_id") val playerId: String,
+    @SerialName("match_id") val matchId: String,
+    @SerialName("tournament_id") val tournamentId: String? = null,
+    @SerialName("award_type") val awardType: String,
+    @SerialName("award_name") val awardName: String
+)
+
+object AwardType {
+    const val PLAYER_OF_MATCH = "player_of_match"
+    const val BEST_BATTER = "best_batter"
+    const val BEST_BOWLER = "best_bowler"
+    const val BEST_PARTNERSHIP = "best_partnership"
+}
 
 data class BatsmanScorecard(
     val player: Player,
@@ -117,6 +153,9 @@ data class PostMatchUiState(
     val inningsCards: List<InningsCard> = emptyList(),
     val motmCandidates: List<MotmCandidate> = emptyList(),
     val selectedMotm: Player? = null,
+    val bestBatter: BatsmanScorecard? = null,
+    val bestBowler: BowlerScorecard? = null,
+    val awardsSaved: Boolean = false,
     val resultText: String = "",
     val matchSaved: Boolean = false
 ) {
@@ -165,10 +204,22 @@ class PostMatchViewModel : ViewModel() {
                     val ballsDeferred = allInnings.map { inn ->
                         async { inn.id to scoringRepository.getBallsByInnings(inn.id) }
                     }
+                    // Any previously-saved awards for this match (may be empty).
+                    val savedAwardsDeferred = async {
+                        try {
+                            SupabaseClient.client.postgrest["player_awards"]
+                                .select { filter { eq("match_id", matchId) } }
+                                .decodeList<PlayerAward>()
+                        } catch (e: Exception) {
+                            android.util.Log.w("CricketHub", "load awards: ${e.message}")
+                            emptyList()
+                        }
+                    }
 
                     val team1 = t1Deferred.await()
                     val team2 = t2Deferred.await()
                     val ballsByInnings: Map<String, List<Ball>> = ballsDeferred.awaitAll().toMap()
+                    val savedAwards = savedAwardsDeferred.await()
 
                     // Team name assignments for the MAIN innings (these drive result text)
                     val inn1BattingTeamId = innings1?.battingTeamId
@@ -224,6 +275,19 @@ class PostMatchViewModel : ViewModel() {
                     val mainBalls = inningsCards.filter { !it.isSuperOver }.flatMap { it.balls }
                     val motmCandidates = computeMotmCandidates(allPlayers, mainBalls)
 
+                    // Auto awards, computed across every innings' scorecards.
+                    val allBatting = inningsCards.flatMap { it.batting }
+                    val allBowling = inningsCards.flatMap { it.bowling }
+                    val bestBatter = allBatting.maxByOrNull { it.runs }?.takeIf { it.balls > 0 }
+                    val bestBowler = allBowling.filter { it.wickets > 0 }.maxByOrNull { it.wickets }
+
+                    // A saved Player of the Match wins over the auto pick, so a manual
+                    // choice survives reload. Fall back to the top Impact candidate.
+                    val savedMotmPlayer = savedAwards
+                        .firstOrNull { it.awardType == AwardType.PLAYER_OF_MATCH }
+                        ?.let { aw -> allPlayers.firstOrNull { it.id == aw.playerId } }
+                    val selectedMotm = savedMotmPlayer ?: motmCandidates.firstOrNull()?.player
+
                     // If the match was decided by an explicit user action (boundary count,
                     // declared tie, abandoned...) the stored result_text is authoritative -
                     // recomputing from innings would overwrite it with "Match tied".
@@ -250,7 +314,9 @@ class PostMatchViewModel : ViewModel() {
                             innings2BowlingTeamName = inn2BowlingTeamName,
                             inningsCards = inningsCards,
                             motmCandidates = motmCandidates,
-                            selectedMotm = motmCandidates.firstOrNull()?.player,
+                            selectedMotm = selectedMotm,
+                            bestBatter = bestBatter,
+                            bestBowler = bestBowler,
                             resultText = resultText
                         )
                     }
@@ -282,6 +348,10 @@ class PostMatchViewModel : ViewModel() {
                         filter { eq("id", matchId) }
                     }
 
+                // Persist awards (POTM + best batter/bowler). Kept resilient in its
+                // own try inside saveAwards so an award failure never blocks completion.
+                saveAwards(match)
+
                 matchRepository.invalidateMatchCache(matchId)
                 matchRepository.invalidateMatchesCache()
 
@@ -294,6 +364,62 @@ class PostMatchViewModel : ViewModel() {
                 android.util.Log.e("CricketHub", "Save result error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message) }
             }
+        }
+    }
+
+    /**
+     * Writes the current awards to player_awards. Idempotent: deletes this match's
+     * existing award rows first, so re-saving (or changing the POTM and saving
+     * again) never duplicates. tournament_id is null for non-tournament matches.
+     */
+    private suspend fun saveAwards(match: Match) {
+        try {
+            val state = _uiState.value
+            val rows = buildList {
+                state.selectedMotm?.let { motm ->
+                    add(
+                        PlayerAwardInsert(
+                            playerId = motm.id,
+                            matchId = match.id,
+                            tournamentId = match.tournamentId,
+                            awardType = AwardType.PLAYER_OF_MATCH,
+                            awardName = "Player of the Match"
+                        )
+                    )
+                }
+                state.bestBatter?.let { batter ->
+                    add(
+                        PlayerAwardInsert(
+                            playerId = batter.player.id,
+                            matchId = match.id,
+                            tournamentId = match.tournamentId,
+                            awardType = AwardType.BEST_BATTER,
+                            awardName = "Best Batter"
+                        )
+                    )
+                }
+                state.bestBowler?.let { bowler ->
+                    add(
+                        PlayerAwardInsert(
+                            playerId = bowler.player.id,
+                            matchId = match.id,
+                            tournamentId = match.tournamentId,
+                            awardType = AwardType.BEST_BOWLER,
+                            awardName = "Best Bowler"
+                        )
+                    )
+                }
+            }
+            if (rows.isEmpty()) return
+
+            SupabaseClient.client.postgrest["player_awards"]
+                .delete { filter { eq("match_id", match.id) } }
+            SupabaseClient.client.postgrest["player_awards"].insert(rows)
+
+            _uiState.update { it.copy(awardsSaved = true) }
+            android.util.Log.d("CricketHub", "Saved ${rows.size} awards for match ${match.id}")
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Save awards error: ${e.message}", e)
         }
     }
 

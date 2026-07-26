@@ -225,9 +225,6 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
 
         // Awards
         item {
-            val allBatting = cards.flatMap { it.batting }
-            val allBowling = cards.flatMap { it.bowling }
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -256,9 +253,8 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                     }
                 }
 
-                // Best Batter
-                val bestBatter = allBatting.maxByOrNull { it.runs }
-                bestBatter?.let {
+                // Best Batter — same source the save path uses
+                uiState.bestBatter?.let {
                     HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
@@ -269,9 +265,8 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                     }
                 }
 
-                // Best Bowler
-                val bestBowler = allBowling.filter { it.wickets > 0 }.maxByOrNull { it.wickets }
-                bestBowler?.let {
+                // Best Bowler — same source the save path uses
+                uiState.bestBowler?.let {
                     HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
