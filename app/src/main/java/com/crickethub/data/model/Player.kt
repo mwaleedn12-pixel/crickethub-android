@@ -48,7 +48,10 @@ data class PlayerInsert(
     @SerialName("batting_hand") val battingHand: String? = "right",
     @SerialName("bowling_hand") val bowlingHand: String? = "right",
     @SerialName("bowling_style") val bowlingStyle: String? = null,
-    val role: String? = "batsman",
+    // Default is null (NOT "batsman"): the Postgrest serializer omits any field whose
+    // value equals its declared default, so a default of "batsman" caused newly-created
+    // batsmen to be sent with no role at all, falling back to the DB column default.
+    val role: String? = null,
     val availability: String? = "available",
     @SerialName("injury_status") val injuryStatus: String? = null,
     @SerialName("debut_date") val debutDate: String? = null

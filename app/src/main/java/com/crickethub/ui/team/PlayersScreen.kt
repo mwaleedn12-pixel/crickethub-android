@@ -73,8 +73,8 @@ fun PlayersScreen(
                 ) {
                     val batsmen = uiState.players.count { it.role?.lowercase() == "batsman" }
                     val bowlers = uiState.players.count { it.role?.lowercase() == "bowler" }
-                    val allRounders = uiState.players.count { it.role?.lowercase() == "all-rounder" }
-                    val keepers = uiState.players.count { it.role?.lowercase() == "wicket keeper" }
+                    val allRounders = uiState.players.count { it.role?.lowercase() == "allrounder" }
+                    val keepers = uiState.players.count { it.role?.lowercase() == "wicketkeeper" }
                     PlayerStatPill("🏏 $batsmen", "Bat")
                     PlayerStatPill("🎳 $bowlers", "Bowl")
                     PlayerStatPill("⚡ $allRounders", "AR")
@@ -193,8 +193,8 @@ fun PlayerCard(
     val roleColor = when (player.role?.lowercase()) {
         "batsman" -> NeonBlue
         "bowler" -> ErrorRed
-        "all-rounder" -> NeonGreen
-        "wicket keeper" -> AmberColor
+        "allrounder" -> NeonGreen
+        "wicketkeeper" -> AmberColor
         else -> TextSecondary
     }
     val availabilityColor = when (player.availability) {
@@ -239,7 +239,7 @@ fun PlayerCard(
                         .padding(horizontal = 5.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        player.role?.replaceFirstChar { it.uppercase() } ?: "Player",
+                        player.role?.let { roleLabel(it) } ?: "Player",
                         color = roleColor, fontSize = 10.sp, fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -280,7 +280,9 @@ fun PlayerDialog(
     var battingHand by remember { mutableStateOf(player?.battingHand ?: "right") }
     var bowlingHand by remember { mutableStateOf(player?.bowlingHand ?: "right") }
     var bowlingStyle by remember { mutableStateOf(player?.bowlingStyle ?: "") }
-    var selectedRole by remember { mutableStateOf(player?.role?.replaceFirstChar { it.uppercase() } ?: "Batsman") }
+    // Keep this in the canonical lowercase form (matches PLAYER_ROLES) so the picker
+    // actually highlights the current role, on both create and edit.
+    var selectedRole by remember { mutableStateOf(player?.role?.lowercase() ?: "batsman") }
     var availability by remember { mutableStateOf(player?.availability ?: "available") }
 
     val bowlingStyles = if (bowlingHand == "right") RIGHT_HAND_BOWLING_STYLES else LEFT_HAND_BOWLING_STYLES
@@ -454,10 +456,10 @@ fun PlayerDialog(
                                 row.forEach { role ->
                                     val isSelected = selectedRole == role
                                     val roleColor = when (role) {
-                                        "Batsman" -> NeonBlue
-                                        "Bowler" -> ErrorRed
-                                        "All-rounder" -> NeonGreen
-                                        "Wicket Keeper" -> AmberColor
+                                        "batsman" -> NeonBlue
+                                        "bowler" -> ErrorRed
+                                        "allrounder" -> NeonGreen
+                                        "wicketkeeper" -> AmberColor
                                         else -> TextSecondary
                                     }
                                     Box(
@@ -471,7 +473,7 @@ fun PlayerDialog(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            role,
+                                            roleLabel(role),
                                             color = if (isSelected) roleColor else TextSecondary,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -539,4 +541,12 @@ fun PlayerDialog(
             TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
         }
     )
+}
+/** Canonical role value (as stored) -> readable label for display. */
+fun roleLabel(role: String): String = when (role.lowercase()) {
+    "batsman" -> "Batsman"
+    "bowler" -> "Bowler"
+    "allrounder" -> "All-rounder"
+    "wicketkeeper" -> "Wicket Keeper"
+    else -> role.replaceFirstChar { it.uppercase() }
 }
