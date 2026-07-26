@@ -6,8 +6,12 @@ import com.crickethub.data.model.BallInsert
 import com.crickethub.data.model.BatsmanStats
 import com.crickethub.data.model.BowlerStats
 import com.crickethub.data.model.InningsInsert
+import com.crickethub.data.model.Match
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.ScoringUiState
+import com.crickethub.data.model.Team
+import com.crickethub.data.model.Tournament
+import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.data.repository.ScoringRepository
 import com.crickethub.ui.match.Interruption
@@ -18,6 +22,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
+/**
+ * Dismissals that happen without a ball being bowled — they must NOT count as a
+ * delivery (no team ball, no ball faced by the batsman, no ball for the bowler).
+ */
+private val NO_DELIVERY_WICKETS = setOf("timed_out", "retired_out", "retired_hurt")
+
 class ScoringViewModel : ViewModel() {
     private val scoringRepository = ScoringRepository()
     private val matchRepository = MatchRepository()
@@ -54,6 +64,27 @@ class ScoringViewModel : ViewModel() {
     private var isRestoring = false
     private var currentMatchId = ""
     private var target: Int? = null
+
+    /** Batting team, bowling team, and tournament display names for the score header. */
+    private suspend fun headerNames(
+        match: Match,
+        battingTeamId: String,
+        bowlingTeamId: String
+    ): Triple<String, String, String?> {
+        suspend fun team(id: String): String = try {
+            SupabaseClient.client.postgrest["teams"]
+                .select { filter { eq("id", id) } }
+                .decodeSingleOrNull<Team>()?.name ?: ""
+        } catch (e: Exception) { "" }
+        val tour: String? = try {
+            match.tournamentId?.let { tid ->
+                SupabaseClient.client.postgrest["tournaments"]
+                    .select { filter { eq("id", tid) } }
+                    .decodeSingleOrNull<Tournament>()?.name
+            }
+        } catch (e: Exception) { null }
+        return Triple(team(battingTeamId), team(bowlingTeamId), tour)
+    }
     private var dlsTeam1Score: Int = 0
     // Stack for undo — stores complete state snapshots (max 20)
     private val undoStack = java.util.ArrayDeque<ScoringUiState>()
@@ -82,7 +113,7 @@ class ScoringViewModel : ViewModel() {
     fun updateDLSParScore() {
         val state = _uiState.value
         if (!state.dlsEnabled || dlsTeam2TotalOvers == 0) return
-        val ballsBowled = state.balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+        val ballsBowled = state.balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" && it.wicketType !in NO_DELIVERY_WICKETS }
         val wicketsNow = state.innings?.totalWickets ?: 0
         val oversUsed = ballsBowled / 6.0
         val updatedInterruptions = dlsTeam2Interruptions.toMutableList()
@@ -140,7 +171,7 @@ class ScoringViewModel : ViewModel() {
         }
 
         val legalBalls = inningsLegalBalls
-            ?: balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+            ?: balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" && it.wicketType !in NO_DELIVERY_WICKETS }
         val overComplete = legalBalls > 0 && legalBalls % 6 == 0
         if (overComplete && striker != null) {
             val tmp = striker; striker = nonStriker; nonStriker = tmp
@@ -323,10 +354,13 @@ class ScoringViewModel : ViewModel() {
                     val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, battingFirstId)
                     val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, bowlingFirstId)
                     isMatchLoaded = true; currentMatchId = matchId
+                    val (batName, bowlName, tourName) = headerNames(match, battingFirstId, bowlingFirstId)
                     _uiState.update { it.copy(isLoading = false, match = match, innings = newInnings,
                         balls = emptyList(), striker = null, nonStriker = null, currentBowler = null,
                         battingTeamPlayers = battingPlayers, bowlingTeamPlayers = bowlingPlayers,
                         batsmanStats = emptyMap(), bowlerStats = emptyMap(),
+                        battingTeamName = batName, bowlingTeamName = bowlName, tournamentName = tourName,
+                        target = target,
                         inningsComplete = false, matchComplete = false, error = null) }
                     return@launch
                 }
@@ -334,8 +368,6 @@ class ScoringViewModel : ViewModel() {
                 val balls = scoringRepository.getBallsByInnings(liveInnings.id)
                 val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, liveInnings.battingTeamId)
                 val bowlingPlayers = scoringRepository.getPlayingXIPlayers(matchId, liveInnings.bowlingTeamId)
-                val batsmanStats = computeBatsmanStats(balls, battingPlayers)
-                val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
 
                 val crease = restoreCrease(
                     balls = balls,
@@ -347,6 +379,8 @@ class ScoringViewModel : ViewModel() {
                 val striker = crease.striker
                 val nonStriker = crease.nonStriker
                 val currentBowler = crease.bowler
+                val batsmanStats = computeBatsmanStats(balls, battingPlayers, striker?.id, nonStriker?.id)
+                val bowlerStats = computeBowlerStats(balls, bowlingPlayers)
                 android.util.Log.d("CricketHub", "RESUME: balls=${balls.size} striker=${striker?.fullName} nonStriker=${nonStriker?.fullName} bowler=${currentBowler?.fullName}")
                 ballStack.clear()
                 balls.forEach { ball -> ballStack.addLast(ball) }
@@ -357,11 +391,14 @@ class ScoringViewModel : ViewModel() {
                 }
 
                 isMatchLoaded = true; currentMatchId = matchId
+                val (batName, bowlName, tourName) = headerNames(match, liveInnings.battingTeamId, liveInnings.bowlingTeamId)
                 _uiState.update { it.copy(
                     isLoading = false, match = match, innings = liveInnings, balls = balls,
                     striker = striker, nonStriker = nonStriker, currentBowler = currentBowler,
                     battingTeamPlayers = battingPlayers, bowlingTeamPlayers = bowlingPlayers,
                     batsmanStats = batsmanStats, bowlerStats = bowlerStats,
+                    battingTeamName = batName, bowlingTeamName = bowlName, tournamentName = tourName,
+                    target = target,
                     inningsComplete = false, matchComplete = false, error = null) }
 
                 android.util.Log.d("CricketHub", "resumeMatch: ${liveInnings.totalRuns}/${liveInnings.totalWickets} " +
@@ -490,10 +527,13 @@ class ScoringViewModel : ViewModel() {
                         else -> (allInnings.maxOfOrNull { it.inningsNo } ?: 0) + 1
                     }
                     val newInnings = scoringRepository.createInnings(InningsInsert(matchId, inningsNo, battingTeamId, bowlingTeamId))
+                    val (batName, bowlName, tourName) = headerNames(match, battingTeamId, bowlingTeamId)
                     _uiState.update { it.copy(match = match, innings = newInnings, balls = emptyList(),
                         striker = null, nonStriker = null, currentBowler = null,
                         battingTeamPlayers = battingPlayers, bowlingTeamPlayers = bowlingPlayers,
                         batsmanStats = emptyMap(), bowlerStats = emptyMap(),
+                        battingTeamName = batName, bowlingTeamName = bowlName, tournamentName = tourName,
+                        target = target,
                         inningsComplete = false, matchComplete = false, isLoading = false) }
                 }
             } catch (e: Exception) {
@@ -730,16 +770,16 @@ class ScoringViewModel : ViewModel() {
                 if (ballStack.isNotEmpty()) ballStack.removeLast()
 
                 val newBalls = balls.dropLast(1)
-                val batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers)
-                val bowlerStats = computeBowlerStats(newBalls, state.bowlingTeamPlayers)
 
                 val (striker, nonStriker, bowler) = restorePlayersFromBalls(
                     newBalls, state.battingTeamPlayers, state.bowlingTeamPlayers
                 )
+                val batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers, striker?.id, nonStriker?.id)
+                val bowlerStats = computeBowlerStats(newBalls, state.bowlingTeamPlayers)
 
                 val totalRuns = newBalls.sumOf { it.runsOffBat + (it.extrasRuns ?: 0) }
                 val totalWickets = newBalls.count { it.isWicket && it.wicketType != "retired_hurt" }
-                val totalLegalBalls = newBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                val totalLegalBalls = newBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" && it.wicketType !in NO_DELIVERY_WICKETS }
 
                 val updatedInnings = scoringRepository.updateInnings(
                     innings.id, totalRuns, totalWickets, totalLegalBalls,
@@ -787,12 +827,15 @@ class ScoringViewModel : ViewModel() {
                 val isWide = extrasType == "wide"; val isNoBall = extrasType == "no_ball"
                 val isBye = extrasType == "bye"; val isLegBye = extrasType == "leg_bye"
                 val isRetiredHurt = wicketType == "retired_hurt"
-                val isLegal = !isWide && !isNoBall
+                // Timed out / retired out / retired hurt: no delivery was bowled, so this
+                // records the dismissal but adds NO ball (team, batsman, or bowler).
+                val noDelivery = isWicket && wicketType in NO_DELIVERY_WICKETS
+                val isLegal = !isWide && !isNoBall && !noDelivery
                 // Derive position from the ACTUAL legal balls already in state, not the
                 // stored total_balls counter. The counter can desync (a failed resume,
                 // an interrupted write) and since over/ball are computed from it, a
                 // desync would misplace every future ball. The ball list is truth.
-                val legalBallsSoFar = state.balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                val legalBallsSoFar = state.balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" && it.wicketType !in NO_DELIVERY_WICKETS }
                 val overNo = legalBallsSoFar / 6; val ballNo = legalBallsSoFar % 6 + 1
                 val phase = when { overNo < match.powerplayOvers -> "powerplay"; overNo < (match.totalOvers * 0.75).toInt() -> "middle"; else -> "death" }
                 // Normalise no-ball input: runs off a no-ball belong to the BATSMAN.
@@ -871,7 +914,7 @@ class ScoringViewModel : ViewModel() {
                 _uiState.update { it.copy(innings = updatedInnings, balls = newBalls,
                     striker = newStriker, nonStriker = newNonStriker,
                     currentBowler = if (isOverEnd) null else state.currentBowler,
-                    batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers),
+                    batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers, newStriker?.id, newNonStriker?.id),
                     bowlerStats = computeBowlerStats(newBalls, state.bowlingTeamPlayers),
                     inningsComplete = isInningsComplete, error = null) }
             } catch (e: Exception) { _uiState.update { it.copy(error = e.message) } } finally { isProcessingBall = false }
@@ -879,30 +922,57 @@ class ScoringViewModel : ViewModel() {
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────
-    private fun computeBatsmanStats(balls: List<Ball>, players: List<Player>): Map<String, BatsmanStats> {
+    private fun computeBatsmanStats(
+        balls: List<Ball>,
+        players: List<Player>,
+        strikerId: String? = null,
+        nonStrikerId: String? = null
+    ): Map<String, BatsmanStats> {
+        // The victim of a wicket is dismissedBatsmanId when set (non-striker run-out),
+        // otherwise the striker (batsmanId). Matching on the victim alone stops a
+        // non-striker run-out from also flagging the striker out.
+        fun victimId(b: Ball) = b.dismissedBatsmanId ?: b.batsmanId
         return players.associate { player ->
             val pb = balls.filter { it.batsmanId == player.id }
-            // A run-out can dismiss the non-striker; that ball carries dismissedBatsmanId
-            // instead of batsmanId. Count both so the victim shows out.
-            val dismissalBall = balls.firstOrNull {
-                it.isWicket && (it.batsmanId == player.id || it.dismissedBatsmanId == player.id)
+            // Balls faced excludes wides AND no-delivery dismissals (timed/retired).
+            val ballsFaced = pb.count { it.extrasType != "wide" && it.wicketType !in NO_DELIVERY_WICKETS }
+
+            val outIdx = balls.indexOfLast {
+                it.isWicket && it.wicketType != "retired_hurt" && victimId(it) == player.id
             }
-            val isOut = dismissalBall != null && dismissalBall.wicketType != "retired_hurt"
+            val retiredIdx = balls.indexOfLast {
+                it.isWicket && it.wicketType == "retired_hurt" && victimId(it) == player.id
+            }
+            // Retired batsman is "back" once he faces a ball again, or is at the crease.
+            val returnedAfterRetire = retiredIdx >= 0 && (
+                    balls.drop(retiredIdx + 1).any { it.batsmanId == player.id } ||
+                            player.id == strikerId || player.id == nonStrikerId
+                    )
+            // A real dismissal after any retirement wins; otherwise a still-off retirement
+            // shows "retired hurt"; otherwise not out.
+            val decidingBall = if (outIdx >= 0 && outIdx > retiredIdx) balls[outIdx] else null
+            val isOut = decidingBall != null
+            val dismissalType = when {
+                isOut -> decidingBall!!.wicketType
+                retiredIdx >= 0 && !returnedAfterRetire -> "retired_hurt"
+                else -> null
+            }
             player.id to BatsmanStats(player = player,
                 runs = pb.sumOf { it.runsOffBat },
-                balls = pb.count { it.extrasType != "wide" },
+                balls = ballsFaced,
                 fours = pb.count { it.isBoundary && !it.isSix },
                 sixes = pb.count { it.isSix },
                 isOut = isOut,
-                dismissalType = dismissalBall?.wicketType,
-                fielderName = dismissalBall?.fielderName,
-                bowlerOnWicket = dismissalBall?.bowlerId)
+                dismissalType = dismissalType,
+                fielderName = decidingBall?.fielderName,
+                bowlerOnWicket = decidingBall?.bowlerId)
         }
     }
     private fun computeBowlerStats(balls: List<Ball>, players: List<Player>): Map<String, BowlerStats> {
         val map = mutableMapOf<String, BowlerStats>()
         players.forEach { player ->
-            val pb = balls.filter { it.bowlerId == player.id }
+            // Exclude no-delivery dismissals: they carry a bowlerId but no ball was bowled.
+            val pb = balls.filter { it.bowlerId == player.id && it.wicketType !in NO_DELIVERY_WICKETS }
             if (pb.isEmpty()) return@forEach
             val legal = pb.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
             // Dot ball: a legal delivery that conceded nothing (no bat runs, no extras).

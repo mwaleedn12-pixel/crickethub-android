@@ -380,7 +380,11 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
 }
 
 fun buildDismissalText(stats: BatsmanStats, bowlerMap: Map<String, String>): String {
-    if (!stats.isOut) return "not out"
+    if (!stats.isOut) {
+        // A retired-hurt batsman is not out, but should read "retired hurt" while off.
+        // Once he returns to bat his dismissalType clears, so this falls back to not out.
+        return if (stats.dismissalType == "retired_hurt") "retired hurt" else "not out"
+    }
     val bowlerName = stats.bowlerOnWicket?.let { bowlerMap[it] } ?: ""
     val fielder = stats.fielderName ?: ""
     return when (stats.dismissalType) {

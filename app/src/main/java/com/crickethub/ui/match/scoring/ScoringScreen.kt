@@ -272,6 +272,10 @@ fun ScoringScreen(
                     Last6BallsRow(balls = uiState.last6Balls)
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Partnership + last wicket + extras
+                    HeaderContextRow(uiState = uiState)
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     CurrentBatsmenRow(
                         striker = uiState.striker,
                         nonStriker = uiState.nonStriker,
@@ -725,56 +729,108 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
     val currentOver = uiState.currentOver
     val powerplayOvers = match?.powerplayOvers ?: 6
     val totalOvers = match?.totalOvers ?: 20
+    val isSuperOver = uiState.isSuperOver
 
     val phaseLabel = when {
-        match == null -> null
+        match == null || isSuperOver -> null
         currentOver < powerplayOvers -> "PP"
         currentOver >= (totalOvers - (match.powerplay3Overs.takeIf { it > 0 } ?: 4)) -> "P3"
         else -> "P2"
     }
 
     Box(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+
+            // ── Match info bar: tournament • Match N • format • venue ──
+            uiState.tournamentName?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            val infoBits = buildList {
+                match?.matchNumber?.let { add("Match $it") }
+                match?.matchType?.takeIf { it.isNotBlank() }?.let { add(it) }
+                match?.venue?.takeIf { it.isNotBlank() }?.let { add(it) }
+            }
+            if (infoBits.isNotEmpty()) {
+                Text(infoBits.joinToString("  •  "), color = TextSecondary, fontSize = 11.sp, maxLines = 1)
+            }
+            if (uiState.tournamentName?.isNotBlank() == true || infoBits.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // ── Team name + big score + overs ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        "${uiState.totalRuns}/${uiState.totalWickets}",
-                        fontSize = 48.sp, fontWeight = FontWeight.Bold, color = TextPrimary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                        Text("${uiState.currentOver}.${uiState.currentBall}", fontSize = 24.sp, color = NeonGreen, fontWeight = FontWeight.Medium)
-                        phaseLabel?.let {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(AmberColor.copy(alpha = 0.2f))
-                                    .border(1.dp, AmberColor, RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(it, color = AmberColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Column {
+                    if (uiState.battingTeamName.isNotBlank()) {
+                        Text(
+                            uiState.battingTeamName.uppercase(),
+                            color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            "${uiState.totalRuns}/${uiState.totalWickets}",
+                            fontSize = 44.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.padding(bottom = 6.dp)) {
+                            Text("${uiState.currentOver}.${uiState.currentBall} Ov", fontSize = 18.sp, color = NeonGreen, fontWeight = FontWeight.Medium)
+                            phaseLabel?.let {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(AmberColor.copy(alpha = 0.2f))
+                                        .border(1.dp, AmberColor, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(it, color = AmberColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("CRR: ${"%.2f".format(uiState.runRate)}", color = TextSecondary, fontSize = 13.sp)
                     // Super over (innings 3+) is always 1 over - don't show the match's total.
-                    val isSuperOver = (uiState.innings?.inningsNo ?: 1) >= 3
                     if (isSuperOver) {
                         Text("SUPER OVER", color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     } else {
-                        match?.let { Text("${it.totalOvers} overs", color = TextSecondary, fontSize = 12.sp) }
+                        match?.let { Text("${it.totalOvers} ov", color = TextSecondary, fontSize = 12.sp) }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     TextButton(onClick = onShare, colors = ButtonDefaults.textButtonColors(contentColor = NeonGreen)) {
                         Text("📤 Share", fontSize = 12.sp)
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = BorderColor)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Stats row: CRR always; chase shows Target + RRR, 1st innings shows Projected ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HeaderStat("CRR", "%.2f".format(uiState.runRate), NeonBlue)
+                if (uiState.isSecondInnings) {
+                    uiState.target?.let { HeaderStat("Target", "$it", AmberColor) }
+                    uiState.requiredRunRate?.let {
+                        HeaderStat("RRR", "%.2f".format(it), if (it > uiState.runRate) ErrorRed else NeonGreen)
+                    }
+                } else if (!isSuperOver) {
+                    uiState.projectedScore?.let { HeaderStat("Projected", "$it", NeonGreen) }
+                }
+            }
+
+            // ── Match status line (chase only) ──
+            headerStatusLine(uiState)?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(it, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         // Celebratory ball-result overlay across the header band
@@ -783,6 +839,54 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
             color = popupColor,
             triggerKey = popupKey,
             modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun HeaderStat(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text("$label ", color = TextSecondary, fontSize = 11.sp)
+        Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** "Team need X off Y" while chasing; null in the 1st innings. Not shown when innings/match is over. */
+fun headerStatusLine(uiState: ScoringUiState): String? {
+    if (!uiState.isSecondInnings) return null
+    if (uiState.inningsComplete || uiState.matchComplete) return null
+    val need = uiState.runsNeeded ?: return null
+    if (need <= 0) return null
+    val team = uiState.battingTeamName.ifBlank { "Batting side" }
+    return "$team need $need off ${uiState.ballsRemaining}"
+}
+
+/** Partnership + last wicket + extras strip, shown under the header. */
+@Composable
+fun HeaderContextRow(uiState: ScoringUiState) {
+    val inn = uiState.innings ?: return
+    val p = uiState.currentPartnership
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column {
+                Text("Partnership", color = TextSecondary, fontSize = 10.sp)
+                Text("${p.runs} (${p.balls})", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            uiState.lastWicket?.let { lw ->
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Last Wkt  ${lw.score}/${lw.wicket}", color = ErrorRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${lw.batsmanName} (${lw.dismissal})", color = TextSecondary, fontSize = 10.sp, maxLines = 1)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Extras ${inn.extrasTotal}  (Wd ${inn.wides}  Nb ${inn.noBalls}  B ${inn.byes}  Lb ${inn.legByes})",
+            color = TextSecondary, fontSize = 10.sp
         )
     }
 }

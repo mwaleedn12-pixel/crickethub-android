@@ -44,6 +44,9 @@ data class LiveScorecardUiState(
     val error: String? = null
 )
 
+/** Dismissals with no ball bowled — excluded from balls faced and the bowler's over. */
+private val NO_DELIVERY_WICKETS_LIVE = setOf("timed_out", "retired_out", "retired_hurt")
+
 class LiveScorecardViewModel : ViewModel() {
 
     private val matchRepository = MatchRepository()
@@ -203,7 +206,7 @@ class LiveScorecardViewModel : ViewModel() {
     }
 
     private fun computeLast6Balls(balls: List<Ball>): List<String> {
-        val legalBalls = balls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
+        val legalBalls = balls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" && it.wicketType !in NO_DELIVERY_WICKETS_LIVE }
         val currentOverNo = if (legalBalls.isEmpty()) 0 else legalBalls.last().overNo
         val currentOverBalls = balls.filter { it.overNo == currentOverNo }
         return currentOverBalls.map { ball ->
@@ -238,25 +241,40 @@ class LiveScorecardViewModel : ViewModel() {
 
     private fun computeBatsmanStats(balls: List<Ball>, players: List<Player>): Map<String, BatsmanStats> {
         val statsMap = mutableMapOf<String, BatsmanStats>()
+        // Victim = dismissedBatsmanId when set (non-striker run-out), else the striker.
+        fun victimId(b: Ball) = b.dismissedBatsmanId ?: b.batsmanId
         players.forEach { player ->
             val playerBalls = balls.filter { it.batsmanId == player.id }
             val runs = playerBalls.sumOf { it.runsOffBat }
-            val ballsFaced = playerBalls.count { it.extrasType != "wide" }
+            // Balls faced excludes wides AND no-delivery dismissals (timed/retired).
+            val ballsFaced = playerBalls.count {
+                it.extrasType != "wide" && it.wicketType !in NO_DELIVERY_WICKETS_LIVE
+            }
             val fours = playerBalls.count { it.isBoundary && !it.isSix }
             val sixes = playerBalls.count { it.isSix }
-            // Include run-outs, and match the victim by batsmanId OR dismissedBatsmanId
-            // (non-striker run-out stores the victim in dismissedBatsmanId).
-            val dismissalBall = balls.firstOrNull {
-                it.isWicket && (it.batsmanId == player.id || it.dismissedBatsmanId == player.id)
+
+            val outIdx = balls.indexOfLast {
+                it.isWicket && it.wicketType != "retired_hurt" && victimId(it) == player.id
             }
-            val isOut = dismissalBall != null && dismissalBall.wicketType != "retired_hurt"
-            val wicketBall = dismissalBall
+            val retiredIdx = balls.indexOfLast {
+                it.isWicket && it.wicketType == "retired_hurt" && victimId(it) == player.id
+            }
+            // Retired batsman is "back" once he faces another ball.
+            val returnedAfterRetire = retiredIdx >= 0 &&
+                    balls.drop(retiredIdx + 1).any { it.batsmanId == player.id }
+            val decidingBall = if (outIdx >= 0 && outIdx > retiredIdx) balls[outIdx] else null
+            val isOut = decidingBall != null
+            val dismissalType = when {
+                isOut -> decidingBall!!.wicketType
+                retiredIdx >= 0 && !returnedAfterRetire -> "retired_hurt"
+                else -> null
+            }
             statsMap[player.id] = BatsmanStats(
                 player = player, runs = runs, balls = ballsFaced,
                 fours = fours, sixes = sixes, isOut = isOut,
-                dismissalType = wicketBall?.wicketType,
-                fielderName = wicketBall?.fielderName,
-                bowlerOnWicket = wicketBall?.bowlerId
+                dismissalType = dismissalType,
+                fielderName = decidingBall?.fielderName,
+                bowlerOnWicket = decidingBall?.bowlerId
             )
         }
         return statsMap
@@ -265,7 +283,10 @@ class LiveScorecardViewModel : ViewModel() {
     private fun computeBowlerStats(balls: List<Ball>, players: List<Player>): Map<String, BowlerStats> {
         val statsMap = mutableMapOf<String, BowlerStats>()
         players.forEach { player ->
-            val playerBalls = balls.filter { it.bowlerId == player.id }
+            // Exclude no-delivery dismissals: they carry a bowlerId but no ball was bowled.
+            val playerBalls = balls.filter {
+                it.bowlerId == player.id && it.wicketType !in NO_DELIVERY_WICKETS_LIVE
+            }
             if (playerBalls.isEmpty()) return@forEach
             val legalBalls = playerBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
             val runs = playerBalls.sumOf { ball ->
