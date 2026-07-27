@@ -82,6 +82,15 @@ data class BowlerScorecard(
     val noBalls: Int
 )
 
+data class BestPartnershipInfo(
+    val batsman1Id: String,
+    val batsman2Id: String,
+    val name1: String,
+    val name2: String,
+    val runs: Int,
+    val balls: Int
+)
+
 data class MotmCandidate(
     val player: Player,
     val score: Double,
@@ -155,6 +164,7 @@ data class PostMatchUiState(
     val selectedMotm: Player? = null,
     val bestBatter: BatsmanScorecard? = null,
     val bestBowler: BowlerScorecard? = null,
+    val bestPartnership: BestPartnershipInfo? = null,
     val awardsSaved: Boolean = false,
     val resultText: String = "",
     val matchSaved: Boolean = false
@@ -280,6 +290,7 @@ class PostMatchViewModel : ViewModel() {
                     val allBowling = inningsCards.flatMap { it.bowling }
                     val bestBatter = allBatting.maxByOrNull { it.runs }?.takeIf { it.balls > 0 }
                     val bestBowler = allBowling.filter { it.wickets > 0 }.maxByOrNull { it.wickets }
+                    val bestPartnership = computeBestPartnership(inningsCards)
 
                     // A saved Player of the Match wins over the auto pick, so a manual
                     // choice survives reload. Fall back to the top Impact candidate.
@@ -317,6 +328,7 @@ class PostMatchViewModel : ViewModel() {
                             selectedMotm = selectedMotm,
                             bestBatter = bestBatter,
                             bestBowler = bestBowler,
+                            bestPartnership = bestPartnership,
                             resultText = resultText
                         )
                     }
@@ -406,6 +418,19 @@ class PostMatchViewModel : ViewModel() {
                             tournamentId = match.tournamentId,
                             awardType = AwardType.BEST_BOWLER,
                             awardName = "Best Bowler"
+                        )
+                    )
+                }
+                state.bestPartnership?.let { p ->
+                    // player_awards holds a single player_id, so store batsman1; the
+                    // readable pair + runs go in award_name.
+                    add(
+                        PlayerAwardInsert(
+                            playerId = p.batsman1Id,
+                            matchId = match.id,
+                            tournamentId = match.tournamentId,
+                            awardType = AwardType.BEST_PARTNERSHIP,
+                            awardName = "Best Partnership: ${p.name1} & ${p.name2} (${p.runs})"
                         )
                     )
                 }
@@ -639,6 +664,37 @@ class PostMatchViewModel : ViewModel() {
                 catches = 0
             )
         }.sortedByDescending { it.score }
+    }
+
+    /** Highest partnership across all innings, derived from balls (pair via nonStrikerId). */
+    private fun computeBestPartnership(cards: List<InningsCard>): BestPartnershipInfo? {
+        var best: BestPartnershipInfo? = null
+        fun ballRuns(b: Ball) = when {
+            b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
+            b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
+            else -> b.runsOffBat + (b.extrasRuns ?: 0)
+        }
+        for (card in cards) {
+            val nameOf = card.batting.associate { it.player.id to it.player.fullName }
+            var b1 = ""; var b2 = ""; var runs = 0; var ballsC = 0
+            fun consider() {
+                if (b1.isNotBlank() && b2.isNotBlank() && (best == null || runs > best!!.runs)) {
+                    best = BestPartnershipInfo(b1, b2, nameOf[b1] ?: "", nameOf[b2] ?: "", runs, ballsC)
+                }
+            }
+            card.balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+                if (b1.isEmpty()) b1 = ball.batsmanId ?: ""
+                if (b2.isEmpty() && ball.nonStrikerId != null) b2 = ball.nonStrikerId!!
+                runs += ballRuns(ball)
+                if (ball.extrasType != "wide") ballsC++
+                if (ball.isWicket && ball.wicketType != "retired_hurt") {
+                    consider()
+                    runs = 0; ballsC = 0; b1 = ""; b2 = ball.nonStrikerId ?: ""
+                }
+            }
+            consider() // final unbroken stand
+        }
+        return best
     }
 
     private fun computeResultText(

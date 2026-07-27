@@ -276,6 +276,18 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                         Text("${it.wickets}/${it.runs}", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+
+                // Best Partnership — highest stand of the match
+                uiState.bestPartnership?.let {
+                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("🤝 Best Partnership", color = PurpleColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("${it.name1} & ${it.name2}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Text("${it.runs} (${it.balls})", color = PurpleColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 

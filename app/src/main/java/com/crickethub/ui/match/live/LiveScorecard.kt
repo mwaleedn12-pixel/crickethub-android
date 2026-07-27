@@ -5,6 +5,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -221,6 +223,9 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        // Ball-by-ball timeline (reverse chronological, over separators)
+        item { LiveBallTimeline(uiState) }
+
         // Batting header
         item {
             Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
@@ -956,4 +961,98 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
             }
         }
     }
+}
+// ── BALL-BY-BALL TIMELINE (reverse chronological) ────────────
+
+@Composable
+fun LiveBallTimeline(uiState: LiveScorecardUiState) {
+    if (uiState.balls.isEmpty()) return
+    val oversDesc = uiState.balls.groupBy { it.overNo }.entries.sortedByDescending { it.key }
+
+    fun ballRuns(b: Ball) = when {
+        b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
+        b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
+        else -> b.runsOffBat + (b.extrasRuns ?: 0)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BackgroundDark)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        oversDesc.forEachIndexed { idx, entry ->
+            if (idx > 0) {
+                val overRuns = entry.value.sumOf { ballRuns(it) }
+                LiveOverSeparator(entry.key + 1, overRuns)
+            }
+            entry.value.sortedBy { it.ballNo }.forEach { ball ->
+                LiveBallChip(ball)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveBallChip(ball: Ball) {
+    val label: String
+    val color: androidx.compose.ui.graphics.Color
+    when {
+        ball.isWicket && ball.wicketType != "retired_hurt" -> { label = "W"; color = ErrorRed }
+        ball.isSix -> { label = "6"; color = PurpleColor }
+        ball.isBoundary -> { label = "4"; color = NeonBlue }
+        ball.extrasType == "wide" -> { label = "Wd"; color = AmberColor }
+        ball.extrasType == "no_ball" -> { label = "Nb"; color = AmberColor }
+        ball.extrasType == "bye" -> { label = "${ball.extrasRuns ?: 0}b"; color = SurfaceCard }
+        ball.extrasType == "leg_bye" -> { label = "${ball.extrasRuns ?: 0}lb"; color = SurfaceCard }
+        ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = SurfaceCard }
+        else -> { label = "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"; color = SurfaceCard }
+    }
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 3.dp)
+            .heightIn(min = 34.dp)
+            .widthIn(min = 34.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(color)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (color == SurfaceCard) TextPrimary else Color.White,
+            fontSize = 13.sp, fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun LiveOverSeparator(overNumber: Int, runs: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 6.dp)
+                .width(1.dp)
+                .height(34.dp)
+                .background(BorderColor)
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(ordinalOver(overNumber), color = TextSecondary, fontSize = 10.sp)
+            Text("$runs RUNS", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+    }
+}
+
+private fun ordinalOver(n: Int): String {
+    val suffix = when {
+        n % 100 in 11..13 -> "th"
+        n % 10 == 1 -> "st"
+        n % 10 == 2 -> "nd"
+        n % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
 }

@@ -23,12 +23,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crickethub.data.model.Ball
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.ScoringUiState
 import com.crickethub.ui.match.getDLSResourceExact
@@ -152,7 +157,7 @@ fun ScoringScreen(
 
     CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
 
                 // ── TOP BAR ──────────────────────────────────────────────
                 Row(
@@ -270,32 +275,28 @@ fun ScoringScreen(
                     }
 
                     Last6BallsRow(balls = uiState.last6Balls)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
 
                     // Partnership + last wicket + extras
                     HeaderContextRow(uiState = uiState)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
 
-                    CurrentBatsmenRow(
-                        striker = uiState.striker,
-                        nonStriker = uiState.nonStriker,
-                        batsmanStats = uiState.batsmanStats,
+                    // Ball-by-ball timeline (reverse chronological, over separators)
+                    ScoringBallTimeline(uiState.balls)
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Batters + bowler compact table
+                    ScoringPlayersTable(
+                        uiState = uiState,
                         strikerClickable = needStriker,
                         nonStrikerClickable = needNonStriker,
-                        onChangeStriker = { if (needStriker) showSelectBatsman = true },
-                        onChangeNonStriker = { if (needNonStriker) showSelectNonStriker = true }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    CurrentBowlerRow(
-                        bowler = uiState.currentBowler,
-                        bowlerStats = uiState.bowlerStats,
                         bowlerClickable = needBowler,
+                        onChangeStriker = { if (needStriker) showSelectBatsman = true },
+                        onChangeNonStriker = { if (needNonStriker) showSelectNonStriker = true },
                         onChangeBowler = { if (needBowler) showSelectBowler = true }
                     )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     uiState.error?.let {
                         Text(it, color = ErrorRed, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
@@ -866,7 +867,7 @@ fun headerStatusLine(uiState: ScoringUiState): String? {
 fun HeaderContextRow(uiState: ScoringUiState) {
     val inn = uiState.innings ?: return
     val p = uiState.currentPartnership
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -896,7 +897,7 @@ fun HeaderContextRow(uiState: ScoringUiState) {
 @Composable
 fun Last6BallsRow(balls: List<String>) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1489,6 +1490,275 @@ private fun BallPopup(
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Black
             )
+        }
+    }
+}
+// ── BALL-BY-BALL TIMELINE (reverse chronological) ────────────
+
+@Composable
+fun ScoringBallTimeline(balls: List<Ball>) {
+    if (balls.isEmpty()) return
+    val oversDesc = balls.groupBy { it.overNo }.entries.sortedByDescending { it.key }
+
+    fun ballRuns(b: Ball) = when {
+        b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
+        b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
+        else -> b.runsOffBat + (b.extrasRuns ?: 0)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        oversDesc.forEachIndexed { idx, entry ->
+            if (idx > 0) {
+                val overRuns = entry.value.sumOf { ballRuns(it) }
+                ScoringOverSeparator(entry.key + 1, overRuns)
+            }
+            entry.value.sortedBy { it.ballNo }.forEach { ball ->
+                ScoringBallChip(ball)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScoringBallChip(ball: Ball) {
+    val label: String
+    val color: Color
+    when {
+        ball.isWicket && ball.wicketType != "retired_hurt" -> { label = "W"; color = ErrorRed }
+        ball.isSix -> { label = "6"; color = PurpleColor }
+        ball.isBoundary -> { label = "4"; color = NeonBlue }
+        ball.extrasType == "wide" -> { label = "Wd"; color = AmberColor }
+        ball.extrasType == "no_ball" -> { label = "Nb"; color = AmberColor }
+        ball.extrasType == "bye" -> { label = "${ball.extrasRuns ?: 0}b"; color = SurfaceCard }
+        ball.extrasType == "leg_bye" -> { label = "${ball.extrasRuns ?: 0}lb"; color = SurfaceCard }
+        ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = SurfaceCard }
+        else -> { label = "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"; color = SurfaceCard }
+    }
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 3.dp)
+            .heightIn(min = 32.dp)
+            .widthIn(min = 32.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(color)
+            .padding(horizontal = 7.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (color == SurfaceCard) TextPrimary else Color.White,
+            fontSize = 13.sp, fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun ScoringOverSeparator(overNumber: Int, runs: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 6.dp)
+                .width(1.dp)
+                .height(32.dp)
+                .background(BorderColor)
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(scoringOrdinalOver(overNumber), color = TextSecondary, fontSize = 10.sp)
+            Text("$runs RUNS", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+    }
+}
+
+private fun scoringOrdinalOver(n: Int): String {
+    val suffix = when {
+        n % 100 in 11..13 -> "th"
+        n % 10 == 1 -> "st"
+        n % 10 == 2 -> "nd"
+        n % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
+}
+
+// ── COMPACT BATTERS + BOWLER TABLE (cricinfo-style) ──────────
+
+@Composable
+fun ScoringPlayersTable(
+    uiState: ScoringUiState,
+    strikerClickable: Boolean,
+    nonStrikerClickable: Boolean,
+    bowlerClickable: Boolean,
+    onChangeStriker: () -> Unit,
+    onChangeNonStriker: () -> Unit,
+    onChangeBowler: () -> Unit
+) {
+    val bowlerId = uiState.currentBowler?.id
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(SurfaceCard)
+            .padding(vertical = 6.dp)
+    ) {
+        // Batters header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("BATTER", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            TableHead("R"); TableHead("B"); TableHead("4s"); TableHead("6s"); TableHead("SR", 42.dp); TableHead("vB", 40.dp)
+        }
+        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+
+        BatterTableRow(uiState.striker, uiState.batsmanStats, true, uiState.balls, bowlerId, strikerClickable, onChangeStriker)
+        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        BatterTableRow(uiState.nonStriker, uiState.batsmanStats, false, uiState.balls, bowlerId, nonStrikerClickable, onChangeNonStriker)
+
+        Spacer(modifier = Modifier.height(2.dp))
+        HorizontalDivider(color = BorderColor)
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Bowler header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("BOWLER", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            TableHead("O", 34.dp); TableHead("M"); TableHead("R"); TableHead("W"); TableHead("Eco", 42.dp)
+            TableHead("0s"); TableHead("4s"); TableHead("6s")
+        }
+        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        BowlerTableRow(uiState.currentBowler, uiState.bowlerStats, uiState.balls, bowlerClickable, onChangeBowler)
+    }
+}
+
+@Composable
+private fun RowScope.TableHead(label: String, width: Dp = 28.dp) {
+    Text(label, color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.End, modifier = Modifier.width(width))
+}
+
+@Composable
+private fun RowScope.TableCell(text: String, width: Dp = 28.dp, color: Color = TextPrimary, bold: Boolean = false) {
+    Text(text, color = color, fontSize = 12.sp,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        textAlign = TextAlign.End, modifier = Modifier.width(width))
+}
+
+private fun handAbbrev(battingHand: String?): String =
+    if (battingHand?.lowercase()?.startsWith("l") == true) "lhb" else "rhb"
+
+/** bowlingHand + bowlingStyle -> short code (LF, RFM, SLA, ROS, RLG, LWS...). */
+private fun bowlingCode(hand: String?, style: String?): String {
+    if (style.isNullOrBlank()) return ""
+    val left = hand?.lowercase()?.startsWith("l") == true
+    val arm = if (left) "L" else "R"
+    val s = style.lowercase().replace(Regex("[-_]"), " ").trim()
+    return when {
+        s.contains("orthodox") || (left && s.contains("off")) -> "SLA"
+        s.contains("chinaman") || s.contains("wrist") || (left && s.contains("leg")) -> "LWS"
+        s.contains("off") -> "ROS"
+        s.contains("leg") -> "RLG"
+        s.contains("fast") && s.contains("medium") ->
+            arm + if (s.indexOf("fast") < s.indexOf("medium")) "FM" else "MF"
+        s.contains("fast") -> arm + "F"
+        s.contains("medium") -> arm + "M"
+        else -> style.take(4)
+    }
+}
+
+@Composable
+private fun BatterTableRow(
+    player: Player?, stats: Map<String, com.crickethub.data.model.BatsmanStats>,
+    isStriker: Boolean, balls: List<Ball>, bowlerId: String?,
+    clickable: Boolean, onClick: () -> Unit
+) {
+    val rowMod = Modifier
+        .fillMaxWidth()
+        .then(if (clickable) Modifier.clickable { onClick() } else Modifier)
+        .padding(horizontal = 10.dp, vertical = 5.dp)
+    Row(modifier = rowMod, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            if (isStriker) {
+                Text("* ", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                player?.fullName ?: if (isStriker) "Select Batsman" else "Select Non-Striker",
+                color = if (player != null) TextPrimary else NeonGreen,
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
+            )
+            player?.let {
+                Text("  ${handAbbrev(it.battingHand)}", color = TextSecondary, fontSize = 10.sp)
+            }
+        }
+        val s = player?.let { stats[it.id] }
+        if (s != null) {
+            TableCell("${s.runs}", 28.dp, TextPrimary, true)
+            TableCell("${s.balls}")
+            TableCell("${s.fours}")
+            TableCell("${s.sixes}")
+            TableCell("%.1f".format(s.strikeRate), 42.dp, TextSecondary)
+            // vs current bowler
+            val vb = player.let { p ->
+                val pb = balls.filter { it.batsmanId == p.id && it.bowlerId == bowlerId }
+                val r = pb.sumOf { it.runsOffBat }
+                val b = pb.count { it.extrasType != "wide" }
+                "$r($b)"
+            }
+            TableCell(vb, 40.dp, TextSecondary)
+        } else {
+            TableCell("-"); TableCell("-"); TableCell("-"); TableCell("-"); TableCell("-", 42.dp); TableCell("-", 40.dp)
+        }
+    }
+}
+
+@Composable
+private fun BowlerTableRow(
+    bowler: Player?, stats: Map<String, com.crickethub.data.model.BowlerStats>,
+    balls: List<Ball>, clickable: Boolean, onClick: () -> Unit
+) {
+    val rowMod = Modifier
+        .fillMaxWidth()
+        .then(if (clickable) Modifier.clickable { onClick() } else Modifier)
+        .padding(horizontal = 10.dp, vertical = 5.dp)
+    Row(modifier = rowMod, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(bowler?.fullName ?: "Select Bowler",
+                color = if (bowler != null) TextPrimary else NeonGreen,
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            bowler?.let { bw ->
+                val code = bowlingCode(bw.bowlingHand, bw.bowlingStyle)
+                if (code.isNotBlank()) {
+                    Text("  $code", color = TextSecondary, fontSize = 10.sp, maxLines = 1, softWrap = false)
+                }
+            }
+        }
+        val s = bowler?.let { stats[it.id] }
+        if (s != null) {
+            TableCell(s.overs, 34.dp, TextPrimary, true)
+            TableCell("${s.maidens}")
+            TableCell("${s.runs}")
+            TableCell("${s.wickets}")
+            TableCell("%.1f".format(s.economy), 42.dp, TextSecondary)
+            val bb = bowler.let { p -> balls.filter { it.bowlerId == p.id } }
+            val dots = bb.count { it.runsOffBat == 0 && it.extrasRuns == null && !it.isWicket }
+            val fours = bb.count { it.isBoundary && !it.isSix }
+            val sixes = bb.count { it.isSix }
+            TableCell("$dots", 28.dp, TextSecondary)
+            TableCell("$fours", 28.dp, TextSecondary)
+            TableCell("$sixes", 28.dp, TextSecondary)
+        } else {
+            TableCell("-", 34.dp); TableCell("-"); TableCell("-"); TableCell("-"); TableCell("-", 42.dp)
+            TableCell("-"); TableCell("-"); TableCell("-")
         }
     }
 }
