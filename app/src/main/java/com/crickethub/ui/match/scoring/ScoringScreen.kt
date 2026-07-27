@@ -116,6 +116,10 @@ fun ScoringScreen(
     var popupLabel by remember { mutableStateOf<String?>(null) }
     var popupColor by remember { mutableStateOf(NeonGreen) }
     var popupKey by remember { mutableStateOf(0) }
+    var popupBig by remember { mutableStateOf(false) }
+    var milestoneLabel by remember { mutableStateOf<String?>(null) }
+    var milestoneColor by remember { mutableStateOf(NeonGreen) }
+    var milestoneKey by remember { mutableStateOf(0) }
     var lastPopupBallCount by remember { mutableStateOf(-1) }
     // Fire only when the ball count grows by exactly 1 (a freshly scored ball) — not
     // on resume, which loads many balls at once, and not on undo, which shrinks it.
@@ -126,10 +130,17 @@ fun ScoringScreen(
         if (prev == -1) return@LaunchedEffect          // first load / resume: no popup
         if (size != prev + 1) return@LaunchedEffect     // undo or bulk change: no popup
         val last = uiState.balls.lastOrNull() ?: return@LaunchedEffect
-        val (label, color) = ballPopupLabel(last)
-        popupLabel = label
-        popupColor = color
-        popupKey++
+        val milestone = detectMilestone(uiState, last)
+        if (milestone != null) {
+            milestoneLabel = milestone.first
+            milestoneColor = milestone.second
+            milestoneKey++
+        } else {
+            val (label, color) = ballPopupLabel(last)
+            popupLabel = label
+            popupColor = color
+            popupKey++
+        }
     }
 
     fun shareScore() {
@@ -218,7 +229,7 @@ fun ScoringScreen(
                 } else {
 
                     ScoreHeader(uiState = uiState, onShare = { shareScore() },
-                        popupLabel = popupLabel, popupColor = popupColor, popupKey = popupKey)
+                        popupLabel = popupLabel, popupColor = popupColor, popupKey = popupKey, popupBig = popupBig)
 
                     // ── DLS LIVE BANNER ───────────────────────────────────
                     if (uiState.dlsEnabled && uiState.dlsParScore != null) {
@@ -336,6 +347,14 @@ fun ScoringScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
+
+            // Milestone celebration overlay — floats near the top, above content, non-blocking
+            MilestonePopup(
+                label = milestoneLabel,
+                color = milestoneColor,
+                triggerKey = milestoneKey,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 130.dp)
+            )
 
             // ── DIALOGS ───────────────────────────────────────────────────
 
@@ -725,7 +744,7 @@ fun DLSDialog(
 
 @Composable
 fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
-                popupLabel: String? = null, popupColor: androidx.compose.ui.graphics.Color = NeonGreen, popupKey: Int = 0) {
+                popupLabel: String? = null, popupColor: androidx.compose.ui.graphics.Color = NeonGreen, popupKey: Int = 0, popupBig: Boolean = false) {
     val match = uiState.match
     val currentOver = uiState.currentOver
     val powerplayOvers = match?.powerplayOvers ?: 6
@@ -839,6 +858,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
             label = popupLabel,
             color = popupColor,
             triggerKey = popupKey,
+            big = popupBig,
             modifier = Modifier.align(Alignment.Center)
         )
     }
@@ -1447,6 +1467,7 @@ private fun BallPopup(
     label: String?,
     color: androidx.compose.ui.graphics.Color,
     triggerKey: Int,
+    big: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (label == null) return
@@ -1455,14 +1476,14 @@ private fun BallPopup(
     LaunchedEffect(triggerKey) {
         if (triggerKey == 0) return@LaunchedEffect
         visible = true
-        kotlinx.coroutines.delay(850)
+        kotlinx.coroutines.delay(if (big) 1900 else 850)
         visible = false
     }
 
     val scale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (visible) 1f else 0.4f,
         animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = 0.5f,
+            dampingRatio = if (big) 0.38f else 0.5f,
             stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
         ),
         label = "popupScale"
@@ -1480,18 +1501,136 @@ private fun BallPopup(
                     this.scaleX = scale; this.scaleY = scale; this.alpha = alpha
                 }
                 .clip(RoundedCornerShape(20.dp))
-                .background(color.copy(alpha = 0.18f))
-                .border(2.dp, color, RoundedCornerShape(20.dp))
-                .padding(horizontal = 32.dp, vertical = 18.dp)
+                .background(color.copy(alpha = if (big) 0.22f else 0.18f))
+                .border(if (big) 3.dp else 2.dp, color, RoundedCornerShape(20.dp))
+                .padding(horizontal = if (big) 28.dp else 32.dp, vertical = 18.dp)
         ) {
             Text(
                 text = label,
                 color = color,
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Black
+                fontSize = if (big) 34.sp else 40.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center
             )
         }
     }
+}
+
+/**
+ * Milestone celebration toast — solid colored badge, white text, compact.
+ * Floats over the top strip so it does not overlap the scorecard/buttons.
+ */
+@Composable
+private fun MilestonePopup(
+    label: String?,
+    color: androidx.compose.ui.graphics.Color,
+    triggerKey: Int,
+    modifier: Modifier = Modifier
+) {
+    if (label == null) return
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(triggerKey) {
+        if (triggerKey == 0) return@LaunchedEffect
+        visible = true
+        kotlinx.coroutines.delay(2000)
+        visible = false
+    }
+
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (visible) 1f else 0.5f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.4f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "milestoneScale"
+    )
+    val alpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "milestoneAlpha"
+    )
+
+    if (alpha > 0.01f) {
+        Box(
+            modifier = modifier
+                .graphicsLayer {
+                    this.scaleX = scale; this.scaleY = scale; this.alpha = alpha
+                }
+                .clip(RoundedCornerShape(16.dp))
+                .background(color)
+                .border(2.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 20.dp, vertical = 11.dp)
+        ) {
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Milestone reached on the last ball (fired once, on a freshly scored ball only).
+ * Priority: hat-trick > century > 5-wkt > fifty > team milestone.
+ */
+private fun detectMilestone(
+    uiState: ScoringUiState,
+    last: Ball
+): Pair<String, androidx.compose.ui.graphics.Color>? {
+    val gold = androidx.compose.ui.graphics.Color(0xFFE8A200)
+    val green = androidx.compose.ui.graphics.Color(0xFF34D399)
+    val purple = androidx.compose.ui.graphics.Color(0xFF8B5CF6)
+    val blue = androidx.compose.ui.graphics.Color(0xFF3B82F6)
+
+    val bowlerWicketTypes = listOf("bowled", "caught", "lbw", "stumped", "hit_wicket")
+    val bowlerCredited = last.isWicket && last.wicketType in bowlerWicketTypes
+
+    // Hat-trick: last 3 of this bowler's deliveries are all bowler-credited wickets.
+    if (bowlerCredited && last.bowlerId != null) {
+        val deliveries = uiState.balls.filter {
+            it.bowlerId == last.bowlerId && it.extrasType != "wide" &&
+                    it.wicketType !in listOf("timed_out", "retired_out", "retired_hurt")
+        }
+        val last3 = deliveries.takeLast(3)
+        if (last3.size == 3 && last3.all { it.isWicket && it.wicketType in bowlerWicketTypes }) {
+            return "🎩 HAT-TRICK! 🎩" to purple
+        }
+    }
+
+    // Batsman fifty / century (the batter who faced this ball)
+    val stats = uiState.batsmanStats[last.batsmanId]
+    if (stats != null && last.extrasType != "wide") {
+        val before = stats.runs - last.runsOffBat
+        val name = stats.player.fullName.uppercase()
+        if (stats.runs >= 100 && before < 100) return "💯 $name — CENTURY! 💯" to gold
+        if (stats.runs >= 50 && before < 50) return "🎉 $name — FIFTY! 🎉" to green
+    }
+
+    // Bowler five-wicket haul
+    if (bowlerCredited) {
+        val bw = uiState.bowlerStats[last.bowlerId]
+        if (bw != null && bw.wickets == 5) {
+            return "🔥 ${bw.player.fullName.uppercase()} — 5 WICKETS! 🔥" to purple
+        }
+    }
+
+    // Team milestones
+    val ballTeamRuns = when {
+        last.extrasType == "wide" -> (last.extrasRuns ?: 1) + last.runsOffBat
+        last.extrasType == "no_ball" -> 1 + last.runsOffBat + (last.extrasRuns ?: 0)
+        else -> last.runsOffBat + (last.extrasRuns ?: 0)
+    }
+    val total = uiState.totalRuns
+    val beforeTotal = total - ballTeamRuns
+    for (m in listOf(200, 150, 100, 50)) {
+        if (total >= m && beforeTotal < m) return "🎉 $m UP! 🎉" to blue
+    }
+
+    return null
 }
 // ── BALL-BY-BALL TIMELINE (reverse chronological) ────────────
 
