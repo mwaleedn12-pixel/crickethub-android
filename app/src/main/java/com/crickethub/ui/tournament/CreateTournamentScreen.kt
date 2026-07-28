@@ -34,7 +34,7 @@ fun CreateTournamentScreen(
 
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedFormat by remember { mutableStateOf("League") }
+    var selectedFormat by remember { mutableStateOf("Round Robin") }
     var venue by remember { mutableStateOf("") }
     var organizer by remember { mutableStateOf("") }
     var startDate by remember { mutableStateOf("") }
@@ -122,7 +122,7 @@ fun CreateTournamentScreen(
                                     Text(
                                         format,
                                         color = if (isSelected) NeonGreen else TextSecondary,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         textAlign = TextAlign.Center
                                     )
@@ -244,6 +244,10 @@ fun CreateTournamentScreen(
                             organizer = organizer.trim().ifBlank { null },
                             startDate = startDate.trim().ifBlank { null },
                             endDate = endDate.trim().ifBlank { null },
+                            oversPerMatch = totalOvers.toIntOrNull() ?: 20,
+                            matchType = matchType,
+                            playersPerSide = 11,
+                            maxTeams = maxTeams.toIntOrNull()
                         )
                     )
                 }

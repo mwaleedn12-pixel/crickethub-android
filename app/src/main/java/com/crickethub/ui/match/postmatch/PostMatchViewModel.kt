@@ -351,6 +351,7 @@ class PostMatchViewModel : ViewModel() {
                 val match = state.match ?: return@launch
                 val innings1 = state.innings1
                 val innings2 = state.innings2
+                val alreadyCompleted = match.status == "completed"
 
                 SupabaseClient.client.postgrest["matches"]
                     .update({
@@ -360,14 +361,15 @@ class PostMatchViewModel : ViewModel() {
                         filter { eq("id", matchId) }
                     }
 
-                // Persist awards (POTM + best batter/bowler). Kept resilient in its
-                // own try inside saveAwards so an award failure never blocks completion.
+                // Update local state immediately so re-taps see "completed"
+                _uiState.update { it.copy(match = match.copy(status = "completed")) }
+
                 saveAwards(match)
 
                 matchRepository.invalidateMatchCache(matchId)
                 matchRepository.invalidateMatchesCache()
 
-                if (match.tournamentId != null && innings1 != null && innings2 != null) {
+                if (!alreadyCompleted && match.tournamentId != null && innings1 != null && innings2 != null) {
                     updateTournamentPoints(match, innings1, innings2)
                 }
 

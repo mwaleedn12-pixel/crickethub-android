@@ -9,6 +9,7 @@ import com.crickethub.data.model.TournamentTeamInsert
 import com.crickethub.data.remote.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
+import kotlin.math.log2
 
 class TournamentRepository {
 
@@ -71,26 +72,13 @@ class TournamentRepository {
         }
     }
 
-    // Deletes a tournament and EVERYTHING under it (Version B - full wipe).
-    // Order matters because of FK rules in the schema:
-    //   player_awards -> tournaments is NO ACTION, so those rows must go first or
-    //     the tournament delete is rejected.
-    //   matches -> tournaments is SET NULL, so deleting the tournament alone would
-    //     orphan the matches; we delete each fixture explicitly instead.
-    //   Everything under a match (innings, balls, playing_xi, player_awards,
-    //     match_notifications) and tournament_teams is CASCADE, so those go
-    //     automatically when their parent row is removed.
     suspend fun deleteTournament(tournamentId: String) {
         val matchRepository = MatchRepository()
-
-        // 1. player_awards tied to the tournament (NO ACTION -> must clear first)
         try {
             client.postgrest["player_awards"].delete { filter { eq("tournament_id", tournamentId) } }
         } catch (e: Exception) {
             android.util.Log.w("CricketHub", "deleteTournament awards: ${e.message}")
         }
-
-        // 2. every fixture — deleteMatch cascades each match's own children
         val fixtures = try {
             client.postgrest["matches"]
                 .select { filter { eq("tournament_id", tournamentId) } }
@@ -100,14 +88,9 @@ class TournamentRepository {
             emptyList()
         }
         for (m in fixtures) {
-            try {
-                matchRepository.deleteMatch(m.id)
-            } catch (e: Exception) {
-                android.util.Log.w("CricketHub", "deleteTournament match ${m.id}: ${e.message}")
-            }
+            try { matchRepository.deleteMatch(m.id) }
+            catch (e: Exception) { android.util.Log.w("CricketHub", "deleteTournament match ${m.id}: ${e.message}") }
         }
-
-        // 3. the tournament itself (tournament_teams cascades away with it)
         client.postgrest["tournaments"].delete { filter { eq("id", tournamentId) } }
     }
 
@@ -121,75 +104,211 @@ class TournamentRepository {
             }
     }
 
-    suspend fun generateFixtures(tournamentId: String, format: String): List<Match> {
+    // ── Fixture generation ─────────────────────────────────────────
+
+    private data class FixtureSpec(val team1Id: String, val team2Id: String, val title: String)
+
+    suspend fun generateFixtures(tournamentId: String, format: String, seriesMatches: Int = 3): List<Match> {
+        val tournament = getTournamentById(tournamentId) ?: return emptyList()
         val teams = getTournamentTeams(tournamentId)
         val teamIds = teams.map { it.teamId }
-        if (teamIds.size < 2) return emptyList()
+        val n = teamIds.size
+        if (n < 2) return emptyList()
 
-        val pairs = mutableListOf<Pair<String, String>>()
+        val specs = mutableListOf<FixtureSpec>()
 
         when (format) {
-            "League", "Round Robin" -> {
-                for (i in teamIds.indices) {
-                    for (j in i + 1 until teamIds.size) {
-                        pairs.add(Pair(teamIds[i], teamIds[j]))
-                    }
-                }
+            "Round Robin" -> {
+                for (i in teamIds.indices)
+                    for (j in i + 1 until n)
+                        specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
             }
+
             "Double Round Robin" -> {
-                for (round in 1..2) {
-                    for (i in teamIds.indices) {
-                        for (j in i + 1 until teamIds.size) {
-                            pairs.add(Pair(teamIds[i], teamIds[j]))
-                        }
+                for (i in teamIds.indices)
+                    for (j in i + 1 until n)
+                        specs.add(FixtureSpec(teamIds[i], teamIds[j], "Leg 1"))
+                for (i in teamIds.indices)
+                    for (j in i + 1 until n)
+                        specs.add(FixtureSpec(teamIds[j], teamIds[i], "Leg 2"))
+            }
+
+            "Single Knockout" -> {
+                specs.addAll(knockoutFirstRound(teamIds))
+            }
+
+            "Group + Knockout" -> {
+                if (n < 4) {
+                    // Fall back to round robin if <4 teams
+                    for (i in teamIds.indices)
+                        for (j in i + 1 until n)
+                            specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
+                } else {
+                    val half = n / 2
+                    val groupA = teamIds.subList(0, half)
+                    val groupB = teamIds.subList(half, n)
+                    for (i in groupA.indices)
+                        for (j in i + 1 until groupA.size)
+                            specs.add(FixtureSpec(groupA[i], groupA[j], "Group A"))
+                    for (i in groupB.indices)
+                        for (j in i + 1 until groupB.size)
+                            specs.add(FixtureSpec(groupB[i], groupB[j], "Group B"))
+                    // Knockout matches created later when teams qualify
+                }
+            }
+
+            "League + Playoffs" -> {
+                for (i in teamIds.indices)
+                    for (j in i + 1 until n)
+                        specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
+                // Playoff matches created later when standings are final
+            }
+
+            "Bilateral Series" -> {
+                if (n >= 2) {
+                    val count = seriesMatches.coerceIn(1, 7)
+                    for (i in 1..count) {
+                        val home = if (i % 2 == 1) teamIds[0] else teamIds[1]
+                        val away = if (i % 2 == 1) teamIds[1] else teamIds[0]
+                        specs.add(FixtureSpec(home, away, "Series"))
                     }
                 }
             }
-            "Knockout" -> {
-                for (i in teamIds.indices step 2) {
-                    if (i + 1 < teamIds.size) {
-                        pairs.add(Pair(teamIds[i], teamIds[i + 1]))
-                    }
+
+            "Tri-Series" -> {
+                val triTeams = teamIds.take(3)
+                if (triTeams.size == 3) {
+                    for (i in 0 until 3)
+                        for (j in i + 1 until 3)
+                            specs.add(FixtureSpec(triTeams[i], triTeams[j], "League"))
+                    for (i in 0 until 3)
+                        for (j in i + 1 until 3)
+                            specs.add(FixtureSpec(triTeams[j], triTeams[i], "League"))
+                    // Final created when standings are final
                 }
             }
-            "Group + Knockout", "Hybrid" -> {
-                for (i in teamIds.indices) {
-                    for (j in i + 1 until teamIds.size) {
-                        pairs.add(Pair(teamIds[i], teamIds[j]))
-                    }
-                }
+
+            "Custom Tournament" -> {
+                for (i in teamIds.indices)
+                    for (j in i + 1 until n)
+                        specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
             }
         }
 
+        val matchType = tournament.matchType ?: "T20"
+        val totalOvers = tournament.oversPerMatch ?: 20
+        val playersPerSide = tournament.playersPerSide ?: 11
         val userId = client.auth.currentUserOrNull()?.id
-        pairs.forEachIndexed { index, (team1Id, team2Id) ->
+        val ppOvers = when {
+            totalOvers <= 10 -> 2
+            totalOvers <= 20 -> 6
+            else -> 10
+        }
+
+        specs.forEachIndexed { index, spec ->
             try {
-                client.postgrest["matches"]
-                    .insert(
-                        MatchInsert(
-                            userId = userId,
-                            team1Id = team1Id,
-                            team2Id = team2Id,
-                            matchType = "T20",
-                            totalOvers = 20,
-                            playersPerSide = 11,
-                            tournamentId = tournamentId,
-                            matchNumber = index + 1,
-                            powerplayOvers = 6,
-                            freeHitOnNoball = true,
-                            superOverEnabled = false,
-                            maxOversPerBowler = 4,
-                            isPublic = true,
-                            inningsBreakMinutes = 20
-                        )
+                client.postgrest["matches"].insert(
+                    MatchInsert(
+                        userId = userId,
+                        title = spec.title,
+                        team1Id = spec.team1Id,
+                        team2Id = spec.team2Id,
+                        matchType = matchType,
+                        totalOvers = totalOvers,
+                        playersPerSide = playersPerSide,
+                        tournamentId = tournamentId,
+                        matchNumber = index + 1,
+                        powerplayOvers = ppOvers,
+                        freeHitOnNoball = true,
+                        superOverEnabled = false,
+                        maxOversPerBowler = if (totalOvers >= 5) totalOvers / 5 else null,
+                        isPublic = true,
+                        inningsBreakMinutes = 20
                     )
+                )
             } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Fixture create error: ${e.message}", e)
+                android.util.Log.e("CricketHub", "Fixture #${index + 1} error: ${e.message}", e)
             }
         }
 
         return getTournamentFixtures(tournamentId)
     }
+
+    /** Single Knockout: only first round (teams without byes) */
+    private fun knockoutFirstRound(teamIds: List<String>): List<FixtureSpec> {
+        val n = teamIds.size
+        if (n == 2) return listOf(FixtureSpec(teamIds[0], teamIds[1], "Final"))
+
+        var bracketSize = 1
+        while (bracketSize < n) bracketSize *= 2
+        val byes = bracketSize - n
+        val totalRounds = log2(bracketSize.toDouble()).toInt()
+        val roundLabel = knockoutLabel(totalRounds - 1)
+
+        val playing = teamIds.subList(byes, n)
+        val specs = mutableListOf<FixtureSpec>()
+        val matchCount = playing.size / 2
+        for (i in 0 until matchCount) {
+            val t1 = playing[i]
+            val t2 = playing[playing.size - 1 - i]
+            val label = if (matchCount > 1) "$roundLabel ${i + 1}" else roundLabel
+            specs.add(FixtureSpec(t1, t2, label))
+        }
+        return specs
+    }
+
+    /** Create a knockout match when teams qualify */
+    suspend fun createKnockoutMatch(
+        tournamentId: String,
+        team1Id: String,
+        team2Id: String,
+        title: String,
+        matchNumber: Int
+    ) {
+        val tournament = getTournamentById(tournamentId) ?: return
+        val matchType = tournament.matchType ?: "T20"
+        val totalOvers = tournament.oversPerMatch ?: 20
+        val userId = client.auth.currentUserOrNull()?.id
+        try {
+            client.postgrest["matches"].insert(
+                MatchInsert(
+                    userId = userId,
+                    title = title,
+                    team1Id = team1Id,
+                    team2Id = team2Id,
+                    matchType = matchType,
+                    totalOvers = totalOvers,
+                    playersPerSide = tournament.playersPerSide ?: 11,
+                    tournamentId = tournamentId,
+                    matchNumber = matchNumber,
+                    powerplayOvers = if (totalOvers <= 10) 2 else if (totalOvers <= 20) 6 else 10,
+                    freeHitOnNoball = true,
+                    superOverEnabled = false,
+                    maxOversPerBowler = if (totalOvers >= 5) totalOvers / 5 else null,
+                    isPublic = true,
+                    inningsBreakMinutes = 20
+                )
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Knockout match create error: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /** Reschedule a fixture */
+    suspend fun rescheduleMatch(matchId: String, newDate: String?, newTime: String?) {
+        try {
+            client.postgrest["matches"].update({
+                if (newDate != null) set("match_date", newDate)
+                if (newTime != null) set("match_time", newTime)
+            }) { filter { eq("id", matchId) } }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Reschedule error: ${e.message}", e)
+            throw e
+        }
+    }
+
+    // ── Points table ───────────────────────────────────────────────
 
     suspend fun updatePointsTable(
         tournamentId: String,
@@ -200,79 +319,77 @@ class TournamentRepository {
         winnerOvers: Double,
         loserOvers: Double
     ) {
+        android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable CALLED: tournament=$tournamentId winner=$winnerTeamId loser=$loserTeamId " +
+                "winnerRuns=$winnerRuns loserRuns=$loserRuns winnerOvers=$winnerOvers loserOvers=$loserOvers")
         try {
             val winnerEntry = client.postgrest["tournament_teams"]
-                .select {
-                    filter {
-                        eq("tournament_id", tournamentId)
-                        eq("team_id", winnerTeamId)
-                    }
-                }
+                .select { filter { eq("tournament_id", tournamentId); eq("team_id", winnerTeamId) } }
                 .decodeSingleOrNull<TournamentTeam>()
 
+            android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: winnerEntry=${winnerEntry != null} id=${winnerEntry?.id}")
+
             if (winnerEntry != null) {
-                val newRunsScored = winnerEntry.runsScoreTotal + winnerRuns
-                val newRunsConceded = winnerEntry.runsConcededTotal + loserRuns
-                val newOversFaced = winnerEntry.oversFacedTotal + winnerOvers
-                val newOversBowled = winnerEntry.oversBowledTotal + loserOvers
-                val nrr = if (newOversFaced > 0 && newOversBowled > 0)
-                    (newRunsScored / newOversFaced) - (newRunsConceded / newOversBowled)
-                else 0.0
+                val rs = winnerEntry.runsScoreTotal + winnerRuns
+                val rc = winnerEntry.runsConcededTotal + loserRuns
+                val of = winnerEntry.oversFacedTotal + winnerOvers
+                val ob = winnerEntry.oversBowledTotal + loserOvers
+                val nrr = if (of > 0 && ob > 0) (rs / of) - (rc / ob) else 0.0
 
                 client.postgrest["tournament_teams"]
                     .update({
                         set("wins", winnerEntry.wins + 1)
                         set("matches_played", winnerEntry.matchesPlayed + 1)
                         set("points", winnerEntry.points + 2)
-                        set("runs_scored_total", newRunsScored)
-                        set("runs_conceded_total", newRunsConceded)
-                        set("overs_faced_total", newOversFaced)
-                        set("overs_bowled_total", newOversBowled)
+                        set("runs_scored_total", rs)
+                        set("runs_conceded_total", rc)
+                        set("overs_faced_total", of)
+                        set("overs_bowled_total", ob)
                         set("nrr", nrr)
-                    }) {
-                        filter {
-                            eq("tournament_id", tournamentId)
-                            eq("team_id", winnerTeamId)
-                        }
-                    }
+                    }) { filter { eq("tournament_id", tournamentId); eq("team_id", winnerTeamId) } }
+                android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: WINNER updated wins=${winnerEntry.wins + 1} pts=${winnerEntry.points + 2}")
+            } else {
+                android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: NO winner entry found for team=$winnerTeamId in tournament=$tournamentId")
             }
 
             val loserEntry = client.postgrest["tournament_teams"]
-                .select {
-                    filter {
-                        eq("tournament_id", tournamentId)
-                        eq("team_id", loserTeamId)
-                    }
-                }
+                .select { filter { eq("tournament_id", tournamentId); eq("team_id", loserTeamId) } }
                 .decodeSingleOrNull<TournamentTeam>()
 
+            android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: loserEntry=${loserEntry != null} id=${loserEntry?.id}")
+
             if (loserEntry != null) {
-                val newRunsScored = loserEntry.runsScoreTotal + loserRuns
-                val newRunsConceded = loserEntry.runsConcededTotal + winnerRuns
-                val newOversFaced = loserEntry.oversFacedTotal + loserOvers
-                val newOversBowled = loserEntry.oversBowledTotal + winnerOvers
-                val nrr = if (newOversFaced > 0 && newOversBowled > 0)
-                    (newRunsScored / newOversFaced) - (newRunsConceded / newOversBowled)
-                else 0.0
+                val rs = loserEntry.runsScoreTotal + loserRuns
+                val rc = loserEntry.runsConcededTotal + winnerRuns
+                val of = loserEntry.oversFacedTotal + loserOvers
+                val ob = loserEntry.oversBowledTotal + winnerOvers
+                val nrr = if (of > 0 && ob > 0) (rs / of) - (rc / ob) else 0.0
 
                 client.postgrest["tournament_teams"]
                     .update({
                         set("losses", loserEntry.losses + 1)
                         set("matches_played", loserEntry.matchesPlayed + 1)
-                        set("runs_scored_total", newRunsScored)
-                        set("runs_conceded_total", newRunsConceded)
-                        set("overs_faced_total", newOversFaced)
-                        set("overs_bowled_total", newOversBowled)
+                        set("runs_scored_total", rs)
+                        set("runs_conceded_total", rc)
+                        set("overs_faced_total", of)
+                        set("overs_bowled_total", ob)
                         set("nrr", nrr)
-                    }) {
-                        filter {
-                            eq("tournament_id", tournamentId)
-                            eq("team_id", loserTeamId)
-                        }
-                    }
+                    }) { filter { eq("tournament_id", tournamentId); eq("team_id", loserTeamId) } }
+                android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: LOSER updated losses=${loserEntry.losses + 1}")
+            } else {
+                android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: NO loser entry found for team=$loserTeamId in tournament=$tournamentId")
             }
+            android.util.Log.e("CricketHub", "POINTS-DEBUG updatePointsTable: DONE successfully")
         } catch (e: Exception) {
             android.util.Log.e("CricketHub", "Points table error: ${e.message}", e)
+        }
+    }
+
+    companion object {
+        fun knockoutLabel(roundsFromFinal: Int): String = when (roundsFromFinal) {
+            0 -> "Final"
+            1 -> "Semi Final"
+            2 -> "Quarter Final"
+            else -> "Round of ${1 shl (roundsFromFinal + 1)}"
         }
     }
 }

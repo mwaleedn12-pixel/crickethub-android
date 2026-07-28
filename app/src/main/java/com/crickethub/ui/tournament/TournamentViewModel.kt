@@ -76,7 +76,6 @@ class TournamentViewModel : ViewModel() {
                 val fixtures = tournamentRepository.getTournamentFixtures(tournamentId)
                 val teamIds = tournamentTeams.map { it.teamId }
 
-                // Parallel load team details — much faster
                 val teamDetails = coroutineScope {
                     teamIds.map { teamId ->
                         async {
@@ -142,15 +141,44 @@ class TournamentViewModel : ViewModel() {
         }
     }
 
-    fun generateFixtures(tournamentId: String, format: String) {
+    fun generateFixtures(tournamentId: String, format: String, seriesMatches: Int = 3) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                tournamentRepository.generateFixtures(tournamentId, format)
+                tournamentRepository.generateFixtures(tournamentId, format, seriesMatches)
                 loadTournamentDetail(tournamentId)
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "Generate fixtures error: ${e.message}", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
+    fun createKnockoutMatch(
+        tournamentId: String,
+        team1Id: String,
+        team2Id: String,
+        title: String,
+        matchNumber: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                tournamentRepository.createKnockoutMatch(tournamentId, team1Id, team2Id, title, matchNumber)
+                loadTournamentDetail(tournamentId)
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Knockout match error: ${e.message}", e)
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun rescheduleMatch(matchId: String, newDate: String?, newTime: String?, tournamentId: String) {
+        viewModelScope.launch {
+            try {
+                tournamentRepository.rescheduleMatch(matchId, newDate, newTime)
+                loadTournamentDetail(tournamentId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }

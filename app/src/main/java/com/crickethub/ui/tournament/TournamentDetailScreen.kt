@@ -26,72 +26,191 @@ import com.crickethub.data.model.Player
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.TournamentTeam
 import com.crickethub.data.repository.ScoringRepository
+import com.crickethub.data.repository.TournamentRepository
 import kotlinx.coroutines.launch
 import com.crickethub.ui.theme.*
+import kotlin.math.log2
 
+// ── FORMATS & HELPERS ────────────────────────────────────────
 
 val TOURNAMENT_FORMATS = listOf(
-    "League", "Round Robin", "Double Round Robin",
-    "Knockout", "Group + Knockout", "Hybrid"
+    "Round Robin", "Double Round Robin", "Single Knockout",
+    "Group + Knockout", "League + Playoffs", "Bilateral Series",
+    "Tri-Series", "Custom Tournament"
 )
 
-fun totalMatches(format: String, n: Int): Int = when (format) {
-    "League", "Round Robin" -> if (n >= 2) n * (n - 1) / 2 else 0
+data class KnockoutPlaceholder(
+    val label: String,
+    val team1Desc: String,
+    val team2Desc: String,
+    val matchNumber: Int
+)
+
+fun hasKnockoutStage(format: String): Boolean = format in listOf(
+    "Single Knockout", "Group + Knockout", "League + Playoffs", "Tri-Series"
+)
+
+fun isKnockoutTitle(title: String?): Boolean {
+    if (title == null) return false
+    return title.startsWith("Final") || title.startsWith("Semi Final") ||
+            title.startsWith("Quarter Final") || title.startsWith("Round of") ||
+            title.startsWith("Qualifier") || title.startsWith("Eliminator")
+}
+
+fun leagueMatchCount(format: String, n: Int): Int = when (format) {
+    "Round Robin", "Custom Tournament" -> if (n >= 2) n * (n - 1) / 2 else 0
     "Double Round Robin" -> if (n >= 2) n * (n - 1) else 0
-    "Knockout" -> if (n >= 2) n - 1 else 0
-    "Group + Knockout" -> if (n >= 2) (n * (n - 1) / 2) + (n / 2) else 0
-    "Hybrid" -> if (n >= 2) n * (n - 1) / 2 + 3 else 0
+    "Group + Knockout" -> {
+        if (n < 4) { if (n >= 2) n * (n - 1) / 2 else 0 }
+        else {
+            val h = n / 2; val r = n - h
+            h * (h - 1) / 2 + r * (r - 1) / 2
+        }
+    }
+    "League + Playoffs" -> if (n >= 2) n * (n - 1) / 2 else 0
+    "Bilateral Series" -> 0 // uses seriesMatches
+    "Tri-Series" -> if (n >= 3) 6 else 0
+    "Single Knockout" -> 0
     else -> 0
 }
 
+fun knockoutMatchCount(format: String, n: Int): Int = when (format) {
+    "Single Knockout" -> if (n >= 2) n - 1 else 0
+    "Group + Knockout" -> if (n >= 4) 3 else 0 // SF1, SF2, Final
+    "League + Playoffs" -> if (n >= 4) 4 else 0 // Q1, Elim, Q2, Final
+    "Tri-Series" -> if (n >= 3) 1 else 0 // Final
+    else -> 0
+}
+
+fun totalMatches(format: String, n: Int, seriesCount: Int = 3): Int = when (format) {
+    "Bilateral Series" -> if (n >= 2) seriesCount else 0
+    "Single Knockout" -> if (n >= 2) n - 1 else 0
+    else -> leagueMatchCount(format, n) + knockoutMatchCount(format, n)
+}
+
+/** First-round knockout matches that get created as real DB rows */
+fun firstRoundKnockoutCount(n: Int): Int {
+    if (n <= 1) return 0
+    if (n == 2) return 1
+    var bs = 1; while (bs < n) bs *= 2
+    return (n - bs / 2) // playing teams / 2 but simplified: n - bracketSize/2
+}
+
+fun getKnockoutPlaceholders(format: String, n: Int, realMatchCount: Int): List<KnockoutPlaceholder> {
+    val placeholders = mutableListOf<KnockoutPlaceholder>()
+    var num = realMatchCount
+
+    when (format) {
+        "Single Knockout" -> {
+            if (n <= 2) return emptyList() // no placeholders, final is a real match
+            var bs = 1; while (bs < n) bs *= 2
+            val totalRounds = log2(bs.toDouble()).toInt()
+            // Skip round 1 (already real matches), generate rest
+            var matchesInRound = bs / 4
+            for (r in 1 until totalRounds) {
+                val fromFinal = totalRounds - 1 - r
+                val label = TournamentRepository.knockoutLabel(fromFinal)
+                for (i in 0 until matchesInRound.coerceAtLeast(1)) {
+                    num++
+                    val suffix = if (matchesInRound > 1) " ${i + 1}" else ""
+                    val desc1 = if (fromFinal == 0) "Winner SF 1" else "Winner ${i * 2 + 1}"
+                    val desc2 = if (fromFinal == 0) "Winner SF 2" else "Winner ${i * 2 + 2}"
+                    placeholders.add(KnockoutPlaceholder("$label$suffix", desc1, desc2, num))
+                }
+                matchesInRound = (matchesInRound / 2).coerceAtLeast(0)
+                if (fromFinal == 0) break
+            }
+        }
+
+        "Group + Knockout" -> {
+            if (n >= 4) {
+                num++; placeholders.add(KnockoutPlaceholder("Semi Final 1", "1st Group A", "2nd Group B", num))
+                num++; placeholders.add(KnockoutPlaceholder("Semi Final 2", "1st Group B", "2nd Group A", num))
+                num++; placeholders.add(KnockoutPlaceholder("Final", "Winner SF 1", "Winner SF 2", num))
+            }
+        }
+
+        "League + Playoffs" -> {
+            if (n >= 4) {
+                num++; placeholders.add(KnockoutPlaceholder("Qualifier 1", "1st on Table", "2nd on Table", num))
+                num++; placeholders.add(KnockoutPlaceholder("Eliminator", "3rd on Table", "4th on Table", num))
+                num++; placeholders.add(KnockoutPlaceholder("Qualifier 2", "Loser Q1", "Winner Eliminator", num))
+                num++; placeholders.add(KnockoutPlaceholder("Final", "Winner Q1", "Winner Q2", num))
+            }
+        }
+
+        "Tri-Series" -> {
+            if (n >= 3) {
+                num++; placeholders.add(KnockoutPlaceholder("Final", "1st on Table", "2nd on Table", num))
+            }
+        }
+    }
+    return placeholders
+}
+
 fun formatDescription(format: String): String = when (format) {
-    "League" -> "Every team plays every other team once.\nTop team on points wins the tournament."
-    "Round Robin" -> "Complete round where every team faces each other once.\nSame as League format."
-    "Double Round Robin" -> "Every team plays every other team twice.\nMore matches, better representation of team strength."
-    "Knockout" -> "Single elimination — lose once and you're out.\nDirect knockout from first round to final."
-    "Group + Knockout" -> "Teams play group stage first.\nTop teams from each group advance to knockouts."
-    "Hybrid" -> "League stage to determine standings.\nTop 4 teams play Semi-Finals then Final."
+    "Round Robin" -> "Every team plays every other team once.\nTop team on points wins."
+    "Double Round Robin" -> "Every team plays every other team twice (home & away).\nMore matches, fairer standings."
+    "Single Knockout" -> "Lose once and you're out.\nDirect elimination from first round to final."
+    "Group + Knockout" -> "Teams split into 2 groups, play round robin.\nTop 2 from each group go to semi-finals."
+    "League + Playoffs" -> "Full round robin league stage.\nTop 4 play IPL/PSL-style playoffs (Q1, Eliminator, Q2, Final)."
+    "Bilateral Series" -> "Two teams play a fixed series.\nChoose 3, 5, or 7 match series."
+    "Tri-Series" -> "Three teams, each pair plays twice.\nTop 2 play the final."
+    "Custom Tournament" -> "Round robin with full control.\nManage fixtures as needed."
     else -> ""
 }
 
-fun formatStages(format: String, n: Int): List<String> = when (format) {
-    "League", "Round Robin" -> listOf(
-        "Round Robin: ${totalMatches(format, n)} matches",
-        "Every team plays every other team once",
-        "Winner: Team with most points"
+fun formatStages(format: String, n: Int, series: Int = 3): List<String> = when (format) {
+    "Round Robin", "Custom Tournament" -> listOf(
+        "Round Robin: ${leagueMatchCount(format, n)} matches",
+        "Winner: Most points"
     )
     "Double Round Robin" -> listOf(
-        "Round 1: ${n * (n - 1) / 2} matches",
-        "Round 2: ${n * (n - 1) / 2} matches",
-        "Total: ${n * (n - 1)} matches",
-        "Winner: Most points after 2 rounds"
+        "Leg 1: ${n * (n - 1) / 2} matches",
+        "Leg 2: ${n * (n - 1) / 2} matches",
+        "Total: ${n * (n - 1)} matches"
     )
-    "Knockout" -> {
-        val rounds = mutableListOf<String>()
-        var remaining = n
-        var round = 1
-        while (remaining > 1) {
-            rounds.add("Round $round: ${remaining / 2} matches")
-            remaining /= 2
-            round++
+    "Single Knockout" -> {
+        val lines = mutableListOf<String>()
+        if (n >= 2) {
+            var bs = 1; while (bs < n) bs *= 2
+            val byes = bs - n
+            if (byes > 0) lines.add("$byes team(s) get bye to next round")
+            lines.add("Total: ${n - 1} matches to decide winner")
         }
-        rounds.add("Total: ${n - 1} matches")
-        rounds
+        lines
     }
-    "Group + Knockout" -> listOf(
-        "Group Stage: ${n * (n - 1) / 2} matches",
-        "Semi Finals: ${n / 2} matches",
+    "Group + Knockout" -> {
+        val h = n / 2; val r = n - h
+        listOf(
+            "Group A: $h teams, ${h * (h - 1) / 2} matches",
+            "Group B: $r teams, ${r * (r - 1) / 2} matches",
+            "Semi Finals: 2 matches",
+            "Final: 1 match",
+            "Total: ${totalMatches(format, n)} matches"
+        )
+    }
+    "League + Playoffs" -> listOf(
+        "League: ${leagueMatchCount(format, n)} matches",
+        "Qualifier 1: 1st vs 2nd",
+        "Eliminator: 3rd vs 4th",
+        "Qualifier 2: Loser Q1 vs Winner Elim",
         "Final: 1 match",
         "Total: ${totalMatches(format, n)} matches"
     )
-    "Hybrid" -> listOf(
-        "League Stage: ${n * (n - 1) / 2} matches",
-        "Semi Finals: 2 matches",
-        "Final: 1 match",
-        "Total: ${totalMatches(format, n)} matches"
+    "Bilateral Series" -> listOf(
+        "$series-match series between 2 teams",
+        "Alternating home/away"
+    )
+    "Tri-Series" -> listOf(
+        "League: 6 matches (each pair plays twice)",
+        "Final: 1st vs 2nd",
+        "Total: 7 matches"
     )
     else -> emptyList()
 }
+
+// ── MAIN SCREEN ──────────────────────────────────────────────
 
 @Composable
 fun TournamentDetailScreen(
@@ -171,8 +290,10 @@ fun TournamentDetailScreen(
                     uiState.currentTournament?.name ?: "Tournament",
                     fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary
                 )
+                val fmt = uiState.currentTournament?.format ?: ""
                 Text(
-                    "${uiState.tournamentTeams.size} teams • ${uiState.fixtures.size} matches",
+                    "${uiState.tournamentTeams.size} teams • ${uiState.fixtures.size} matches" +
+                            if (fmt.isNotBlank()) " • $fmt" else "",
                     fontSize = 12.sp, color = TextSecondary
                 )
             }
@@ -205,14 +326,7 @@ fun TournamentDetailScreen(
             }
         } else {
             when (selectedTab) {
-                0 -> TFixturesTab(
-                    uiState = uiState,
-                    tournamentId = tournamentId,
-                    onMatchClick = onMatchClick,
-                    onViewScorecard = onViewScorecard,
-                    onViewAnalytics = onViewAnalytics,
-                    viewModel = viewModel
-                )
+                0 -> TFixturesTab(uiState, tournamentId, onMatchClick, onViewScorecard, onViewAnalytics, viewModel)
                 1 -> TPointsTab(uiState = uiState)
                 2 -> TStatsTab(allBalls, playerTeamMap, playerMap, statsLoading)
                 3 -> TAwardsTab(allBalls, playerTeamMap, playerMap, statsLoading)
@@ -232,43 +346,44 @@ fun TFixturesTab(
     onViewAnalytics: (String) -> Unit,
     viewModel: TournamentViewModel
 ) {
-    var selectedFormat by remember { mutableStateOf("League") }
+    // Default to tournament's saved format
+    val savedFormat = uiState.currentTournament?.format
+    var selectedFormat by remember(savedFormat) {
+        mutableStateOf(
+            if (savedFormat != null && savedFormat in TOURNAMENT_FORMATS) savedFormat else "Round Robin"
+        )
+    }
     var showTeamPicker by remember { mutableStateOf(false) }
     var showFormatInfo by remember { mutableStateOf(false) }
+    var seriesCount by remember { mutableIntStateOf(3) }
     val fixturesGenerated = uiState.fixtures.isNotEmpty()
     val teamCount = uiState.tournamentTeams.size
+
+    // Stage sub-tab for formats with league + knockout
+    var stageTab by remember { mutableIntStateOf(0) } // 0=All, 1=League, 2=Knockout
+    val showStageTabs = fixturesGenerated && hasKnockoutStage(selectedFormat)
+
+    val leagueFixtures = uiState.fixtures.filter { !isKnockoutTitle(it.title) }
+    val knockoutFixtures = uiState.fixtures.filter { isKnockoutTitle(it.title) }
+    val knockoutPlaceholders = if (fixturesGenerated) {
+        getKnockoutPlaceholders(selectedFormat, teamCount, uiState.fixtures.size)
+    } else emptyList()
 
     // Format info dialog
     if (showFormatInfo) {
         AlertDialog(
             onDismissRequest = { showFormatInfo = false },
             containerColor = SurfaceCard,
-            title = {
-                Text(
-                    "Format: $selectedFormat",
-                    color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp
-                )
-            },
+            title = { Text("Format: $selectedFormat", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
             text = {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.heightIn(max = 500.dp)
-                ) {
-                    item {
-                        Text(
-                            formatDescription(selectedFormat),
-                            color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp
-                        )
-                    }
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.heightIn(max = 500.dp)) {
+                    item { Text(formatDescription(selectedFormat), color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp) }
                     item { HorizontalDivider(color = BorderColor) }
                     item {
                         Text("How it works:", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
-                        formatStages(selectedFormat, teamCount.coerceAtLeast(2)).forEach { stage ->
-                            Row(
-                                modifier = Modifier.padding(vertical = 3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                        formatStages(selectedFormat, teamCount.coerceAtLeast(2), seriesCount).forEach { stage ->
+                            Row(modifier = Modifier.padding(vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("•", color = NeonGreen, fontSize = 13.sp)
                                 Text(stage, color = TextPrimary, fontSize = 13.sp)
                             }
@@ -277,24 +392,13 @@ fun TFixturesTab(
                     item { HorizontalDivider(color = BorderColor) }
                     item {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(NeonGreen.copy(alpha = 0.1f))
-                                .border(1.dp, NeonGreen, RoundedCornerShape(8.dp))
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                .background(NeonGreen.copy(alpha = 0.1f)).border(1.dp, NeonGreen, RoundedCornerShape(8.dp)).padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(
-                                    "With $teamCount teams",
-                                    color = TextSecondary, fontSize = 12.sp
-                                )
-                                Text(
-                                    "Total Matches: ${totalMatches(selectedFormat, teamCount)}",
-                                    color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold
-                                )
+                                Text("With $teamCount teams", color = TextSecondary, fontSize = 12.sp)
+                                Text("Total Matches: ${totalMatches(selectedFormat, teamCount, seriesCount)}", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                             Text("🏏", fontSize = 24.sp)
                         }
@@ -302,45 +406,27 @@ fun TFixturesTab(
                     item {
                         HorizontalDivider(color = BorderColor)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "All Formats ($teamCount teams):",
-                            color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
-                        )
+                        Text("All Formats ($teamCount teams):", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         TOURNAMENT_FORMATS.forEach { format ->
                             val isCurrent = format == selectedFormat
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(6.dp))
                                     .background(if (isCurrent) NeonGreen.copy(alpha = 0.1f) else Color.Transparent)
-                                    .clickable { selectedFormat = format }
-                                    .padding(8.dp),
+                                    .clickable { selectedFormat = format }.padding(8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    format,
-                                    color = if (isCurrent) NeonGreen else TextSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
-                                )
-                                Text(
-                                    "${totalMatches(format, teamCount)} matches",
-                                    color = if (isCurrent) NeonGreen else TextSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
-                                )
+                                Text(format, color = if (isCurrent) NeonGreen else TextSecondary, fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
+                                Text("${totalMatches(format, teamCount, seriesCount)} matches", color = if (isCurrent) NeonGreen else TextSecondary, fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = { showFormatInfo = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
-                ) { Text("Got it", color = Color.Black, fontWeight = FontWeight.Bold) }
+                Button(onClick = { showFormatInfo = false }, colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) {
+                    Text("Got it", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
             }
         )
     }
@@ -350,51 +436,31 @@ fun TFixturesTab(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Show setup only before fixtures generated
+        // ── Setup section (before fixtures generated) ──
         if (!fixturesGenerated) {
-            // Teams section
+            // Teams
             item {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceCard)
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SurfaceCard).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Teams (${uiState.tournamentTeams.size})",
-                            color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                        )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Teams (${uiState.tournamentTeams.size})", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         OutlinedButton(
                             onClick = { showTeamPicker = true },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(34.dp),
+                            shape = RoundedCornerShape(8.dp), modifier = Modifier.height(34.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                        ) {
-                            Text("+ Add Team", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
+                        ) { Text("+ Add Team", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     }
-
                     if (uiState.tournamentTeams.isEmpty()) {
                         Text("No teams added yet — tap + Add Team", color = TextSecondary, fontSize = 12.sp)
                     } else {
                         uiState.tournamentTeams.forEach { tt ->
                             val teamName = uiState.teamDetails.find { it.id == tt.teamId }?.name ?: "Team"
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(BackgroundDark)
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BackgroundDark).padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(teamName, color = TextPrimary, fontSize = 13.sp)
                                 TextButton(
@@ -411,65 +477,37 @@ fun TFixturesTab(
             // Format selector
             item {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceCard)
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SurfaceCard).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Select Format",
-                            color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                        )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Select Format", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         TextButton(
                             onClick = { showFormatInfo = true },
                             colors = ButtonDefaults.textButtonColors(contentColor = NeonBlue),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                        ) {
-                            Text("ℹ How formats work", fontSize = 12.sp)
-                        }
+                        ) { Text("ℹ How formats work", fontSize = 12.sp) }
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         TOURNAMENT_FORMATS.chunked(2).forEach { row ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { format ->
                                     val isSelected = selectedFormat == format
-                                    val matches = totalMatches(format, teamCount)
+                                    val matches = totalMatches(format, teamCount, seriesCount)
                                     Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(8.dp))
+                                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
                                             .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
                                             .border(1.dp, if (isSelected) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
-                                            .clickable { selectedFormat = format }
-                                            .padding(10.dp),
+                                            .clickable { selectedFormat = format }.padding(10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Text(
-                                            format,
-                                            color = if (isSelected) NeonGreen else TextSecondary,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            textAlign = TextAlign.Center
-                                        )
+                                        Text(format, color = if (isSelected) NeonGreen else TextSecondary, fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center)
                                         if (teamCount >= 2) {
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                "$matches matches",
-                                                color = if (isSelected) NeonGreen.copy(alpha = 0.8f) else TextSecondary.copy(alpha = 0.6f),
-                                                fontSize = 10.sp,
-                                                textAlign = TextAlign.Center
-                                            )
+                                            Text("$matches matches", color = if (isSelected) NeonGreen.copy(alpha = 0.8f) else TextSecondary.copy(alpha = 0.6f),
+                                                fontSize = 10.sp, textAlign = TextAlign.Center)
                                         }
                                     }
                                 }
@@ -478,49 +516,78 @@ fun TFixturesTab(
                         }
                     }
 
-                    // Format preview
-                    if (teamCount >= 2) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(NeonGreen.copy(alpha = 0.08f))
-                                .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
-                        ) {
-                            Column {
-                                Text(
-                                    "$selectedFormat • $teamCount teams • ${totalMatches(selectedFormat, teamCount)} matches",
-                                    color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    formatDescription(selectedFormat).lines().first(),
-                                    color = TextSecondary, fontSize = 11.sp
-                                )
+                    // Bilateral series count selector
+                    if (selectedFormat == "Bilateral Series") {
+                        Text("Series Length", color = TextSecondary, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(3, 5, 7).forEach { count ->
+                                val isSel = seriesCount == count
+                                Box(
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSel) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
+                                        .border(1.dp, if (isSel) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                        .clickable { seriesCount = count }.padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text("$count Matches", color = if (isSel) NeonGreen else TextSecondary, fontSize = 12.sp,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
+                                }
                             }
                         }
                     }
 
+                    // Validation warnings
+                    if (selectedFormat == "Bilateral Series" && teamCount != 2) {
+                        Text("⚠ Bilateral Series requires exactly 2 teams", color = AmberColor, fontSize = 11.sp)
+                    }
+                    if (selectedFormat == "Tri-Series" && teamCount != 3) {
+                        Text("⚠ Tri-Series requires exactly 3 teams", color = AmberColor, fontSize = 11.sp)
+                    }
+                    if (selectedFormat == "Group + Knockout" && teamCount < 4) {
+                        Text("⚠ Group + Knockout needs at least 4 teams", color = AmberColor, fontSize = 11.sp)
+                    }
+                    if (selectedFormat == "League + Playoffs" && teamCount < 4) {
+                        Text("⚠ League + Playoffs needs at least 4 teams for playoffs", color = AmberColor, fontSize = 11.sp)
+                    }
+
+                    // Preview
+                    if (teamCount >= 2) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                .background(NeonGreen.copy(alpha = 0.08f)).border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp)
+                        ) {
+                            Column {
+                                Text("$selectedFormat • $teamCount teams • ${totalMatches(selectedFormat, teamCount, seriesCount)} matches",
+                                    color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(formatDescription(selectedFormat).lines().first(), color = TextSecondary, fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    val canGenerate = when (selectedFormat) {
+                        "Bilateral Series" -> teamCount == 2
+                        "Tri-Series" -> teamCount == 3
+                        else -> teamCount >= 2
+                    }
+
                     Button(
-                        onClick = { viewModel.generateFixtures(tournamentId, selectedFormat) },
-                        enabled = teamCount >= 2 && !uiState.isLoading,
+                        onClick = { viewModel.generateFixtures(tournamentId, selectedFormat, seriesCount) },
+                        enabled = canGenerate && !uiState.isLoading,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         if (uiState.isLoading) {
-                            CircularProgressIndicator(
-                                color = Color.Black,
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp
-                            )
+                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Generating...", color = Color.Black, fontWeight = FontWeight.Bold)
                         } else {
                             Text(
-                                if (teamCount < 2) "Add at least 2 teams first"
-                                else "Generate ${totalMatches(selectedFormat, teamCount)} Fixtures",
+                                if (!canGenerate) when (selectedFormat) {
+                                    "Bilateral Series" -> "Need exactly 2 teams"
+                                    "Tri-Series" -> "Need exactly 3 teams"
+                                    else -> "Add at least 2 teams first"
+                                } else "Generate ${totalMatches(selectedFormat, teamCount, seriesCount)} Fixtures",
                                 color = Color.Black, fontWeight = FontWeight.Bold
                             )
                         }
@@ -528,58 +595,90 @@ fun TFixturesTab(
                 }
             }
         } else {
-            // Schedule generated summary
+            // ── Schedule generated summary ──
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(NeonGreen.copy(alpha = 0.1f))
-                        .border(1.dp, NeonGreen, RoundedCornerShape(10.dp))
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                        .background(NeonGreen.copy(alpha = 0.1f)).border(1.dp, NeonGreen, RoundedCornerShape(10.dp)).padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            "✅ Schedule Generated",
-                            color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "${uiState.tournamentTeams.size} teams • ${uiState.fixtures.size} matches",
-                            color = TextSecondary, fontSize = 12.sp
-                        )
+                        Text("✅ Schedule Generated", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        val fmt = uiState.currentTournament?.format ?: selectedFormat
+                        val total = uiState.fixtures.size + knockoutPlaceholders.size
+                        Text("$fmt • ${uiState.tournamentTeams.size} teams • $total matches", color = TextSecondary, fontSize = 12.sp)
                     }
                     Text("🏏", fontSize = 24.sp)
                 }
             }
+
+            // ── Stage sub-tabs ──
+            if (showStageTabs) {
+                item {
+                    val stageTabs = listOf("All", "League", "Knockout")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        stageTabs.forEachIndexed { index, label ->
+                            val isSel = stageTab == index
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
+                                    .border(1.dp, if (isSel) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                    .clickable { stageTab = index }.padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                val count = when (index) {
+                                    1 -> leagueFixtures.size
+                                    2 -> knockoutFixtures.size + knockoutPlaceholders.size
+                                    else -> uiState.fixtures.size + knockoutPlaceholders.size
+                                }
+                                Text("$label ($count)", color = if (isSel) NeonGreen else TextSecondary, fontSize = 12.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // Fixtures list
-        if (uiState.fixtures.isNotEmpty()) {
-            item {
-                Text(
-                    "Fixtures (${uiState.fixtures.size})",
-                    color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                )
+        // ── Fixture cards ──
+        val displayFixtures = when {
+            !fixturesGenerated -> emptyList()
+            !showStageTabs -> uiState.fixtures
+            stageTab == 1 -> leagueFixtures
+            stageTab == 2 -> knockoutFixtures
+            else -> uiState.fixtures
+        }
+
+        if (displayFixtures.isNotEmpty()) {
+            // Group by stage label
+            val grouped = displayFixtures.groupBy { it.title ?: "Match" }
+            grouped.forEach { (stage, matches) ->
+                item {
+                    Text(stage, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp))
+                }
+                items(matches) { match ->
+                    TFixtureCard(match, uiState.teamDetails, onMatchClick, onViewScorecard, onViewAnalytics)
+                }
             }
-            items(uiState.fixtures) { match ->
-                TFixtureCard(
-                    match = match,
-                    teamDetails = uiState.teamDetails,
-                    onMatchClick = onMatchClick,
-                    onViewScorecard = onViewScorecard,
-                    onViewAnalytics = onViewAnalytics
-                )
+        }
+
+        // ── Knockout placeholders ──
+        val showPlaceholders = fixturesGenerated && (stageTab == 0 || stageTab == 2)
+        if (showPlaceholders && knockoutPlaceholders.isNotEmpty()) {
+            item {
+                Text("🏆 Knockout Stage", color = AmberColor, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp))
+                Text("Teams will be filled from standings", color = TextSecondary, fontSize = 11.sp)
+            }
+            items(knockoutPlaceholders) { placeholder ->
+                KnockoutPlaceholderCard(placeholder)
             }
         }
     }
 
     // Team picker dialog
     if (showTeamPicker) {
-        val availableTeams = uiState.allTeams.filter { team ->
-            uiState.tournamentTeams.none { it.teamId == team.id }
-        }
+        val availableTeams = uiState.allTeams.filter { team -> uiState.tournamentTeams.none { it.teamId == team.id } }
         AlertDialog(
             onDismissRequest = { showTeamPicker = false },
             containerColor = SurfaceCard,
@@ -588,24 +687,13 @@ fun TFixturesTab(
                 if (availableTeams.isEmpty()) {
                     Text("No teams available. Create teams first.", color = TextSecondary)
                 } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.heightIn(max = 400.dp)
-                    ) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 400.dp)) {
                         items(availableTeams) { team ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(BackgroundDark)
-                                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        viewModel.addTeamToTournament(tournamentId, team.id)
-                                        showTeamPicker = false
-                                    }
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                    .background(BackgroundDark).border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                    .clickable { viewModel.addTeamToTournament(tournamentId, team.id); showTeamPicker = false }.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
                                     Text(team.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -618,11 +706,7 @@ fun TFixturesTab(
                 }
             },
             confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showTeamPicker = false }) {
-                    Text("Cancel", color = TextSecondary)
-                }
-            }
+            dismissButton = { TextButton(onClick = { showTeamPicker = false }) { Text("Cancel", color = TextSecondary) } }
         )
     }
 }
@@ -646,21 +730,19 @@ fun TFixtureCard(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-            .padding(14.dp)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(SurfaceCard).border(1.dp, BorderColor, RoundedCornerShape(12.dp)).padding(14.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(match.status.uppercase(), color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Match ${match.matchNumber ?: ""}", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(match.status.uppercase(), color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
             Text("${match.matchType} • ${match.totalOvers} ov", color = TextSecondary, fontSize = 11.sp)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(team1Name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
@@ -674,24 +756,46 @@ fun TFixtureCard(
         Spacer(modifier = Modifier.height(10.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(
-                onClick = { onMatchClick(match.id) },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
-                shape = RoundedCornerShape(8.dp)
+                onClick = { onMatchClick(match.id) }, modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen), shape = RoundedCornerShape(8.dp)
             ) { Text("Score", fontSize = 11.sp) }
             OutlinedButton(
-                onClick = { onViewScorecard(match.id) },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonBlue),
-                shape = RoundedCornerShape(8.dp)
+                onClick = { onViewScorecard(match.id) }, modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonBlue), shape = RoundedCornerShape(8.dp)
             ) { Text("Live", fontSize = 11.sp) }
             OutlinedButton(
-                onClick = { onViewAnalytics(match.id) },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor),
-                shape = RoundedCornerShape(8.dp)
+                onClick = { onViewAnalytics(match.id) }, modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor), shape = RoundedCornerShape(8.dp)
             ) { Text("Stats", fontSize = 11.sp) }
         }
+    }
+}
+
+// ── KNOCKOUT PLACEHOLDER CARD ────────────────────────────────
+
+@Composable
+fun KnockoutPlaceholderCard(placeholder: KnockoutPlaceholder) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(SurfaceCard.copy(alpha = 0.6f))
+            .border(1.dp, AmberColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(14.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Match ${placeholder.matchNumber}", color = AmberColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(placeholder.label, color = AmberColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(placeholder.team1Desc, color = TextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text("vs", color = TextSecondary.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+            Text(placeholder.team2Desc, color = TextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text("🔒 Teams decided from standings", color = TextSecondary.copy(alpha = 0.5f), fontSize = 10.sp)
     }
 }
 
@@ -720,11 +824,16 @@ fun TPointsTab(uiState: TournamentUiState) {
 
         items(sortedTeams.withIndex().toList()) { (index, tt) ->
             val teamName = uiState.teamDetails.find { it.id == tt.teamId }?.name ?: "Team"
+            val qualifyColor = when {
+                uiState.currentTournament?.format == "League + Playoffs" && index < 4 -> NeonGreen
+                uiState.currentTournament?.format == "Group + Knockout" && index < 4 -> NeonGreen
+                else -> if (index == 0) NeonGreen else TextSecondary
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("${index + 1}", color = if (index < 4) NeonGreen else TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
+                Text("${index + 1}", color = qualifyColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
                 Text(teamName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text("${tt.matchesPlayed}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
                 Text("${tt.wins}", color = NeonGreen, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
@@ -750,41 +859,21 @@ fun TStatsTab(
     val statTabs = listOf("Orange Cap", "Purple Cap", "Best SR", "Boundaries")
 
     if (isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = NeonGreen)
-        }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NeonGreen) }
         return
     }
-
     if (allBalls.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No match data yet", color = TextSecondary)
-        }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No match data yet", color = TextSecondary) }
         return
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        ScrollableTabRow(
-            selectedTabIndex = selectedStat,
-            containerColor = BackgroundDark,
-            contentColor = AmberColor,
-            edgePadding = 0.dp
-        ) {
+        ScrollableTabRow(selectedTabIndex = selectedStat, containerColor = BackgroundDark, contentColor = AmberColor, edgePadding = 0.dp) {
             statTabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedStat == index,
-                    onClick = { selectedStat = index },
-                    text = {
-                        Text(
-                            tab, fontSize = 12.sp,
-                            fontWeight = if (selectedStat == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedStat == index) AmberColor else TextSecondary
-                        )
-                    }
-                )
+                Tab(selected = selectedStat == index, onClick = { selectedStat = index },
+                    text = { Text(tab, fontSize = 12.sp, fontWeight = if (selectedStat == index) FontWeight.Bold else FontWeight.Normal, color = if (selectedStat == index) AmberColor else TextSecondary) })
             }
         }
-
         when (selectedStat) {
             0 -> OrangeCapTab(allBalls, playerTeamMap, playerMap)
             1 -> PurpleCapTab(allBalls, playerTeamMap, playerMap)
@@ -795,13 +884,8 @@ fun TStatsTab(
 }
 
 @Composable
-fun OrangeCapTab(
-    allBalls: List<Pair<Ball, String>>,
-    playerTeamMap: Map<String, String>,
-    playerMap: Map<String, Player>
-) {
+fun OrangeCapTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, String>, playerMap: Map<String, Player>) {
     data class BatStat(val player: Player, val team: String, val runs: Int, val balls: Int, val fours: Int, val sixes: Int, val avg: Double, val sr: Double)
-
     val stats = allBalls.groupBy { it.first.batsmanId ?: "" }
         .filter { it.key.isNotEmpty() && playerMap.containsKey(it.key) }
         .mapNotNull { (playerId, pBalls) ->
@@ -854,13 +938,8 @@ fun OrangeCapTab(
 }
 
 @Composable
-fun PurpleCapTab(
-    allBalls: List<Pair<Ball, String>>,
-    playerTeamMap: Map<String, String>,
-    playerMap: Map<String, Player>
-) {
+fun PurpleCapTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, String>, playerMap: Map<String, Player>) {
     data class BowlStat(val player: Player, val team: String, val wickets: Int, val runs: Int, val economy: Double, val avg: Double, val sr: Double, val dots: Int, val maidens: Int)
-
     val stats = allBalls.groupBy { it.first.bowlerId ?: "" }
         .filter { it.key.isNotEmpty() && playerMap.containsKey(it.key) }
         .mapNotNull { (playerId, pBalls) ->
@@ -873,7 +952,7 @@ fun PurpleCapTab(
             val eco = if (legal > 0) runs * 6.0 / legal else 0.0
             val avg = runs.toDouble() / wickets
             val sr = if (wickets > 0) legal.toDouble() / wickets else 0.0
-            val dots = balls.count { it.runsOffBat == 0 && it.extrasRuns == null && it.extrasType == null }
+            val dots = balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" && it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0 }
             val maidens = balls.groupBy { it.overNo }.values.count { ob ->
                 ob.count { it.extrasType != "wide" && it.extrasType != "no_ball" } == 6 &&
                         ob.sumOf { it.runsOffBat + (it.extrasRuns ?: 0) } == 0
@@ -916,13 +995,8 @@ fun PurpleCapTab(
 }
 
 @Composable
-fun BestSRTab(
-    allBalls: List<Pair<Ball, String>>,
-    playerTeamMap: Map<String, String>,
-    playerMap: Map<String, Player>
-) {
+fun BestSRTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, String>, playerMap: Map<String, Player>) {
     data class SRStat(val player: Player, val team: String, val runs: Int, val balls: Int, val sr: Double)
-
     val stats = allBalls.groupBy { it.first.batsmanId ?: "" }
         .filter { it.key.isNotEmpty() && playerMap.containsKey(it.key) }
         .mapNotNull { (playerId, pBalls) ->
@@ -954,16 +1028,10 @@ fun BestSRTab(
 }
 
 @Composable
-fun MostBoundariesTab(
-    allBalls: List<Pair<Ball, String>>,
-    playerTeamMap: Map<String, String>,
-    playerMap: Map<String, Player>
-) {
+fun MostBoundariesTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, String>, playerMap: Map<String, Player>) {
     var selectedBdry by remember { mutableIntStateOf(0) }
     val bdryTabs = listOf("Total", "Most 6s", "Most 4s")
-
     data class BdryStat(val player: Player, val team: String, val fours: Int, val sixes: Int)
-
     val allStats = allBalls.groupBy { it.first.batsmanId ?: "" }
         .filter { it.key.isNotEmpty() && playerMap.containsKey(it.key) }
         .mapNotNull { (pid, pb) ->
@@ -975,11 +1043,8 @@ fun MostBoundariesTab(
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedBdry, containerColor = BackgroundDark, contentColor = NeonGreen) {
             bdryTabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedBdry == index,
-                    onClick = { selectedBdry = index },
-                    text = { Text(tab, fontSize = 12.sp, color = if (selectedBdry == index) NeonGreen else TextSecondary) }
-                )
+                Tab(selected = selectedBdry == index, onClick = { selectedBdry = index },
+                    text = { Text(tab, fontSize = 12.sp, color = if (selectedBdry == index) NeonGreen else TextSecondary) })
             }
         }
         val sortedStats = when (selectedBdry) {
@@ -1007,28 +1072,11 @@ fun MostBoundariesTab(
 // ── AWARDS TAB ───────────────────────────────────────────────
 
 @Composable
-fun TAwardsTab(
-    allBalls: List<Pair<Ball, String>>,
-    playerTeamMap: Map<String, String>,
-    playerMap: Map<String, Player>,
-    isLoading: Boolean
-) {
-    if (isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = NeonGreen)
-        }
-        return
-    }
-
-    if (allBalls.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No match data yet", color = TextSecondary)
-        }
-        return
-    }
+fun TAwardsTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, String>, playerMap: Map<String, Player>, isLoading: Boolean) {
+    if (isLoading) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NeonGreen) }; return }
+    if (allBalls.isEmpty()) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No match data yet", color = TextSecondary) }; return }
 
     data class MVPStat(val player: Player, val team: String, val score: Double, val runs: Int, val wickets: Int)
-
     val playerBatBalls = allBalls.groupBy { it.first.batsmanId ?: "" }
     val playerBowlBalls = allBalls.groupBy { it.first.bowlerId ?: "" }
 
@@ -1070,10 +1118,7 @@ fun TAwardsTab(
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         mvpList.firstOrNull()?.let { mvp ->
-            item { AwardCard("🏆", "Tournament MVP", mvp.player.fullName, mvp.team, "${mvp.runs} runs | ${mvp.wickets} wickets", AmberColor) }
-        }
-        mvpList.getOrNull(1)?.let { pot ->
-            item { AwardCard("⭐", "Player of Tournament", pot.player.fullName, pot.team, "${pot.runs} runs | ${pot.wickets} wickets", NeonGreen) }
+            item { AwardCard("🏆", "Player of the Tournament", mvp.player.fullName, mvp.team, "${"%.1f".format(mvp.score)} pts • ${mvp.runs} runs | ${mvp.wickets} wickets", AmberColor) }
         }
         highestScorer?.let { p ->
             item { AwardCard("🏏", "Best Batter", p.fullName, playerTeamMap[p.id] ?: "", "HS: ${highestScore?.value ?: 0} runs", NeonBlue) }
@@ -1090,11 +1135,7 @@ fun TAwardsTab(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "${index + 1}",
-                    color = when (index) { 0 -> AmberColor; 2 -> Color(0xFFCD7F32); else -> TextSecondary },
-                    fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp)
-                )
+                Text("${index + 1}", color = when (index) { 0 -> AmberColor; 2 -> Color(0xFFCD7F32); else -> TextSecondary }, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(s.player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Text(s.team, color = TextSecondary, fontSize = 11.sp)
@@ -1111,14 +1152,9 @@ fun TAwardsTab(
 @Composable
 fun AwardCard(emoji: String, title: String, playerName: String, team: String, detail: String, color: Color) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(color.copy(alpha = 0.1f))
-            .border(1.dp, color, RoundedCornerShape(12.dp))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.1f)).border(1.dp, color, RoundedCornerShape(12.dp)).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(emoji, fontSize = 28.sp)
         Column(modifier = Modifier.weight(1f)) {

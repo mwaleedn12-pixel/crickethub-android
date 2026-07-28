@@ -36,7 +36,11 @@ data class TournamentInsert(
     @SerialName("end_date") val endDate: String? = null,
     val venue: String? = null,
     val organizer: String? = null,
-    @SerialName("is_public") val isPublic: Boolean = true
+    @SerialName("is_public") val isPublic: Boolean = true,
+    @SerialName("overs_per_match") val oversPerMatch: Int? = 20,
+    @SerialName("match_type") val matchType: String? = "T20",
+    @SerialName("players_per_side") val playersPerSide: Int? = 11,
+    @SerialName("max_teams") val maxTeams: Int? = null
 )
 
 @Serializable
