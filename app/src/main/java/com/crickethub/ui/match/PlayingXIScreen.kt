@@ -135,7 +135,9 @@ fun PlayingXIScreen(
             ) {
                 items(players) { player ->
                     val isSelected = player.id in selectedIds
-                    val canSelect = isSelected || selectedCount < playersPerSide
+                    val unavailable = (player.availability?.lowercase() ?: "available") != "available" ||
+                            (!player.injuryStatus.isNullOrBlank() && player.injuryStatus!!.lowercase() != "fit")
+                    val canSelect = isSelected || (!unavailable && selectedCount < playersPerSide)
 
                     val isCaptain = captainId == player.id
                     val isKeeper = keeperId == player.id
@@ -222,6 +224,12 @@ fun PlayingXIScreen(
                                         Text("WK", color = NeonBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                                             modifier = Modifier
                                                 .background(NeonBlue.copy(0.2f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 1.dp))
+                                    }
+                                    if (unavailable) {
+                                        Text("UNAVAILABLE", color = ErrorRed, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                                            modifier = Modifier
+                                                .background(ErrorRed.copy(0.2f), RoundedCornerShape(4.dp))
                                                 .padding(horizontal = 4.dp, vertical = 1.dp))
                                     }
                                 }

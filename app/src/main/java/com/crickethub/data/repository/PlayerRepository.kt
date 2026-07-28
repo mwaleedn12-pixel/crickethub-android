@@ -59,6 +59,7 @@ class PlayerRepository {
     suspend fun computePlayerStats(playerId: String): PlayerStats {
         return try {
             coroutineScope {
+                val playerName = try { getPlayerById(playerId)?.fullName ?: "" } catch (e: Exception) { "" }
                 val batBallsDeferred = async {
                     client.postgrest["balls"]
                         .select { filter { eq("batsman_id", playerId) } }
@@ -72,21 +73,21 @@ class PlayerRepository {
                 val catchBallsDeferred = async {
                     try {
                         client.postgrest["balls"]
-                            .select { filter { eq("fielder_id", playerId); eq("wicket_type", "caught") } }
+                            .select { filter { eq("fielder_name", playerName); eq("wicket_type", "caught") } }
                             .decodeList<Ball>()
                     } catch (e: Exception) { emptyList() }
                 }
                 val runOutBallsDeferred = async {
                     try {
                         client.postgrest["balls"]
-                            .select { filter { eq("fielder_id", playerId); eq("wicket_type", "run_out") } }
+                            .select { filter { eq("fielder_name", playerName); eq("wicket_type", "run_out") } }
                             .decodeList<Ball>()
                     } catch (e: Exception) { emptyList() }
                 }
                 val stumpingBallsDeferred = async {
                     try {
                         client.postgrest["balls"]
-                            .select { filter { eq("fielder_id", playerId); eq("wicket_type", "stumped") } }
+                            .select { filter { eq("fielder_name", playerName); eq("wicket_type", "stumped") } }
                             .decodeList<Ball>()
                     } catch (e: Exception) { emptyList() }
                 }
@@ -116,6 +117,8 @@ class PlayerRepository {
                 val boundaryRuns = (fours * 4) + (sixes * 6)
                 val totalBatRuns = battingBalls.sumOf { it.runsOffBat }
                 val boundaryPct = if (totalBatRuns > 0) boundaryRuns * 100.0 / totalBatRuns else 0.0
+                val battingDots = battingBalls.count { it.extrasType != "wide" && it.runsOffBat == 0 }
+                val dotBallPct = if (ballsFaced > 0) battingDots * 100.0 / ballsFaced else 0.0
 
                 // Bowling stats
                 val legalBalls = bowlingBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
@@ -162,6 +165,7 @@ class PlayerRepository {
                     sixes = sixes,
                     notOuts = notOuts,
                     boundaryPercent = boundaryPct,
+                    dotBallPercent = dotBallPct,
                     oversBowled = oversBowled,
                     maidens = maidens,
                     runsConceded = runsConceded,

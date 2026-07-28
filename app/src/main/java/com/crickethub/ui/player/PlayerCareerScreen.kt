@@ -570,6 +570,7 @@ fun CareerStatsTab(data: CareerData) {
                 StatRowItem("Fours", s.fours.toString())
                 StatRowItem("Sixes", s.sixes.toString())
                 StatRowItem("Boundary %", "%.1f%%".format(s.boundaryPercent))
+                StatRowItem("Dot %", "%.1f%%".format(s.dotBallPercent))
             }
         }
         item {

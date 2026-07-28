@@ -8,6 +8,8 @@ import com.crickethub.data.model.BowlerStats
 import com.crickethub.data.model.InningsInsert
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.Player
+import com.crickethub.data.model.PartnershipInsert
+import com.crickethub.data.model.MissedChanceInsert
 import com.crickethub.data.model.ScoringUiState
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.Tournament
@@ -752,6 +754,30 @@ class ScoringViewModel : ViewModel() {
     }
 
     // ── Undo ──────────────────────────────────────────────────────────────────
+    /** Record a fielding miss (dropped catch / missed run-out / missed stumping). */
+    fun recordMissedChance(player: Player, type: String) {
+        viewModelScope.launch {
+            try {
+                val state = _uiState.value
+                val innings = state.innings ?: return@launch
+                SupabaseClient.client.postgrest["missed_chances"].insert(
+                    MissedChanceInsert(
+                        matchId = state.match?.id,
+                        inningsId = innings.id,
+                        ballId = state.balls.lastOrNull()?.id?.takeIf { it.isNotBlank() },
+                        playerId = player.id,
+                        playerName = player.fullName,
+                        type = type,
+                        overNo = state.currentOver
+                    )
+                )
+                android.util.Log.d("CricketHub", "Missed chance: ${player.fullName} $type")
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Missed chance error: ${e.message}", e)
+            }
+        }
+    }
+
     fun undoLastBall() {
         viewModelScope.launch {
             val state = _uiState.value
@@ -910,7 +936,10 @@ class ScoringViewModel : ViewModel() {
                 val maxWickets = if (isSuperOver) 2 else match.playersPerSide - 1
                 val targetChased = target != null && newTotalRuns >= target!!
                 val isInningsComplete = newTotalWickets >= maxWickets || newTotalBalls >= maxOvers * 6 || targetChased
-                if (isInningsComplete) scoringRepository.completeInnings(innings.id)
+                if (isInningsComplete) {
+                    scoringRepository.completeInnings(innings.id)
+                    savePartnerships(innings.id, newBalls)
+                }
                 _uiState.update { it.copy(innings = updatedInnings, balls = newBalls,
                     striker = newStriker, nonStriker = newNonStriker,
                     currentBowler = if (isOverEnd) null else state.currentBowler,
@@ -918,6 +947,59 @@ class ScoringViewModel : ViewModel() {
                     bowlerStats = computeBowlerStats(newBalls, state.bowlingTeamPlayers),
                     inningsComplete = isInningsComplete, error = null) }
             } catch (e: Exception) { _uiState.update { it.copy(error = e.message) } } finally { isProcessingBall = false }
+        }
+    }
+
+    // ── Partnerships ──────────────────────────────────────────────────────────
+    /**
+     * All partnerships in an innings, derived from the ball list (each ball stores
+     * batsman + non-striker, so the pair is reliable). A partnership runs between two
+     * falling wickets; the final unbroken stand is included with wicket_no = wickets+1.
+     */
+    private fun computePartnerships(inningsId: String, balls: List<Ball>): List<PartnershipInsert> {
+        val result = mutableListOf<PartnershipInsert>()
+        var b1 = ""
+        var b2 = ""
+        var runs = 0
+        var ballCount = 0
+        var wicketNo = 0
+        balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+            if (b1.isEmpty()) b1 = ball.batsmanId ?: ""
+            if (b2.isEmpty() && ball.nonStrikerId != null) b2 = ball.nonStrikerId
+            runs += when {
+                ball.extrasType == "wide" -> (ball.extrasRuns ?: 1) + ball.runsOffBat
+                ball.extrasType == "no_ball" -> 1 + ball.runsOffBat + (ball.extrasRuns ?: 0)
+                else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
+            }
+            if (ball.extrasType != "wide" && ball.wicketType !in NO_DELIVERY_WICKETS) ballCount++
+            if (ball.isWicket && ball.wicketType != "retired_hurt") {
+                wicketNo++
+                result.add(PartnershipInsert(inningsId, b1, b2, runs, ballCount, wicketNo))
+                runs = 0; ballCount = 0
+                b1 = ""
+                b2 = ball.nonStrikerId ?: ""
+            }
+        }
+        // Final unbroken stand (innings ended on overs/target, not a wicket).
+        if (ballCount > 0 || runs > 0) {
+            result.add(PartnershipInsert(inningsId, b1, b2, runs, ballCount, wicketNo + 1))
+        }
+        // Drop malformed rows (a partnership needs both batsmen).
+        return result.filter { it.batsman1Id.isNotBlank() && it.batsman2Id.isNotBlank() }
+    }
+
+    /** Recompute-and-replace the innings' partnerships in the DB. Idempotent. */
+    private suspend fun savePartnerships(inningsId: String, balls: List<Ball>) {
+        try {
+            val rows = computePartnerships(inningsId, balls)
+            SupabaseClient.client.postgrest["partnerships"]
+                .delete { filter { eq("innings_id", inningsId) } }
+            if (rows.isNotEmpty()) {
+                SupabaseClient.client.postgrest["partnerships"].insert(rows)
+            }
+            android.util.Log.d("CricketHub", "Saved ${rows.size} partnerships for innings $inningsId")
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Save partnerships error: ${e.message}", e)
         }
     }
 
