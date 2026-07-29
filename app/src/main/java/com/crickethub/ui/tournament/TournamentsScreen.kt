@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Tournament
+import com.crickethub.ui.components.ShareDialog
 import com.crickethub.ui.theme.*
 
 @Composable
@@ -121,6 +122,15 @@ fun TournamentCard(
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    if (showShareDialog) {
+        ShareDialog(
+            resourceType = "tournament",
+            resourceId = tournament.id,
+            resourceName = tournament.name,
+            onDismiss = { showShareDialog = false }
+        )
+    }
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -200,6 +210,10 @@ fun TournamentCard(
                         onDismissRequest = { showMenu = false },
                         modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("📤 Share", color = green, fontSize = 13.sp) },
+                            onClick = { showMenu = false; showShareDialog = true }
+                        )
                         DropdownMenuItem(
                             text = { Text("\uD83C\uDFF3\uFE0F Cancel Tournament", color = gold, fontSize = 13.sp) },
                             onClick = { showMenu = false; onCancel() }

@@ -25,8 +25,10 @@ import kotlinx.coroutines.launch
 fun JoinWithCodeScreen(
     onBack: () -> Unit,
     onJoinMatch: (matchId: String, canEdit: Boolean) -> Unit,
+    onViewScorecard: (matchId: String) -> Unit,
     onJoinTeam: (teamId: String) -> Unit,
-    onJoinTournament: (tournamentId: String) -> Unit
+    onJoinTournament: (tournamentId: String) -> Unit,
+    onJoinPlayer: (playerId: String) -> Unit = {}
 ) {
     val repo = remember { SharingRepository() }
     val scope = rememberCoroutineScope()
@@ -87,9 +89,13 @@ fun JoinWithCodeScreen(
                                     error = "Invalid code. Check and try again."
                                 } else {
                                     when (link.resourceType) {
-                                        "match" -> onJoinMatch(link.resourceId, link.canEdit)
+                                        "match" -> {
+                                            if (link.canEdit) onJoinMatch(link.resourceId, true)
+                                            else onViewScorecard(link.resourceId)
+                                        }
                                         "team" -> onJoinTeam(link.resourceId)
                                         "tournament" -> onJoinTournament(link.resourceId)
+                                        "player" -> onJoinPlayer(link.resourceId)
                                         else -> error = "Unknown resource type"
                                     }
                                 }

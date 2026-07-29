@@ -202,6 +202,7 @@ fun CricketHubApp() {
                 DashboardScreen(
                     onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
                     onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") },
+                    onJoinWithCode = { navController.navigate("join") },
                     onLogout = {
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
@@ -438,8 +439,10 @@ fun CricketHubApp() {
                 JoinWithCodeScreen(
                     onBack = { navController.popBackStack() },
                     onJoinMatch = { matchId, _ -> navController.navigate("scoring/$matchId") },
-                    onJoinTeam = { navController.navigate("teams") },
-                    onJoinTournament = { navController.navigate("tournaments") }
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onJoinTeam = { teamId -> navController.navigate("players/$teamId") },
+                    onJoinTournament = { tournamentId -> navController.navigate("tournament_detail/$tournamentId") },
+                    onJoinPlayer = { playerId -> navController.navigate("career?playerId=$playerId") }
                 )
             }
 

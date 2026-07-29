@@ -202,6 +202,16 @@ fun MatchCard(
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
+
+    if (showShareDialog) {
+        ShareDialog(
+            resourceType = "match",
+            resourceId = match.id,
+            resourceName = "$team1Name vs $team2Name",
+            onDismiss = { showShareDialog = false }
+        )
+    }
 
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
@@ -304,6 +314,10 @@ fun MatchCard(
                             onDismissRequest = { showMoreMenu = false },
                             modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("📤 Share", color = Color(0xFF34D399), fontSize = 13.sp) },
+                                onClick = { showMoreMenu = false; showShareDialog = true }
+                            )
                             DropdownMenuItem(
                                 text = { Text("🏳️ Abandon Match", color = Color(0xFFF59E0B), fontSize = 13.sp) },
                                 onClick = { onAbandon(); showMoreMenu = false }

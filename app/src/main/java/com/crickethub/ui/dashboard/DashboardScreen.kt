@@ -38,6 +38,7 @@ import com.crickethub.ui.theme.*
 fun DashboardScreen(
     onViewScorecard: (String) -> Unit = {},
     onViewAnalytics: (String) -> Unit = {},
+    onJoinWithCode: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
@@ -150,6 +151,18 @@ fun DashboardScreen(
                 QuickStatCard("Players", "$playerCount", Icons.Default.Person, NeonBlue, Modifier.weight(1f))
                 QuickStatCard("Matches", "$matchCount", Icons.Default.List, AmberColor, Modifier.weight(1f))
                 QuickStatCard("Tourneys", "$tournamentCount", Icons.Default.Star, PurpleColor, Modifier.weight(1f))
+            }
+        }
+
+        // Join with Code button
+        item {
+            Button(
+                onClick = onJoinWithCode,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen.copy(alpha = 0.15f))
+            ) {
+                Text("🔗  Join with Code", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
 

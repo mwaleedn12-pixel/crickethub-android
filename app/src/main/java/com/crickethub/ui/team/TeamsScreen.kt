@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MenuAnchorType
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.TeamInsert
+import com.crickethub.ui.components.ShareDialog
 import com.crickethub.ui.theme.*
 
 val TEAM_CATEGORIES = listOf(
@@ -221,6 +223,16 @@ fun TeamCard(
     val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
     val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
 
+    var showShareDialog by remember { mutableStateOf(false) }
+    if (showShareDialog) {
+        ShareDialog(
+            resourceType = "team",
+            resourceId = team.id,
+            resourceName = team.name,
+            onDismiss = { showShareDialog = false }
+        )
+    }
+
     val teamColor = try {
         Color(android.graphics.Color.parseColor(team.jerseyColor ?: "#34D399"))
     } catch (e: Exception) { green }
@@ -291,6 +303,14 @@ fun TeamCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.BarChart, null, tint = Color(0xFF60A5FA), modifier = Modifier.size(16.dp))
+            }
+            Box(
+                modifier = Modifier.size(34.dp).clip(CircleShape)
+                    .background(greenDk.copy(alpha = if (isDark) 0.15f else 0.1f))
+                    .clickable { showShareDialog = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Share, null, tint = greenDk, modifier = Modifier.size(16.dp))
             }
         }
 
