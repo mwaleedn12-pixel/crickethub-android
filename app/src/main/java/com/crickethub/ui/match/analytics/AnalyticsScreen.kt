@@ -17,9 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,6 +35,54 @@ import com.crickethub.data.repository.ScoringRepository
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 import com.crickethub.ui.theme.*
+
+// ── SHARED HELPERS ───────────────────────────────────────────
+
+/** Total runs from a single ball including extras and penalties. */
+private fun Ball.totalRuns(): Int = when {
+    extrasType == "wide" -> (extrasRuns ?: 1) + runsOffBat
+    extrasType == "no_ball" -> 1 + runsOffBat + (extrasRuns ?: 0)
+    else -> runsOffBat + (extrasRuns ?: 0)
+}
+
+private fun Ball.isLegal(): Boolean =
+    extrasType != "wide" && extrasType != "no_ball"
+
+private fun Ball.isDot(): Boolean =
+    isLegal() && runsOffBat == 0 && (extrasRuns ?: 0) == 0
+
+private fun Ball.isRealWicket(): Boolean =
+    isWicket && wicketType != "retired_hurt"
+
+/** Draw axis label text on Canvas using native Paint. */
+private fun DrawScope.drawAxisText(
+    text: String, x: Float, y: Float,
+    textSize: Float = 24f, color: Long = 0xFF9E9E9E,
+    align: android.graphics.Paint.Align = android.graphics.Paint.Align.CENTER
+) {
+    drawContext.canvas.nativeCanvas.drawText(
+        text, x, y,
+        android.graphics.Paint().apply {
+            this.textSize = textSize
+            this.color = color.toInt()
+            this.textAlign = align
+            isAntiAlias = true
+        }
+    )
+}
+
+/** Compute runs per over from ball list. Key = overNo, value = total runs. */
+private fun runsPerOver(balls: List<Ball>): Map<Int, Int> =
+    balls.groupBy { it.overNo }.mapValues { (_, ob) -> ob.sumOf { it.totalRuns() } }
+
+/** Cumulative runs at end of each over. */
+private fun cumulativeRunsPerOver(balls: List<Ball>): List<Pair<Int, Int>> {
+    val rpo = runsPerOver(balls).toSortedMap()
+    var cum = 0
+    return rpo.map { (over, runs) -> cum += runs; Pair(over, cum) }
+}
+
+// ── MAIN SCREEN ──────────────────────────────────────────────
 
 @Composable
 fun AnalyticsScreen(
@@ -66,21 +117,19 @@ fun AnalyticsScreen(
                 inn1Balls = if (innings1 != null) scoringRepo.getBallsByInnings(innings1.id) else emptyList()
                 inn2Balls = if (innings2 != null) scoringRepo.getBallsByInnings(innings2.id) else emptyList()
 
-                // Team names
                 val t1Id = match?.team1Id ?: ""
                 val t2Id = match?.team2Id ?: ""
-                val battingFirstId = match?.battingFirstId ?: t1Id
 
                 team1Name = try {
-                    com.crickethub.data.remote.SupabaseClient.client.postgrest["teams"]
+                    SupabaseClient.client.postgrest["teams"]
                         .select { filter { eq("id", t1Id) } }
-                        .decodeSingleOrNull<com.crickethub.data.model.Team>()?.name ?: "Team 1"
+                        .decodeSingleOrNull<Team>()?.name ?: "Team 1"
                 } catch (e: Exception) { "Team 1" }
 
                 team2Name = try {
-                    com.crickethub.data.remote.SupabaseClient.client.postgrest["teams"]
+                    SupabaseClient.client.postgrest["teams"]
                         .select { filter { eq("id", t2Id) } }
-                        .decodeSingleOrNull<com.crickethub.data.model.Team>()?.name ?: "Team 2"
+                        .decodeSingleOrNull<Team>()?.name ?: "Team 2"
                 } catch (e: Exception) { "Team 2" }
 
                 inn1BattingTeamName = if (innings1?.battingTeamId == t1Id) team1Name else team2Name
@@ -140,7 +189,7 @@ fun AnalyticsScreen(
             }
         }
     }
-} // CricketAnimatedBackground
+} // AnalyticsScreen
 
 // ── BATTING TAB ──────────────────────────────────────────────
 
@@ -157,8 +206,8 @@ fun BattingAnalyticsTab(
         // Dismissal Types
         item {
             AnalyticsCard("Dismissal Types") {
-                val wickets1 = inn1Balls.filter { it.isWicket && it.wicketType != "retired_hurt" }
-                val wickets2 = inn2Balls.filter { it.isWicket && it.wicketType != "retired_hurt" }
+                val wickets1 = inn1Balls.filter { it.isRealWicket() }
+                val wickets2 = inn2Balls.filter { it.isRealWicket() }
                 val allWickets = (wickets1 + wickets2)
                 val dismissalGroups = allWickets.groupBy {
                     it.wicketType?.replace("_", " ")?.replaceFirstChar { c -> c.uppercase() } ?: "Unknown"
@@ -196,7 +245,6 @@ fun BattingAnalyticsTab(
                 if (boundaries.isEmpty()) {
                     Text("No boundaries yet", color = TextSecondary, fontSize = 12.sp)
                 } else {
-                    // Over by over boundaries
                     val overGroups = allBalls.groupBy { it.overNo }
                     val maxOver = (overGroups.keys.maxOrNull() ?: 0) + 1
                     Row(
@@ -270,9 +318,8 @@ fun BattingAnalyticsTab(
             AnalyticsCard("Dot Ball Analysis") {
                 listOf(inn1Balls to inn1Name, inn2Balls to inn2Name).forEach { (balls, name) ->
                     if (balls.isEmpty()) return@forEach
-                    val legalBalls = balls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
-                    // Dot = legal ball conceding nothing. extrasRuns may be 0 (not null).
-                    val dotBalls = legalBalls.count { it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0 }
+                    val legalBalls = balls.filter { it.isLegal() }
+                    val dotBalls = legalBalls.count { it.isDot() }
                     val dotPct = if (legalBalls.isNotEmpty()) dotBalls * 100.0 / legalBalls.size else 0.0
 
                     Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -299,15 +346,9 @@ fun BattingAnalyticsTab(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         phases.forEachIndexed { i, phase ->
                             val phaseBalls = balls.filter { it.inningsPhase == phase }
-                            val runs = phaseBalls.sumOf { b ->
-                                when {
-                                    b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                                    b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                                    else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                                }
-                            }
-                            val legal = phaseBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
-                            val wkts = phaseBalls.count { it.isWicket && it.wicketType != "retired_hurt" }
+                            val runs = phaseBalls.sumOf { it.totalRuns() }
+                            val legal = phaseBalls.count { it.isLegal() }
+                            val wkts = phaseBalls.count { it.isRealWicket() }
                             val rr = if (legal > 0) runs * 6.0 / legal else 0.0
                             Column(
                                 modifier = Modifier
@@ -354,39 +395,47 @@ fun BowlingAnalyticsTab(
                     Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    val maxEconomy = 18.0
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(80.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        overGroups.forEach { (_, overBalls) ->
-                            val runs = overBalls.sumOf { b ->
-                                when {
-                                    b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                                    b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                                    else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                                }
-                            }
-                            val legal = overBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
-                            val eco = if (legal > 0) runs * 6.0 / legal else 0.0
-                            val heightFraction = (eco / maxEconomy).coerceIn(0.0, 1.0)
+                    val ecoData = overGroups.map { (over, overBalls) ->
+                        val runs = overBalls.sumOf { it.totalRuns() }
+                        val legal = overBalls.count { it.isLegal() }
+                        val eco = if (legal > 0) runs * 6.0 / legal else 0.0
+                        Pair(over, eco)
+                    }
+                    val maxEco = (ecoData.maxOfOrNull { it.second } ?: 12.0).coerceAtLeast(6.0)
+
+                    // Axis-labeled bar chart via Canvas
+                    Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
+                        val padLeft = 28.dp.toPx()
+                        val padBottom = 20.dp.toPx()
+                        val padTop = 4.dp.toPx()
+                        val graphW = size.width - padLeft
+                        val graphH = size.height - padBottom - padTop
+                        val barCount = ecoData.size.coerceAtLeast(1)
+                        val barW = (graphW / barCount) * 0.7f
+                        val gap = (graphW / barCount) * 0.3f
+
+                        // Y-axis grid + labels
+                        val ySteps = 3
+                        for (i in 0..ySteps) {
+                            val v = maxEco * i / ySteps
+                            val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
+                            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+                            drawAxisText("%.0f".format(v), padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
+                        }
+
+                        // Bars + X labels
+                        ecoData.forEachIndexed { idx, (over, eco) ->
+                            val x = padLeft + idx * (barW + gap) + gap / 2
+                            val h = ((eco / maxEco) * graphH).toFloat().coerceAtLeast(2.dp.toPx())
+                            val y = padTop + graphH - h
                             val barColor = when {
                                 eco >= 12 -> ErrorRed; eco >= 9 -> AmberColor
                                 eco >= 6 -> NeonGreen; else -> NeonBlue
                             }
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Bottom
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height((heightFraction * 70).dp.coerceAtLeast(4.dp))
-                                        .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                                        .background(barColor)
-                                )
+                            drawRect(barColor, Offset(x, y), Size(barW, h))
+                            // X label every 2 overs or if < 10 overs show all
+                            if (barCount <= 10 || over % 2 == 0) {
+                                drawAxisText("${over + 1}", x + barW / 2, size.height - 2.dp.toPx(), 18f)
                             }
                         }
                     }
@@ -400,7 +449,7 @@ fun BowlingAnalyticsTab(
             AnalyticsCard("Wickets Timeline") {
                 listOf(inn1Balls to inn1Name, inn2Balls to inn2Name).forEach { (balls, name) ->
                     if (balls.isEmpty()) return@forEach
-                    val wickets = balls.filter { it.isWicket && it.wicketType != "retired_hurt" }
+                    val wickets = balls.filter { it.isRealWicket() }
                     Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     if (wickets.isEmpty()) {
@@ -409,13 +458,7 @@ fun BowlingAnalyticsTab(
                         wickets.forEachIndexed { index, ball ->
                             val runsSoFar = balls
                                 .filter { b -> b.overNo < ball.overNo || (b.overNo == ball.overNo && b.ballNo <= ball.ballNo) }
-                                .sumOf { b ->
-                                    when {
-                                        b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                                        b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                                        else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                                    }
-                                }
+                                .sumOf { it.totalRuns() }
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -491,51 +534,56 @@ fun TeamAnalyticsTab(
         // Worm Graph
         item {
             AnalyticsCard("Worm Graph (Cumulative Runs)") {
-                WormGraph(
-                    inn1Balls = inn1Balls,
-                    inn2Balls = inn2Balls,
-                    inn1Name = inn1Name,
-                    inn2Name = inn2Name,
-                    totalOvers = totalOvers
-                )
+                WormGraph(inn1Balls, inn2Balls, inn1Name, inn2Name, totalOvers)
             }
         }
 
         // Manhattan Chart
         item {
             AnalyticsCard("Manhattan Chart (Runs per Over)") {
-                ManhattanChart(
-                    inn1Balls = inn1Balls,
-                    inn2Balls = inn2Balls,
-                    inn1Name = inn1Name,
-                    inn2Name = inn2Name,
-                    totalOvers = totalOvers
-                )
+                ManhattanChart(inn1Balls, inn2Balls, inn1Name, inn2Name, totalOvers)
+            }
+        }
+
+        // Run-Rate Graph (NEW)
+        item {
+            AnalyticsCard("Run Rate Graph") {
+                RunRateGraph(inn1Balls, inn2Balls, inn1Name, inn2Name, totalOvers)
             }
         }
 
         // Partnership Graph
         item {
             AnalyticsCard("Partnership Graph") {
-                PartnershipGraph(
-                    inn1Balls = inn1Balls,
-                    inn2Balls = inn2Balls,
-                    inn1Name = inn1Name,
-                    inn2Name = inn2Name
-                )
+                PartnershipGraph(inn1Balls, inn2Balls, inn1Name, inn2Name)
+            }
+        }
+
+        // Wicket Progression (NEW)
+        item {
+            AnalyticsCard("Wicket Progression") {
+                WicketProgressionGraph(inn1Balls, inn2Balls, inn1Name, inn2Name, totalOvers)
+            }
+        }
+
+        // Powerplay Analysis (NEW)
+        item {
+            AnalyticsCard("Powerplay Analysis") {
+                PhaseAnalysisChart(inn1Balls, inn2Balls, inn1Name, inn2Name, "powerplay", "Powerplay")
+            }
+        }
+
+        // Death Overs Analysis (NEW)
+        item {
+            AnalyticsCard("Death Overs Analysis") {
+                PhaseAnalysisChart(inn1Balls, inn2Balls, inn1Name, inn2Name, "death", "Death Overs")
             }
         }
 
         // Win Probability
         item {
             AnalyticsCard("Win Probability") {
-                WinProbabilityGraph(
-                    inn1Balls = inn1Balls,
-                    inn2Balls = inn2Balls,
-                    inn1Name = inn1Name,
-                    inn2Name = inn2Name,
-                    totalOvers = totalOvers
-                )
+                WinProbabilityGraph(inn1Balls, inn2Balls, inn1Name, inn2Name, totalOvers)
             }
         }
     }
@@ -558,23 +606,14 @@ fun SummaryAnalyticsTab(
             AnalyticsCard("Innings Summary") {
                 listOf(inn1Balls to inn1Name, inn2Balls to inn2Name).forEach { (balls, name) ->
                     if (balls.isEmpty()) return@forEach
-                    val runs = balls.sumOf { b ->
-                        when {
-                            b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                            b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                            else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                        }
-                    }
-                    val wickets = balls.count { it.isWicket && it.wicketType != "retired_hurt" }
-                    val legalBalls = balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                    val runs = balls.sumOf { it.totalRuns() }
+                    val wickets = balls.count { it.isRealWicket() }
+                    val legalBalls = balls.count { it.isLegal() }
                     val overs = "${legalBalls / 6}.${legalBalls % 6}"
                     val rr = if (legalBalls > 0) runs * 6.0 / legalBalls else 0.0
                     val fours = balls.count { it.isBoundary && !it.isSix }
                     val sixes = balls.count { it.isSix }
-                    val dotBalls = balls.count {
-                        it.extrasType != "wide" && it.extrasType != "no_ball" &&
-                                it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0
-                    }
+                    val dotBalls = balls.count { it.isDot() }
                     val extras = balls.sumOf { it.extrasRuns ?: 0 } +
                             balls.count { it.extrasType == "wide" } +
                             balls.count { it.extrasType == "no_ball" }
@@ -611,28 +650,15 @@ fun SummaryAnalyticsTab(
         if (inn1Balls.isNotEmpty() && inn2Balls.isNotEmpty()) {
             item {
                 AnalyticsCard("Head to Head") {
-                    val inn1Runs = inn1Balls.sumOf { b ->
-                        when {
-                            b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                            b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                            else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                        }
-                    }
-                    val inn2Runs = inn2Balls.sumOf { b ->
-                        when {
-                            b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                            b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                            else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                        }
-                    }
-                    val inn1Wkts = inn1Balls.count { it.isWicket && it.wicketType != "retired_hurt" }
-                    val inn2Wkts = inn2Balls.count { it.isWicket && it.wicketType != "retired_hurt" }
+                    val inn1Runs = inn1Balls.sumOf { it.totalRuns() }
+                    val inn2Runs = inn2Balls.sumOf { it.totalRuns() }
+                    val inn1Wkts = inn1Balls.count { it.isRealWicket() }
+                    val inn2Wkts = inn2Balls.count { it.isRealWicket() }
                     val inn1Fours = inn1Balls.count { it.isBoundary && !it.isSix }
                     val inn2Fours = inn2Balls.count { it.isBoundary && !it.isSix }
                     val inn1Sixes = inn1Balls.count { it.isSix }
                     val inn2Sixes = inn2Balls.count { it.isSix }
 
-                    // Header
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(inn1Name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         Text("", modifier = Modifier.width(60.dp))
@@ -662,66 +688,59 @@ fun WormGraph(
         return
     }
 
-    fun cumulativeRuns(balls: List<Ball>): List<Pair<Float, Float>> {
-        var totalRuns = 0
-        val points = mutableListOf(Pair(0f, 0f))
-        balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
-            val legalBalls = balls.count { b ->
-                (b.overNo < ball.overNo || (b.overNo == ball.overNo && b.ballNo <= ball.ballNo)) &&
-                        b.extrasType != "wide" && b.extrasType != "no_ball"
-            }
-            val runs = when {
-                ball.extrasType == "wide" -> (ball.extrasRuns ?: 1) + ball.runsOffBat
-                ball.extrasType == "no_ball" -> 1 + ball.runsOffBat + (ball.extrasRuns ?: 0)
-                else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
-            }
-            totalRuns += runs
-            val overPoint = legalBalls / 6f
-            points.add(Pair(overPoint, totalRuns.toFloat()))
+    val inn1Cum = cumulativeRunsPerOver(inn1Balls)
+    val inn2Cum = cumulativeRunsPerOver(inn2Balls)
+    val maxRuns = ((inn1Cum.maxOfOrNull { it.second } ?: 0)
+        .coerceAtLeast(inn2Cum.maxOfOrNull { it.second } ?: 0) + 10)
+        .coerceAtLeast(1)
+    val maxOver = totalOvers
+
+    Canvas(modifier = Modifier.fillMaxWidth().height(180.dp)) {
+        val padLeft = 32.dp.toPx()
+        val padBottom = 22.dp.toPx()
+        val padTop = 6.dp.toPx()
+        val graphW = size.width - padLeft
+        val graphH = size.height - padBottom - padTop
+
+        // Y-axis grid + labels (5 steps)
+        val ySteps = 4
+        for (i in 0..ySteps) {
+            val v = maxRuns * i / ySteps
+            val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
+            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawAxisText("$v", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
         }
-        return points
-    }
 
-    val inn1Points = cumulativeRuns(inn1Balls)
-    val inn2Points = cumulativeRuns(inn2Balls)
-    val maxRuns = ((inn1Points.maxOfOrNull { it.second } ?: 0f).coerceAtLeast(
-        inn2Points.maxOfOrNull { it.second } ?: 0f
-    ) * 1.1f).coerceAtLeast(1f)
-
-    Canvas(modifier = Modifier.fillMaxWidth().height(160.dp)) {
-        val w = size.width
-        val h = size.height
-        val padLeft = 8.dp.toPx()
-        val padBottom = 8.dp.toPx()
-        val graphW = w - padLeft
-        val graphH = h - padBottom
-
-        // Grid lines
-        (0..4).forEach { i ->
-            val y = graphH - (i / 4f) * graphH
-            drawLine(BorderColor, Offset(padLeft, y), Offset(w, y), strokeWidth = 0.5f)
+        // X-axis labels (over numbers)
+        val xStep = if (maxOver <= 10) 1 else if (maxOver <= 25) 2 else 5
+        for (ov in 0..maxOver step xStep) {
+            val x = padLeft + (ov.toFloat() / maxOver) * graphW
+            drawAxisText("$ov", x, size.height - 2.dp.toPx(), 20f)
+            if (ov > 0) drawLine(BorderColor, Offset(x, padTop), Offset(x, padTop + graphH), strokeWidth = 0.3f)
         }
 
         // Inn1 line
-        if (inn1Points.size >= 2) {
+        if (inn1Cum.size >= 1) {
             val path = Path()
-            inn1Points.forEachIndexed { i, (over, runs) ->
-                val x = padLeft + (over / totalOvers) * graphW
-                val y = graphH - (runs / maxRuns) * graphH
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            path.moveTo(padLeft, padTop + graphH) // start at 0,0
+            inn1Cum.forEach { (over, runs) ->
+                val x = padLeft + ((over + 1).toFloat() / maxOver) * graphW
+                val y = padTop + graphH - (runs.toFloat() / maxRuns) * graphH
+                path.lineTo(x, y)
             }
-            drawPath(path, NeonGreen, style = Stroke(width = 2.dp.toPx()))
+            drawPath(path, NeonGreen, style = Stroke(width = 2.5.dp.toPx()))
         }
 
         // Inn2 line
-        if (inn2Points.size >= 2) {
+        if (inn2Cum.size >= 1) {
             val path = Path()
-            inn2Points.forEachIndexed { i, (over, runs) ->
-                val x = padLeft + (over / totalOvers) * graphW
-                val y = graphH - (runs / maxRuns) * graphH
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            path.moveTo(padLeft, padTop + graphH)
+            inn2Cum.forEach { (over, runs) ->
+                val x = padLeft + ((over + 1).toFloat() / maxOver) * graphW
+                val y = padTop + graphH - (runs.toFloat() / maxRuns) * graphH
+                path.lineTo(x, y)
             }
-            drawPath(path, NeonBlue, style = Stroke(width = 2.dp.toPx()))
+            drawPath(path, NeonBlue, style = Stroke(width = 2.5.dp.toPx()))
         }
     }
 
@@ -750,64 +769,63 @@ fun ManhattanChart(
         return
     }
 
-    fun runsPerOver(balls: List<Ball>): Map<Int, Int> {
-        return balls.groupBy { it.overNo }.mapValues { (_, overBalls) ->
-            overBalls.sumOf { b ->
-                when {
-                    b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-                    b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-                    else -> b.runsOffBat + (b.extrasRuns ?: 0)
-                }
-            }
-        }
-    }
-
     val inn1OverRuns = runsPerOver(inn1Balls)
     val inn2OverRuns = runsPerOver(inn2Balls)
-    val maxRuns = ((inn1OverRuns.values.maxOrNull() ?: 0).coerceAtLeast(
-        inn2OverRuns.values.maxOrNull() ?: 0
-    ) + 2).coerceAtLeast(1)
-    val maxOver = totalOvers
+    val allOvers = (inn1OverRuns.keys + inn2OverRuns.keys)
+    val maxOverIdx = (allOvers.maxOrNull() ?: 0)
+    val maxRuns = ((inn1OverRuns.values.maxOrNull() ?: 0)
+        .coerceAtLeast(inn2OverRuns.values.maxOrNull() ?: 0) + 2).coerceAtLeast(1)
+    val overCount = (maxOverIdx + 1).coerceAtLeast(1)
 
-    Row(
-        modifier = Modifier.fillMaxWidth().height(120.dp),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        (0 until maxOver).forEach { over ->
-            val runs1 = inn1OverRuns[over] ?: 0
-            val runs2 = inn2OverRuns[over] ?: 0
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                if (runs2 > 0) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.4f)
-                            .height((runs2.toFloat() / maxRuns * 100).dp.coerceAtLeast(2.dp))
-                            .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                            .background(NeonBlue.copy(alpha = 0.7f))
-                    )
-                }
-                if (runs1 > 0) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.4f)
-                            .height((runs1.toFloat() / maxRuns * 100).dp.coerceAtLeast(2.dp))
-                            .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                            .background(NeonGreen.copy(alpha = 0.7f))
-                    )
-                }
+    Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+        val padLeft = 28.dp.toPx()
+        val padBottom = 22.dp.toPx()
+        val padTop = 6.dp.toPx()
+        val graphW = size.width - padLeft
+        val graphH = size.height - padBottom - padTop
+
+        // Y grid + labels
+        val ySteps = 3
+        for (i in 0..ySteps) {
+            val v = maxRuns * i / ySteps
+            val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
+            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawAxisText("$v", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
+        }
+
+        val slotW = graphW / overCount
+        val barW = slotW * 0.35f
+
+        (0 until overCount).forEach { over ->
+            val r1 = inn1OverRuns[over] ?: 0
+            val r2 = inn2OverRuns[over] ?: 0
+            val cx = padLeft + over * slotW + slotW / 2f
+
+            // Inn1 bar (left of center)
+            if (r1 > 0) {
+                val h = (r1.toFloat() / maxRuns) * graphH
+                drawRect(
+                    NeonGreen.copy(alpha = 0.8f),
+                    Offset(cx - barW - 1, padTop + graphH - h),
+                    Size(barW, h)
+                )
+            }
+            // Inn2 bar (right of center)
+            if (r2 > 0) {
+                val h = (r2.toFloat() / maxRuns) * graphH
+                drawRect(
+                    NeonBlue.copy(alpha = 0.8f),
+                    Offset(cx + 1, padTop + graphH - h),
+                    Size(barW, h)
+                )
+            }
+
+            // X label
+            val xStep = if (overCount <= 10) 1 else if (overCount <= 25) 2 else 5
+            if (over % xStep == 0) {
+                drawAxisText("${over + 1}", cx, size.height - 2.dp.toPx(), 18f)
             }
         }
-    }
-
-    // Y-axis labels
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("0", color = TextSecondary, fontSize = 9.sp)
-        Text("$maxOver overs", color = TextSecondary, fontSize = 9.sp)
     }
 
     Spacer(modifier = Modifier.height(4.dp))
@@ -825,6 +843,294 @@ fun ManhattanChart(
     }
 }
 
+// ── NEW: Run-Rate Graph ──────────────────────────────────────
+
+@Composable
+fun RunRateGraph(
+    inn1Balls: List<Ball>, inn2Balls: List<Ball>,
+    inn1Name: String, inn2Name: String, totalOvers: Int
+) {
+    if (inn1Balls.isEmpty()) {
+        Text("No data yet", color = TextSecondary, fontSize = 12.sp)
+        return
+    }
+
+    // CRR at end of each over = cumRuns / overs_completed
+    fun crrPerOver(balls: List<Ball>): List<Pair<Int, Float>> {
+        val cum = cumulativeRunsPerOver(balls)
+        return cum.map { (over, runs) -> Pair(over, runs.toFloat() / (over + 1)) }
+    }
+
+    val inn1RR = crrPerOver(inn1Balls)
+    val inn2RR = crrPerOver(inn2Balls)
+    val maxRR = ((inn1RR.maxOfOrNull { it.second } ?: 6f)
+        .coerceAtLeast(inn2RR.maxOfOrNull { it.second } ?: 0f) + 2f).coerceAtLeast(2f)
+
+    Canvas(modifier = Modifier.fillMaxWidth().height(170.dp)) {
+        val padLeft = 32.dp.toPx()
+        val padBottom = 22.dp.toPx()
+        val padTop = 6.dp.toPx()
+        val graphW = size.width - padLeft
+        val graphH = size.height - padBottom - padTop
+
+        // Y grid
+        val ySteps = 4
+        for (i in 0..ySteps) {
+            val v = maxRR * i / ySteps
+            val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
+            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawAxisText("%.0f".format(v), padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
+        }
+
+        // X labels
+        val xStep = if (totalOvers <= 10) 1 else if (totalOvers <= 25) 2 else 5
+        for (ov in 0..totalOvers step xStep) {
+            val x = padLeft + (ov.toFloat() / totalOvers) * graphW
+            drawAxisText("$ov", x, size.height - 2.dp.toPx(), 20f)
+        }
+
+        // Inn1 line
+        if (inn1RR.isNotEmpty()) {
+            val path = Path()
+            inn1RR.forEachIndexed { i, (over, rr) ->
+                val x = padLeft + ((over + 1).toFloat() / totalOvers) * graphW
+                val y = padTop + graphH - (rr / maxRR) * graphH
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path, NeonGreen, style = Stroke(width = 2.5.dp.toPx()))
+        }
+
+        // Inn2 line
+        if (inn2RR.isNotEmpty()) {
+            val path = Path()
+            inn2RR.forEachIndexed { i, (over, rr) ->
+                val x = padLeft + ((over + 1).toFloat() / totalOvers) * graphW
+                val y = padTop + graphH - (rr / maxRR) * graphH
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path, NeonBlue, style = Stroke(width = 2.5.dp.toPx()))
+        }
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
+            Text(inn1Name, color = TextSecondary, fontSize = 11.sp)
+        }
+        if (inn2Balls.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonBlue))
+                Text(inn2Name, color = TextSecondary, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+// ── NEW: Wicket Progression Graph ────────────────────────────
+
+@Composable
+fun WicketProgressionGraph(
+    inn1Balls: List<Ball>, inn2Balls: List<Ball>,
+    inn1Name: String, inn2Name: String, totalOvers: Int
+) {
+    val inn1Wkts = inn1Balls.filter { it.isRealWicket() }
+    val inn2Wkts = inn2Balls.filter { it.isRealWicket() }
+
+    if (inn1Wkts.isEmpty() && inn2Wkts.isEmpty()) {
+        Text("No wickets yet", color = TextSecondary, fontSize = 12.sp)
+        return
+    }
+
+    // Build cumulative wicket points: (overNo as float, cumWickets)
+    fun wicketPoints(balls: List<Ball>): List<Pair<Float, Int>> {
+        val wkts = balls.filter { it.isRealWicket() }
+            .sortedWith(compareBy({ it.overNo }, { it.ballNo }))
+        val pts = mutableListOf(Pair(0f, 0))
+        var cum = 0
+        wkts.forEach { b ->
+            cum++
+            val overPt = b.overNo + b.ballNo / 6f
+            pts.add(Pair(overPt, cum))
+        }
+        return pts
+    }
+
+    val inn1Pts = wicketPoints(inn1Balls)
+    val inn2Pts = wicketPoints(inn2Balls)
+    val maxWkts = (inn1Pts.maxOfOrNull { it.second } ?: 0)
+        .coerceAtLeast(inn2Pts.maxOfOrNull { it.second } ?: 0)
+        .coerceAtLeast(1)
+
+    Canvas(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+        val padLeft = 24.dp.toPx()
+        val padBottom = 22.dp.toPx()
+        val padTop = 6.dp.toPx()
+        val graphW = size.width - padLeft
+        val graphH = size.height - padBottom - padTop
+
+        // Y grid (wicket count)
+        for (i in 0..maxWkts) {
+            val y = padTop + graphH - (i.toFloat() / maxWkts) * graphH
+            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawAxisText("$i", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
+        }
+
+        // X labels
+        val xStep = if (totalOvers <= 10) 1 else if (totalOvers <= 25) 2 else 5
+        for (ov in 0..totalOvers step xStep) {
+            val x = padLeft + (ov.toFloat() / totalOvers) * graphW
+            drawAxisText("$ov", x, size.height - 2.dp.toPx(), 20f)
+        }
+
+        // Step-line for inn1
+        if (inn1Pts.size >= 2) {
+            val path = Path()
+            inn1Pts.forEachIndexed { i, (over, wkts) ->
+                val x = padLeft + (over / totalOvers) * graphW
+                val y = padTop + graphH - (wkts.toFloat() / maxWkts) * graphH
+                if (i == 0) path.moveTo(x, y) else {
+                    // Step: horizontal then vertical
+                    val prevY = padTop + graphH - (inn1Pts[i - 1].second.toFloat() / maxWkts) * graphH
+                    path.lineTo(x, prevY)
+                    path.lineTo(x, y)
+                }
+            }
+            drawPath(path, NeonGreen, style = Stroke(width = 2.dp.toPx()))
+            // Dot at each wicket
+            inn1Pts.drop(1).forEach { (over, wkts) ->
+                val x = padLeft + (over / totalOvers) * graphW
+                val y = padTop + graphH - (wkts.toFloat() / maxWkts) * graphH
+                drawCircle(NeonGreen, 4.dp.toPx(), Offset(x, y))
+            }
+        }
+
+        // Step-line for inn2
+        if (inn2Pts.size >= 2) {
+            val path = Path()
+            inn2Pts.forEachIndexed { i, (over, wkts) ->
+                val x = padLeft + (over / totalOvers) * graphW
+                val y = padTop + graphH - (wkts.toFloat() / maxWkts) * graphH
+                if (i == 0) path.moveTo(x, y) else {
+                    val prevY = padTop + graphH - (inn2Pts[i - 1].second.toFloat() / maxWkts) * graphH
+                    path.lineTo(x, prevY)
+                    path.lineTo(x, y)
+                }
+            }
+            drawPath(path, NeonBlue, style = Stroke(width = 2.dp.toPx()))
+            inn2Pts.drop(1).forEach { (over, wkts) ->
+                val x = padLeft + (over / totalOvers) * graphW
+                val y = padTop + graphH - (wkts.toFloat() / maxWkts) * graphH
+                drawCircle(NeonBlue, 4.dp.toPx(), Offset(x, y))
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
+            Text(inn1Name, color = TextSecondary, fontSize = 11.sp)
+        }
+        if (inn2Wkts.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonBlue))
+                Text(inn2Name, color = TextSecondary, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+// ── NEW: Phase Analysis Chart (Powerplay / Death) ────────────
+
+@Composable
+fun PhaseAnalysisChart(
+    inn1Balls: List<Ball>, inn2Balls: List<Ball>,
+    inn1Name: String, inn2Name: String,
+    phase: String, phaseLabel: String
+) {
+    val p1 = inn1Balls.filter { it.inningsPhase == phase }
+    val p2 = inn2Balls.filter { it.inningsPhase == phase }
+
+    if (p1.isEmpty() && p2.isEmpty()) {
+        Text("No $phaseLabel data yet", color = TextSecondary, fontSize = 12.sp)
+        return
+    }
+
+    // Build per-over breakdown within the phase
+    data class OverStat(val over: Int, val runs: Int, val wickets: Int, val dots: Int, val boundaries: Int)
+
+    fun phaseOverStats(balls: List<Ball>): List<OverStat> =
+        balls.groupBy { it.overNo }.toSortedMap().map { (over, ob) ->
+            OverStat(
+                over = over,
+                runs = ob.sumOf { it.totalRuns() },
+                wickets = ob.count { it.isRealWicket() },
+                dots = ob.count { it.isDot() },
+                boundaries = ob.count { it.isBoundary || it.isSix }
+            )
+        }
+
+    // Stats summary boxes per innings
+    listOf(p1 to inn1Name, p2 to inn2Name).forEach { (balls, name) ->
+        if (balls.isEmpty()) return@forEach
+        val runs = balls.sumOf { it.totalRuns() }
+        val wkts = balls.count { it.isRealWicket() }
+        val legal = balls.count { it.isLegal() }
+        val dots = balls.count { it.isDot() }
+        val bdry = balls.count { it.isBoundary || it.isSix }
+        val rr = if (legal > 0) runs * 6.0 / legal else 0.0
+
+        Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            StatBox("Runs", "$runs", NeonGreen, Modifier.weight(1f))
+            StatBox("Wkts", "$wkts", ErrorRed, Modifier.weight(1f))
+            StatBox("RR", "${"%.1f".format(rr)}", NeonBlue, Modifier.weight(1f))
+            StatBox("Dots", "$dots", TextSecondary, Modifier.weight(1f))
+            StatBox("Bdry", "$bdry", AmberColor, Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Per-over bar chart within this phase
+        val overStats = phaseOverStats(balls)
+        if (overStats.isNotEmpty()) {
+            val maxR = (overStats.maxOfOrNull { it.runs } ?: 1).coerceAtLeast(1)
+            Canvas(modifier = Modifier.fillMaxWidth().height(90.dp)) {
+                val padLeft = 22.dp.toPx()
+                val padBottom = 18.dp.toPx()
+                val padTop = 4.dp.toPx()
+                val graphW = size.width - padLeft
+                val graphH = size.height - padBottom - padTop
+                val barCount = overStats.size.coerceAtLeast(1)
+                val slotW = graphW / barCount
+                val barW = slotW * 0.6f
+
+                // Y labels
+                for (i in listOf(0, maxR / 2, maxR)) {
+                    val y = padTop + graphH - (i.toFloat() / maxR) * graphH
+                    drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.3f)
+                    drawAxisText("$i", padLeft - 3.dp.toPx(), y + 4.dp.toPx(), 18f, align = android.graphics.Paint.Align.RIGHT)
+                }
+
+                overStats.forEachIndexed { idx, os ->
+                    val cx = padLeft + idx * slotW + slotW / 2f
+                    val h = (os.runs.toFloat() / maxR) * graphH
+                    val barColor = if (os.wickets > 0) ErrorRed else NeonGreen
+                    drawRect(barColor.copy(alpha = 0.8f), Offset(cx - barW / 2, padTop + graphH - h), Size(barW, h.coerceAtLeast(1f)))
+                    // Wicket dot on top
+                    if (os.wickets > 0) {
+                        drawCircle(ErrorRed, 3.dp.toPx(), Offset(cx, padTop + graphH - h - 4.dp.toPx()))
+                    }
+                    // X label
+                    drawAxisText("${os.over + 1}", cx, size.height - 1.dp.toPx(), 17f)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+}
+
 @Composable
 fun PartnershipGraph(
     inn1Balls: List<Ball>, inn2Balls: List<Ball>,
@@ -832,28 +1138,15 @@ fun PartnershipGraph(
 ) {
     fun computePartnerships(balls: List<Ball>): List<Pair<String, Int>> {
         val partnerships = mutableListOf<Pair<String, Int>>()
-        var currentBatter1 = ""
-        var currentBatter2 = ""
         var pRuns = 0
         var pNo = 1
 
         balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
-            if (currentBatter1.isEmpty()) currentBatter1 = ball.batsmanId ?: ""
-            if (currentBatter2.isEmpty() && ball.nonStrikerId != null) currentBatter2 = ball.nonStrikerId
-
-            val runs = when {
-                ball.extrasType == "wide" -> (ball.extrasRuns ?: 1) + ball.runsOffBat
-                ball.extrasType == "no_ball" -> 1 + ball.runsOffBat + (ball.extrasRuns ?: 0)
-                else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
-            }
-            pRuns += runs
-
-            if (ball.isWicket && ball.wicketType != "retired_hurt") {
+            pRuns += ball.totalRuns()
+            if (ball.isRealWicket()) {
                 partnerships.add(Pair("P$pNo", pRuns))
                 pNo++
                 pRuns = 0
-                currentBatter1 = ""
-                currentBatter2 = ball.nonStrikerId ?: ""
             }
         }
         if (pRuns > 0) partnerships.add(Pair("P$pNo*", pRuns))
@@ -908,36 +1201,23 @@ fun WinProbabilityGraph(
         return
     }
 
-    val inn1Total = inn1Balls.sumOf { b ->
-        when {
-            b.extrasType == "wide" -> (b.extrasRuns ?: 1) + b.runsOffBat
-            b.extrasType == "no_ball" -> 1 + b.runsOffBat + (b.extrasRuns ?: 0)
-            else -> b.runsOffBat + (b.extrasRuns ?: 0)
-        }
-    }
+    val inn1Total = inn1Balls.sumOf { it.totalRuns() }
     val target = inn1Total + 1
-    val totalBalls = totalOvers * 6
+    val totalBallsInMatch = totalOvers * 6
 
-    // Compute win probability over each ball of 2nd innings
     val probPoints = mutableListOf<Float>()
     var runsSoFar = 0
     var wicketsSoFar = 0
     val maxWickets = 10
 
     inn2Balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEachIndexed { index, ball ->
-        val runs = when {
-            ball.extrasType == "wide" -> (ball.extrasRuns ?: 1) + ball.runsOffBat
-            ball.extrasType == "no_ball" -> 1 + ball.runsOffBat + (ball.extrasRuns ?: 0)
-            else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
-        }
-        runsSoFar += runs
-        if (ball.isWicket && ball.wicketType != "retired_hurt") wicketsSoFar++
+        runsSoFar += ball.totalRuns()
+        if (ball.isRealWicket()) wicketsSoFar++
 
-        val ballsLeft = (totalBalls - (index + 1)).coerceAtLeast(0)
+        val ballsLeft = (totalBallsInMatch - (index + 1)).coerceAtLeast(0)
         val runsNeeded = (target - runsSoFar).coerceAtLeast(0)
         val wicketsLeft = (maxWickets - wicketsSoFar).coerceAtLeast(0)
 
-        // Simple probability model
         val prob = when {
             runsSoFar >= target -> 1.0f
             ballsLeft == 0 -> 0.0f
@@ -959,42 +1239,62 @@ fun WinProbabilityGraph(
     }
 
     val currentProb = probPoints.lastOrNull() ?: 0.5f
-    val inn2Name2 = inn2Name
 
     Text(
-        "Current: $inn2Name2 ${"%.0f".format(currentProb * 100)}% | $inn1Name ${"%.0f".format((1 - currentProb) * 100)}%",
+        "Current: $inn2Name ${"%.0f".format(currentProb * 100)}% | $inn1Name ${"%.0f".format((1 - currentProb) * 100)}%",
         color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold
     )
     Spacer(modifier = Modifier.height(8.dp))
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-        val w = size.width
-        val h = size.height
+    Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
+        val padLeft = 30.dp.toPx()
+        val padBottom = 22.dp.toPx()
+        val padTop = 6.dp.toPx()
+        val graphW = size.width - padLeft
+        val graphH = size.height - padBottom - padTop
 
-        // Grid
-        listOf(0.25f, 0.5f, 0.75f).forEach { frac ->
-            val y = h - frac * h
-            drawLine(BorderColor, Offset(0f, y), Offset(w, y), strokeWidth = 0.5f)
+        // Y grid + labels (0%, 25%, 50%, 75%, 100%)
+        for (pct in listOf(0, 25, 50, 75, 100)) {
+            val frac = pct / 100f
+            val y = padTop + graphH - frac * graphH
+            drawLine(
+                if (pct == 50) TextSecondary.copy(alpha = 0.5f) else BorderColor,
+                Offset(padLeft, y), Offset(size.width, y),
+                strokeWidth = if (pct == 50) 1f else 0.5f
+            )
+            drawAxisText("$pct%", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 18f, align = android.graphics.Paint.Align.RIGHT)
         }
 
-        // 50% line
-        drawLine(TextSecondary.copy(alpha = 0.5f), Offset(0f, h * 0.5f), Offset(w, h * 0.5f), strokeWidth = 1f)
+        // X labels (over numbers based on ball index)
+        val totalBalls2 = probPoints.size
+        if (totalBalls2 > 0) {
+            val xStep = if (totalOvers <= 10) 1 else if (totalOvers <= 25) 2 else 5
+            for (ov in 0..totalOvers step xStep) {
+                val ballIdx = ov * 6
+                if (ballIdx <= totalBalls2) {
+                    val x = padLeft + (ballIdx.toFloat() / totalBalls2.coerceAtLeast(1)) * graphW
+                    drawAxisText("$ov", x, size.height - 2.dp.toPx(), 18f)
+                }
+            }
+        }
 
+        // Line
         if (probPoints.size >= 2) {
             val path = Path()
             probPoints.forEachIndexed { i, prob ->
-                val x = (i.toFloat() / (probPoints.size - 1)) * w
-                val y = h - prob * h
+                val x = padLeft + (i.toFloat() / (probPoints.size - 1)) * graphW
+                val y = padTop + graphH - prob * graphH
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             drawPath(path, NeonGreen, style = Stroke(width = 2.dp.toPx()))
         }
     }
 
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("Start", color = TextSecondary, fontSize = 9.sp)
-        Text("50%", color = TextSecondary, fontSize = 9.sp)
-        Text("Now", color = TextSecondary, fontSize = 9.sp)
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
+            Text("$inn2Name win %", color = TextSecondary, fontSize = 11.sp)
+        }
     }
 }
 
