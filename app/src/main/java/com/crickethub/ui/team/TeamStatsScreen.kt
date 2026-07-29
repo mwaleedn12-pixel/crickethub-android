@@ -12,13 +12,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.crickethub.data.model.Team
+import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.TeamStats
 import com.crickethub.data.repository.TeamStatsRepository
+import com.crickethub.export.*
 import com.crickethub.ui.components.CricketAnimatedBackground
 import com.crickethub.ui.theme.*
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 
 @Composable
@@ -31,6 +36,8 @@ fun TeamStatsScreen(
     val scope = rememberCoroutineScope()
     var stats by remember { mutableStateOf<TeamStats?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var showExport by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(teamId) {
         scope.launch {
@@ -43,6 +50,31 @@ fun TeamStatsScreen(
         }
     }
 
+    // Export dialog
+    ExportDialog(
+        show = showExport,
+        onDismiss = { showExport = false },
+        title = "Export Team Stats",
+        onExport = { format ->
+            val s = stats!!
+            val team = try {
+                SupabaseClient.client.postgrest["teams"]
+                    .select { filter { eq("id", teamId) } }.decodeSingleOrNull<Team>()
+            } catch (e: Exception) { null } ?: Team(id = teamId, name = teamName)
+            val data = TeamReportData(
+                team = team, matches = s.matchesPlayed, won = s.won,
+                lost = s.lost, tied = s.tied, winPct = s.winPercentage,
+                totalRuns = s.totalRuns, totalWickets = s.totalWickets,
+                highestTotal = s.highestScore, lowestTotal = s.lowestScore,
+                currentStreak = "${s.currentWinStreak}W"
+            )
+            when (format) {
+                ExportFormat.PDF -> TeamReportGenerator.generatePdf(context, data)
+                ExportFormat.CSV -> TeamReportGenerator.generateCsv(context, data)
+            }
+        }
+    )
+
     CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -54,9 +86,12 @@ fun TeamStatsScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, null, tint = TextPrimary)
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(teamName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("Team Statistics", color = TextSecondary, fontSize = 12.sp)
+                }
+                if (stats != null) {
+                    ExportButton(onClick = { showExport = true })
                 }
             }
 
@@ -75,7 +110,6 @@ fun TeamStatsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                    // Match Results Card
                     item {
                         StatsCard(title = "Match Results") {
                             Row(
@@ -91,7 +125,6 @@ fun TeamStatsScreen(
                         }
                     }
 
-                    // Win Rate
                     item {
                         StatsCard(title = "Win Rate") {
                             Column(
@@ -115,7 +148,6 @@ fun TeamStatsScreen(
                         }
                     }
 
-                    // Batting Stats
                     item {
                         StatsCard(title = "🏏 Batting") {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,7 +159,6 @@ fun TeamStatsScreen(
                         }
                     }
 
-                    // Streak
                     item {
                         StatsCard(title = "🔥 Win Streaks") {
                             Row(

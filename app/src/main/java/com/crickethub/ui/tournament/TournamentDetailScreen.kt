@@ -29,6 +29,8 @@ import com.crickethub.data.repository.ScoringRepository
 import com.crickethub.data.repository.TournamentRepository
 import kotlinx.coroutines.launch
 import com.crickethub.ui.theme.*
+import com.crickethub.export.*
+import androidx.compose.ui.platform.LocalContext
 import kotlin.math.log2
 
 // ── FORMATS & HELPERS ────────────────────────────────────────
@@ -230,6 +232,8 @@ fun TournamentDetailScreen(
     var playerTeamMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var playerMap by remember { mutableStateOf<Map<String, Player>>(emptyMap()) }
     var statsLoading by remember { mutableStateOf(false) }
+    var showExport by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(tournamentId) {
         viewModel.loadAllTeams()
@@ -297,6 +301,7 @@ fun TournamentDetailScreen(
                     fontSize = 12.sp, color = TextSecondary
                 )
             }
+            ExportButton(onClick = { showExport = true })
         }
 
         ScrollableTabRow(
@@ -333,6 +338,27 @@ fun TournamentDetailScreen(
             }
         }
     }
+
+    ExportDialog(
+        show = showExport,
+        onDismiss = { showExport = false },
+        title = "Export Tournament Report",
+        onExport = { format ->
+            val t = uiState.currentTournament!!
+            val pointsRows = uiState.tournamentTeams
+                .sortedWith(compareByDescending<TournamentTeam> { it.points }.thenByDescending { it.nrr })
+                .map { tt ->
+                    val name = uiState.teamDetails.find { it.id == tt.teamId }?.name ?: "Team"
+                    PointsRow(name, tt.matchesPlayed, tt.wins, tt.losses, 0, 0, tt.nrr, tt.points)
+                }
+            val pNames = playerMap.mapValues { it.value.fullName }
+            val data = TournamentReportData(t, uiState.teamDetails, uiState.fixtures, pointsRows, pNames)
+            when (format) {
+                ExportFormat.PDF -> TournamentReportGenerator.generatePdf(context, data)
+                ExportFormat.CSV -> TournamentReportGenerator.generateCsv(context, data)
+            }
+        }
+    )
 }
 
 // ── FIXTURES TAB ─────────────────────────────────────────────
