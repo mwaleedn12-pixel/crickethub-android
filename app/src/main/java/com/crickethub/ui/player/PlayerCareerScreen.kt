@@ -58,6 +58,7 @@ data class CareerData(
 
 @Composable
 fun PlayerCareerScreen(
+    playerId: String? = null,
     onBack: () -> Unit,
     onViewScorecard: (String) -> Unit = {},
     onViewAnalytics: (String) -> Unit = {}
@@ -88,8 +89,11 @@ fun PlayerCareerScreen(
                 allTeams = teams
                 // Default: logged in user ka player
                 val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
-                selectedPlayer = players.firstOrNull()
-            } catch (e: Exception) {
+                selectedPlayer = if (playerId != null) {
+                    players.firstOrNull { it.id == playerId }
+                } else {
+                    players.firstOrNull()
+                }            } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "Players load error: ${e.message}", e)
             } finally {
                 isLoading = false

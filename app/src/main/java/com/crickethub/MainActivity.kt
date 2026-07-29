@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
@@ -31,6 +32,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -41,12 +45,12 @@ import androidx.navigation.navArgument
 import com.crickethub.data.model.Innings
 import com.crickethub.data.model.Team
 import com.crickethub.data.remote.SupabaseClient
-import androidx.compose.runtime.produceState
 import io.github.jan.supabase.auth.auth
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.ui.auth.ForgotPasswordScreen
 import com.crickethub.ui.auth.LoginScreen
 import com.crickethub.ui.auth.SignupScreen
+import com.crickethub.ui.dashboard.DashboardScreen
 import com.crickethub.ui.match.CreateMatchScreen
 import com.crickethub.ui.match.MatchesScreen
 import com.crickethub.ui.match.PlayingXIScreen
@@ -57,7 +61,9 @@ import com.crickethub.ui.match.live.LiveScorecardViewModel
 import com.crickethub.ui.match.postmatch.PostMatchScreen
 import com.crickethub.ui.match.scoring.ScoringScreen
 import com.crickethub.ui.match.scoring.ScoringViewModel
+import com.crickethub.ui.player.AllPlayersScreen
 import com.crickethub.ui.player.PlayerCareerScreen
+import com.crickethub.ui.player.PlayerComparisonScreen
 import com.crickethub.ui.team.PlayersScreen
 import com.crickethub.ui.team.TeamsScreen
 import com.crickethub.ui.theme.CricketHubTheme
@@ -66,7 +72,6 @@ import com.crickethub.ui.tournament.TournamentDetailScreen
 import com.crickethub.ui.tournament.TournamentsScreen
 import com.crickethub.ui.join.JoinWithCodeScreen
 import com.crickethub.ui.team.TeamStatsScreen
-import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
@@ -75,6 +80,24 @@ private val BackgroundDark = Color(0xFF030712)
 private val SurfaceCard = Color(0xFF111827)
 private val NeonGreen = Color(0xFF10B981)
 private val TextSecondary = Color(0xFF9CA3AF)
+
+// ── Bottom-nav tab definitions ───────────────────────────────
+private data class BottomTab(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
+
+private val bottomTabs = listOf(
+    BottomTab("dashboard", "Home", Icons.Default.Home),
+    BottomTab("all_players", "Players", Icons.Default.Person),
+    BottomTab("matches", "Matches", Icons.Default.List),
+    BottomTab("teams", "Teams", Icons.Default.Person),
+    BottomTab("tournaments", "Tourneys", Icons.Default.Star),
+    BottomTab("player_comparison", "Compare", Icons.Default.AccountCircle)
+)
+
+private val bottomRoutes = bottomTabs.map { it.route }.toSet()
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,16 +116,16 @@ fun CricketHubApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = currentRoute in listOf("teams", "matches", "tournaments", "career")
+    val showBottomBar = currentRoute in bottomRoutes
     val scope = rememberCoroutineScope()
 
-    // Session check — if logged in go to matches
+    // Session check — if logged in go to dashboard
     LaunchedEffect(Unit) {
         scope.launch {
             try {
                 val user = SupabaseClient.client.auth.currentUserOrNull()
                 if (user != null) {
-                    navController.navigate("matches") {
+                    navController.navigate("dashboard") {
                         popUpTo("login") { inclusive = true }
                     }
                 }
@@ -117,66 +140,27 @@ fun CricketHubApp() {
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(containerColor = SurfaceCard, contentColor = NeonGreen) {
-                    NavigationBarItem(
-                        selected = currentRoute == "teams",
-                        onClick = {
-                            navController.navigate("teams") {
-                                popUpTo("teams") { inclusive = true }
-                            }
-                        },
-                        icon = { Icon(Icons.Default.Person, contentDescription = "Teams") },
-                        label = { Text("Teams") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
-                            indicatorColor = NeonGreen.copy(alpha = 0.15f)
+                    bottomTabs.forEach { tab ->
+                        NavigationBarItem(
+                            selected = currentRoute == tab.route,
+                            onClick = {
+                                if (currentRoute != tab.route) {
+                                    navController.navigate(tab.route) {
+                                        // Pop back to dashboard to keep backstack clean
+                                        popUpTo("dashboard") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            },
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = { Text(tab.label, fontSize = 10.sp, maxLines = 1) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
+                                unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
+                                indicatorColor = NeonGreen.copy(alpha = 0.15f)
+                            )
                         )
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == "matches",
-                        onClick = {
-                            navController.navigate("matches") {
-                                popUpTo("teams") { inclusive = false }
-                            }
-                        },
-                        icon = { Icon(Icons.Default.List, contentDescription = "Matches") },
-                        label = { Text("Matches") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
-                            indicatorColor = NeonGreen.copy(alpha = 0.15f)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == "tournaments",
-                        onClick = {
-                            navController.navigate("tournaments") {
-                                popUpTo("teams") { inclusive = false }
-                            }
-                        },
-                        icon = { Icon(Icons.Default.Star, contentDescription = "Tournaments") },
-                        label = { Text("Tournaments") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
-                            indicatorColor = NeonGreen.copy(alpha = 0.15f)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == "career",
-                        onClick = {
-                            navController.navigate("career") {
-                                popUpTo("teams") { inclusive = false }
-                            }
-                        },
-                        icon = { Icon(Icons.Default.AccountCircle, contentDescription = "Career") },
-                        label = { Text("Career") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonGreen, selectedTextColor = NeonGreen,
-                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
-                            indicatorColor = NeonGreen.copy(alpha = 0.15f)
-                        )
-                    )
+                    }
                 }
             }
         }
@@ -186,10 +170,11 @@ fun CricketHubApp() {
             startDestination = "login",
             modifier = Modifier.padding(paddingValues)
         ) {
+            // ── Auth ─────────────────────────────────────
             composable("login") {
                 LoginScreen(
                     onLoginSuccess = {
-                        navController.navigate("teams") {
+                        navController.navigate("dashboard") {
                             popUpTo("login") { inclusive = true }
                         }
                     },
@@ -200,7 +185,7 @@ fun CricketHubApp() {
             composable("signup") {
                 SignupScreen(
                     onSignupSuccess = {
-                        navController.navigate("teams") {
+                        navController.navigate("dashboard") {
                             popUpTo("login") { inclusive = true }
                         }
                     },
@@ -210,6 +195,38 @@ fun CricketHubApp() {
             composable("forgot_password") {
                 ForgotPasswordScreen(onBack = { navController.popBackStack() })
             }
+
+            // ── Bottom-nav destinations ──────────────────
+
+            composable("dashboard") {
+                DashboardScreen(
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") },
+                    onLogout = {
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            composable("all_players") {
+                AllPlayersScreen(
+                    onPlayerClick = { playerId ->
+                        navController.navigate("career?playerId=$playerId")
+                    }
+                )
+            }
+
+            composable("matches") {
+                MatchesScreen(
+                    onCreateMatch = { navController.navigate("create_match") },
+                    onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") },
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
+                )
+            }
+
             composable("teams") {
                 TeamsScreen(
                     onTeamClick = { teamId -> navController.navigate("players/$teamId") },
@@ -218,6 +235,40 @@ fun CricketHubApp() {
                     }
                 )
             }
+
+            composable("tournaments") {
+                TournamentsScreen(
+                    onCreateTournament = { navController.navigate("create_tournament") },
+                    onTournamentClick = { id -> navController.navigate("tournament_detail/$id") }
+                )
+            }
+
+            composable("player_comparison") {
+                PlayerComparisonScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // ── Career (opened from Players tab or standalone) ──
+            composable(
+                route = "career?playerId={playerId}",
+                arguments = listOf(navArgument("playerId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStackEntry ->
+                val playerId = backStackEntry.arguments?.getString("playerId")
+                PlayerCareerScreen(
+                    playerId = playerId,
+                    onBack = { navController.popBackStack() },
+                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
+                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
+                )
+            }
+
+            // ── Team sub-screens ─────────────────────────
+
             composable(
                 route = "team_stats/{teamId}/{teamName}",
                 arguments = listOf(
@@ -237,14 +288,9 @@ fun CricketHubApp() {
                 val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
                 PlayersScreen(teamId = teamId, onBack = { navController.popBackStack() })
             }
-            composable("matches") {
-                MatchesScreen(
-                    onCreateMatch = { navController.navigate("create_match") },
-                    onMatchClick = { matchId -> navController.navigate("match_flow/$matchId") },
-                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
-                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
-                )
-            }
+
+            // ── Match flow ───────────────────────────────
+
             composable("create_match") {
                 CreateMatchScreen(
                     onBack = { navController.popBackStack() },
@@ -255,6 +301,7 @@ fun CricketHubApp() {
                     }
                 )
             }
+
             composable(
                 route = "playing_xi_flow/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -307,6 +354,7 @@ fun CricketHubApp() {
                     }
                 )
             }
+
             composable(
                 route = "toss/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -321,6 +369,7 @@ fun CricketHubApp() {
                     }
                 )
             }
+
             composable(
                 route = "playing_xi/{matchId}/{teamId}/{teamName}/{playersPerSide}",
                 arguments = listOf(
@@ -341,10 +390,9 @@ fun CricketHubApp() {
                     playersPerSide = playersPerSide,
                     onBack = { navController.popBackStack() },
                     onXISaved = {
-                        // Check if team2 needs XI, otherwise go to scoring
-                        kotlinx.coroutines.MainScope().launch {
+                        MainScope().launch {
                             try {
-                                val repo = com.crickethub.data.repository.MatchRepository()
+                                val repo = MatchRepository()
                                 val match = repo.getMatchById(matchId)
                                 if (match != null) {
                                     val xi = SupabaseClient.client.postgrest["playing_xi"]
@@ -385,6 +433,7 @@ fun CricketHubApp() {
                     }
                 )
             }
+
             composable("join") {
                 JoinWithCodeScreen(
                     onBack = { navController.popBackStack() },
@@ -393,6 +442,8 @@ fun CricketHubApp() {
                     onJoinTournament = { navController.navigate("tournaments") }
                 )
             }
+
+            // ── Scoring ──────────────────────────────────
 
             composable(
                 route = "scoring/{matchId}",
@@ -415,6 +466,7 @@ fun CricketHubApp() {
                     viewModel = scoringViewModel
                 )
             }
+
             composable(
                 route = "live_scorecard/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -489,6 +541,7 @@ fun CricketHubApp() {
                     )
                 }
             }
+
             composable(
                 route = "analytics/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -499,6 +552,7 @@ fun CricketHubApp() {
                     onBack = { navController.popBackStack() }
                 )
             }
+
             composable(
                 route = "post_match/{matchId}",
                 arguments = listOf(navArgument("matchId") { type = NavType.StringType })
@@ -514,12 +568,9 @@ fun CricketHubApp() {
                     }
                 )
             }
-            composable("tournaments") {
-                TournamentsScreen(
-                    onCreateTournament = { navController.navigate("create_tournament") },
-                    onTournamentClick = { id -> navController.navigate("tournament_detail/$id") }
-                )
-            }
+
+            // ── Tournament sub-screens ───────────────────
+
             composable("create_tournament") {
                 CreateTournamentScreen(
                     onBack = { navController.popBackStack() },
@@ -543,16 +594,11 @@ fun CricketHubApp() {
                     onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
                 )
             }
-            composable("career") {
-                PlayerCareerScreen(
-                    onBack = { navController.popBackStack() },
-                    onViewScorecard = { matchId -> navController.navigate("live_scorecard/$matchId") },
-                    onViewAnalytics = { matchId -> navController.navigate("analytics/$matchId") }
-                )
-            }
         }
     }
 }
+
+// ── Helper screens (unchanged) ───────────────────────────────
 
 @Composable
 fun PlayingXIFlowScreen(
