@@ -11,44 +11,71 @@ import io.github.jan.supabase.postgrest.postgrest
 class MatchRepository {
 
     private val client = SupabaseClient.client
+
+    // TTL cache for full list
     private var matchesCache: List<Match>? = null
+    private var matchesCacheTime: Long = 0L
+    private val MATCHES_TTL_MS = 2 * 60 * 1000L  // 2 minutes
+
     private val matchCache = mutableMapOf<String, Match>()
     private val xiCache = mutableMapOf<String, List<PlayingXI>>()
 
     suspend fun getAllMatches(): List<Match> {
-        return matchesCache ?: run {
+        val cached = matchesCache
+        if (cached != null && System.currentTimeMillis() - matchesCacheTime < MATCHES_TTL_MS) {
+            return cached
+        }
+        return SupabaseClient.withRetry {
             val matches = client.postgrest["matches"]
                 .select()
                 .decodeList<Match>()
                 .sortedByDescending { it.createdAt }
             matchesCache = matches
+            matchesCacheTime = System.currentTimeMillis()
             matches
+        }
+    }
+
+    /** Paginated match list: returns [limit] matches starting at [offset]. */
+    suspend fun getMatchesPaginated(limit: Int = 20, offset: Int = 0): List<Match> {
+        return SupabaseClient.withRetry {
+            client.postgrest["matches"]
+                .select {
+                    range(offset.toLong(), (offset + limit - 1).toLong())
+                }
+                .decodeList<Match>()
+                .sortedByDescending { it.createdAt }
         }
     }
 
     fun invalidateMatchesCache() {
         matchesCache = null
+        matchesCacheTime = 0L
         matchCache.clear()
     }
 
     suspend fun getMatchById(matchId: String): Match? {
-        return matchCache.getOrPut(matchId) {
+        matchCache[matchId]?.let { return it }
+        return SupabaseClient.withRetry {
             client.postgrest["matches"]
                 .select { filter { eq("id", matchId) } }
-                .decodeSingleOrNull<Match>() ?: return null
+                .decodeSingleOrNull<Match>()?.also { matchCache[matchId] = it }
         }
     }
 
     fun invalidateMatchCache(matchId: String) {
         matchCache.remove(matchId)
         matchesCache = null
+        matchesCacheTime = 0L
     }
 
     suspend fun createMatch(match: MatchInsert): Match {
-        val result = client.postgrest["matches"]
-            .insert(match) { select() }
-            .decodeSingle<Match>()
-        matchesCache = null
+        val result = SupabaseClient.withRetry {
+            client.postgrest["matches"]
+                .insert(match) { select() }
+                .decodeSingle<Match>()
+        }
+        invalidateMatchesCache()
         return result
     }
 
@@ -58,27 +85,32 @@ class MatchRepository {
         tossDecision: String,
         battingFirstId: String
     ): Match {
-        val result = client.postgrest["matches"]
-            .update({
-                set("toss_winner_id", tossWinnerId)
-                set("toss_decision", tossDecision)
-                set("batting_first_id", battingFirstId)
-                set("status", "live")
-            }) {
-                filter { eq("id", matchId) }
-                select()
-            }
-            .decodeSingle<Match>()
+        val result = SupabaseClient.withRetry {
+            client.postgrest["matches"]
+                .update({
+                    set("toss_winner_id", tossWinnerId)
+                    set("toss_decision", tossDecision)
+                    set("batting_first_id", battingFirstId)
+                    set("status", "live")
+                }) {
+                    filter { eq("id", matchId) }
+                    select()
+                }
+                .decodeSingle<Match>()
+        }
         matchCache[matchId] = result
         matchesCache = null
+        matchesCacheTime = 0L
         return result
     }
 
     suspend fun getPlayingXI(matchId: String): List<PlayingXI> {
         return xiCache.getOrPut(matchId) {
-            client.postgrest["playing_xi"]
-                .select { filter { eq("match_id", matchId) } }
-                .decodeList()
+            SupabaseClient.withRetry {
+                client.postgrest["playing_xi"]
+                    .select { filter { eq("match_id", matchId) } }
+                    .decodeList()
+            }
         }
     }
 
@@ -86,11 +118,10 @@ class MatchRepository {
         xiCache.remove(matchId)
     }
 
-    // Deletes a match. All children (innings, balls, playing_xi, player_awards,
-    // match_notifications) are ON DELETE CASCADE in the database, so removing the
-    // match row removes them automatically.
     suspend fun deleteMatch(matchId: String) {
-        client.postgrest["matches"].delete { filter { eq("id", matchId) } }
+        SupabaseClient.withRetry {
+            client.postgrest["matches"].delete { filter { eq("id", matchId) } }
+        }
         invalidateMatchCache(matchId)
         invalidateMatchesCache()
         invalidateXICache(matchId)
@@ -100,7 +131,6 @@ class MatchRepository {
         if (players.isEmpty()) return
         val matchId = players.first().matchId
         val teamId = players.first().teamId
-        // Delete existing XI for this team in this match first
         try {
             client.postgrest["playing_xi"].delete {
                 filter {
@@ -111,7 +141,9 @@ class MatchRepository {
         } catch (e: Exception) {
             android.util.Log.w("CricketHub", "Delete XI warning: ${e.message}")
         }
-        client.postgrest["playing_xi"].insert(players)
+        SupabaseClient.withRetry {
+            client.postgrest["playing_xi"].insert(players)
+        }
         xiCache.remove(matchId)
     }
 }

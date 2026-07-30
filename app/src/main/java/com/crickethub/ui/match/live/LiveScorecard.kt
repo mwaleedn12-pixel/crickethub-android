@@ -195,7 +195,16 @@ fun LiveScorecardScreen(
                 }
             }
 
-            if (uiState.isLoading) {
+            if (uiState.error != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("⚠️", fontSize = 40.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(uiState.error ?: "Unknown error", color = TextSecondary, fontSize = 14.sp,
+                            textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
+                    }
+                }
+            } else if (uiState.isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = NeonGreen)
                 }

@@ -10,15 +10,22 @@ class TeamRepository {
 
     private val client = SupabaseClient.client
 
-    // Cache
+    // Cache with TTL
     private var teamsCache: List<Team>? = null
+    private var teamsCacheTime: Long = 0L
+    private val TEAMS_TTL_MS = 3 * 60 * 1000L  // 3 minutes
 
     suspend fun getAllTeams(): List<Team> {
-        return teamsCache ?: run {
+        val cached = teamsCache
+        if (cached != null && System.currentTimeMillis() - teamsCacheTime < TEAMS_TTL_MS) {
+            return cached
+        }
+        return SupabaseClient.withRetry {
             val teams = client.postgrest["teams"]
                 .select()
                 .decodeList<Team>()
             teamsCache = teams
+            teamsCacheTime = System.currentTimeMillis()
             teams
         }
     }
@@ -45,27 +52,30 @@ class TeamRepository {
     suspend fun createTeam(team: TeamInsert): Team {
         val joinCode = generateJoinCode()
         val userId = client.auth.currentUserOrNull()?.id
-        val result = client.postgrest["teams"]
-            .insert(
-                TeamInsert(
-                    userId = userId,
-                    name = team.name,
-                    shortName = team.shortName,
-                    logoUrl = team.logoUrl,
-                    jerseyColor = team.jerseyColor ?: "#10B981",
-                    category = team.category ?: "Club",
-                    country = team.country,
-                    city = team.city,
-                    homeGround = team.homeGround,
-                    coach = team.coach,
-                    captainId = team.captainId,
-                    viceCaptainId = team.viceCaptainId,
-                    joinCode = joinCode,
-                    isPublic = team.isPublic
-                )
-            ) { select() }
-            .decodeSingle<Team>()
+        val result = SupabaseClient.withRetry {
+            client.postgrest["teams"]
+                .insert(
+                    TeamInsert(
+                        userId = userId,
+                        name = team.name,
+                        shortName = team.shortName,
+                        logoUrl = team.logoUrl,
+                        jerseyColor = team.jerseyColor ?: "#10B981",
+                        category = team.category ?: "Club",
+                        country = team.country,
+                        city = team.city,
+                        homeGround = team.homeGround,
+                        coach = team.coach,
+                        captainId = team.captainId,
+                        viceCaptainId = team.viceCaptainId,
+                        joinCode = joinCode,
+                        isPublic = team.isPublic
+                    )
+                ) { select() }
+                .decodeSingle<Team>()
+        }
         teamsCache = null
+        teamsCacheTime = 0L
         return result
     }
 
@@ -94,9 +104,12 @@ class TeamRepository {
     }
 
     suspend fun deleteTeam(teamId: String) {
-        client.postgrest["teams"]
-            .delete { filter { eq("id", teamId) } }
+        SupabaseClient.withRetry {
+            client.postgrest["teams"]
+                .delete { filter { eq("id", teamId) } }
+        }
         teamsCache = null
+        teamsCacheTime = 0L
     }
 
     suspend fun getTeamByJoinCode(code: String): Team? {

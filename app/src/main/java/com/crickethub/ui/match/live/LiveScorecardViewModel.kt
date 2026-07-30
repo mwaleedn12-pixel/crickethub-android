@@ -114,13 +114,20 @@ class LiveScorecardViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val match = matchRepository.getMatchById(matchId) ?: return@launch
+                val match = matchRepository.getMatchById(matchId)
+                if (match == null) {
+                    _uiState.update { it.copy(isLoading = false, error = "Match not found. The owner may need to share access.") }
+                    return@launch
+                }
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
                 val currentInnings = allInnings
                     .filter { it.status == "live" }
                     .maxByOrNull { it.totalBalls * 10000 + it.totalRuns }
                     ?: allInnings.lastOrNull()
-                    ?: return@launch
+                if (currentInnings == null) {
+                    _uiState.update { it.copy(isLoading = false, error = "No innings data found for this match.") }
+                    return@launch
+                }
 
                 val team1 = SupabaseClient.client.postgrest["teams"]
                     .select { filter { eq("id", match.team1Id) } }

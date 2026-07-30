@@ -15,35 +15,60 @@ class TournamentRepository {
 
     private val client = SupabaseClient.client
 
+    // TTL cache
+    private var tournamentsCache: List<Tournament>? = null
+    private var tournamentsCacheTime: Long = 0L
+    private val TTL_MS = 2 * 60 * 1000L
+
     suspend fun getAllTournaments(): List<Tournament> {
-        return client.postgrest["tournaments"]
-            .select()
-            .decodeList()
+        val cached = tournamentsCache
+        if (cached != null && System.currentTimeMillis() - tournamentsCacheTime < TTL_MS) {
+            return cached
+        }
+        return SupabaseClient.withRetry {
+            val list = client.postgrest["tournaments"]
+                .select()
+                .decodeList<Tournament>()
+            tournamentsCache = list
+            tournamentsCacheTime = System.currentTimeMillis()
+            list
+        }
     }
 
     suspend fun getTournamentById(tournamentId: String): Tournament? {
-        return client.postgrest["tournaments"]
-            .select { filter { eq("id", tournamentId) } }
-            .decodeSingleOrNull()
+        return SupabaseClient.withRetry {
+            client.postgrest["tournaments"]
+                .select { filter { eq("id", tournamentId) } }
+                .decodeSingleOrNull()
+        }
     }
 
     suspend fun createTournament(tournament: TournamentInsert): Tournament {
         val userId = client.auth.currentUserOrNull()?.id
-        return client.postgrest["tournaments"]
-            .insert(tournament.copy(userId = userId)) { select() }
-            .decodeSingle()
+        val result = SupabaseClient.withRetry {
+            client.postgrest["tournaments"]
+                .insert(tournament.copy(userId = userId)) { select() }
+                .decodeSingle<Tournament>()
+        }
+        tournamentsCache = null
+        tournamentsCacheTime = 0L
+        return result
     }
 
     suspend fun getTournamentTeams(tournamentId: String): List<TournamentTeam> {
-        return client.postgrest["tournament_teams"]
-            .select { filter { eq("tournament_id", tournamentId) } }
-            .decodeList()
+        return SupabaseClient.withRetry {
+            client.postgrest["tournament_teams"]
+                .select { filter { eq("tournament_id", tournamentId) } }
+                .decodeList()
+        }
     }
 
     suspend fun getTournamentFixtures(tournamentId: String): List<Match> {
-        return client.postgrest["matches"]
-            .select { filter { eq("tournament_id", tournamentId) } }
-            .decodeList()
+        return SupabaseClient.withRetry {
+            client.postgrest["matches"]
+                .select { filter { eq("tournament_id", tournamentId) } }
+                .decodeList()
+        }
     }
 
     suspend fun addTeamToTournament(tournamentId: String, teamId: String) {

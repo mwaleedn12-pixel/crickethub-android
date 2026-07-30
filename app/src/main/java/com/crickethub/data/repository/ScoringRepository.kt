@@ -14,17 +14,21 @@ class ScoringRepository {
 
     private val client = SupabaseClient.client
 
-    // Cache
+    // Cache with TTL (5 min for players, always-fresh for innings/balls)
     private val inningsCache = mutableMapOf<String, List<Innings>>()
     private val ballsCache = mutableMapOf<String, List<Ball>>()
-    private val playersCache = mutableMapOf<String, List<Player>>()
+    private data class CachedPlayers(val players: List<Player>, val timestamp: Long)
+    private val playersCache = mutableMapOf<String, CachedPlayers>()
+    private val PLAYERS_TTL_MS = 5 * 60 * 1000L  // 5 minutes
 
     suspend fun getInningsByMatch(matchId: String): List<Innings> {
-        val fresh = client.postgrest["innings"]
-            .select { filter { eq("match_id", matchId) } }
-            .decodeList<Innings>().sortedBy { it.inningsNo }
-        inningsCache[matchId] = fresh
-        return fresh
+        return SupabaseClient.withRetry {
+            val fresh = client.postgrest["innings"]
+                .select { filter { eq("match_id", matchId) } }
+                .decodeList<Innings>().sortedBy { it.inningsNo }
+            inningsCache[matchId] = fresh
+            fresh
+        }
     }
 
     fun invalidateInningsCache(matchId: String) {
@@ -32,14 +36,13 @@ class ScoringRepository {
     }
 
     suspend fun getBallsByInnings(inningsId: String): List<Ball> {
-        val fresh = client.postgrest["balls"]
-            .select { filter { eq("innings_id", inningsId) } }
-            // Order by creation time - the true sequence balls were bowled. Sorting by
-            // over/ball breaks when positions are corrupt, and puts wides/no-balls
-            // (ball_no = 0) before legal balls in the same over.
-            .decodeList<Ball>().sortedBy { it.createdAt ?: "" }
-        ballsCache[inningsId] = fresh
-        return fresh
+        return SupabaseClient.withRetry {
+            val fresh = client.postgrest["balls"]
+                .select { filter { eq("innings_id", inningsId) } }
+                .decodeList<Ball>().sortedBy { it.createdAt ?: "" }
+            ballsCache[inningsId] = fresh
+            fresh
+        }
     }
 
     fun invalidateBallsCache(inningsId: String) {
@@ -48,7 +51,11 @@ class ScoringRepository {
 
     suspend fun getPlayingXIPlayers(matchId: String, teamId: String): List<Player> {
         val key = "$matchId-$teamId"
-        return playersCache.getOrPut(key) {
+        val cached = playersCache[key]
+        if (cached != null && System.currentTimeMillis() - cached.timestamp < PLAYERS_TTL_MS) {
+            return cached.players
+        }
+        return SupabaseClient.withRetry {
             val playingXI = client.postgrest["playing_xi"]
                 .select {
                     filter {
@@ -58,13 +65,15 @@ class ScoringRepository {
                 }
                 .decodeList<com.crickethub.data.model.PlayingXI>()
 
-            if (playingXI.isEmpty()) return@getOrPut emptyList()
+            if (playingXI.isEmpty()) return@withRetry emptyList<Player>()
 
             val playerIds = playingXI.map { it.playerId }
-            client.postgrest["players"]
+            val players = client.postgrest["players"]
                 .select { filter { isIn("id", playerIds) } }
                 .decodeList<Player>()
                 .sortedBy { p -> playingXI.indexOfFirst { it.playerId == p.id } }
+            playersCache[key] = CachedPlayers(players, System.currentTimeMillis())
+            players
         }
     }
 
@@ -96,39 +105,43 @@ class ScoringRepository {
         wides: Int,
         noBalls: Int
     ): Innings {
-        val result = client.postgrest["innings"]
-            .update({
-                set("total_runs", totalRuns)
-                set("total_wickets", totalWickets)
-                set("total_balls", totalBalls)
-                set("extras_total", extrasTotal)
-                set("wides", wides)
-                set("no_balls", noBalls)
-            }) {
-                filter { eq("id", inningsId) }
-                select()
-            }
-            .decodeSingle<Innings>()
-        // Invalidate innings cache
-        ballsCache.remove(inningsId)
-        return result
+        return SupabaseClient.withRetry {
+            val result = client.postgrest["innings"]
+                .update({
+                    set("total_runs", totalRuns)
+                    set("total_wickets", totalWickets)
+                    set("total_balls", totalBalls)
+                    set("extras_total", extrasTotal)
+                    set("wides", wides)
+                    set("no_balls", noBalls)
+                }) {
+                    filter { eq("id", inningsId) }
+                    select()
+                }
+                .decodeSingle<Innings>()
+            ballsCache.remove(inningsId)
+            result
+        }
     }
 
     suspend fun completeInnings(inningsId: String) {
-        client.postgrest["innings"]
-            .update({ set("status", "completed") }) {
-                filter { eq("id", inningsId) }
-            }
+        SupabaseClient.withRetry {
+            client.postgrest["innings"]
+                .update({ set("status", "completed") }) {
+                    filter { eq("id", inningsId) }
+                }
+        }
         ballsCache.remove(inningsId)
     }
 
     suspend fun insertBall(ball: BallInsert): Ball {
-        val result = client.postgrest["balls"]
-            .insert(ball) { select() }
-            .decodeSingle<Ball>()
-        // Invalidate balls cache
-        ballsCache.remove(ball.inningsId)
-        return result
+        return SupabaseClient.withRetry {
+            val result = client.postgrest["balls"]
+                .insert(ball) { select() }
+                .decodeSingle<Ball>()
+            ballsCache.remove(ball.inningsId)
+            result
+        }
     }
 
     suspend fun deleteLastBall(ballId: String) {
