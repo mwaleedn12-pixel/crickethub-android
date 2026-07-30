@@ -36,7 +36,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.ScoringUiState
-import com.crickethub.ui.match.getDLSResourceExact
+// DLS removed — future update
+import io.github.jan.supabase.auth.auth
 import com.crickethub.ui.theme.*
 
 
@@ -70,10 +71,21 @@ fun ScoringScreen(
     var showPenaltyDialog by remember { mutableStateOf(false) }
     var showMissedChanceDialog by remember { mutableStateOf(false) }
     var showManualEditDialog by remember { mutableStateOf(false) }
-    var showDLSDialog by remember { mutableStateOf(false) }
     var isFreeHit by remember { mutableStateOf(false) }
+    var lastResumeTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
-    LaunchedEffect(matchId, resumeKey) { viewModel.resumeMatch(matchId) }
+    LaunchedEffect(matchId, resumeKey) {
+        // If returning from background after 30+ seconds, refresh session and force reload
+        val elapsed = System.currentTimeMillis() - lastResumeTime
+        if (elapsed > 30_000) {
+            try { com.crickethub.data.remote.SupabaseClient.client.auth.refreshCurrentSession() }
+            catch (_: Exception) {}
+            viewModel.resumeMatch(matchId, force = true)
+        } else {
+            viewModel.resumeMatch(matchId)
+        }
+        lastResumeTime = System.currentTimeMillis()
+    }
 
     // Re-run resumeMatch every time screen becomes visible again
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -104,7 +116,6 @@ fun ScoringScreen(
     LaunchedEffect(uiState.balls.size) {
         val lastBall = uiState.balls.lastOrNull()
         isFreeHit = lastBall?.extrasType == "no_ball" && (uiState.match?.freeHitOnNoball == true)
-        if (uiState.dlsEnabled) viewModel.updateDLSParScore()
     }
 
     val needStriker = uiState.striker == null && !uiState.isLoading && uiState.innings != null
@@ -156,9 +167,6 @@ fun ScoringScreen(
             uiState.currentBowler?.let {
                 appendLine("🎳 ${it.fullName}: ${uiState.bowlerStats[it.id]?.overs ?: "0.0"}-${uiState.bowlerStats[it.id]?.runs ?: 0}-${uiState.bowlerStats[it.id]?.wickets ?: 0}")
             }
-            if (uiState.dlsEnabled && uiState.dlsParScore != null) {
-                appendLine("🌧️ DLS Par: ${uiState.dlsParScore} | Target: ${uiState.dlsTarget}")
-            }
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -184,18 +192,6 @@ fun ScoringScreen(
                         fontSize = 18.sp, fontWeight = FontWeight.Bold,
                         color = TextPrimary, modifier = Modifier.weight(1f)
                     )
-                    // DLS Button
-                    IconButton(onClick = { showDLSDialog = true }) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (uiState.dlsEnabled) AmberColor.copy(alpha = 0.35f) else AmberColor.copy(alpha = 0.1f))
-                                .border(1.dp, if (uiState.dlsEnabled) AmberColor else AmberColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 3.dp)
-                        ) {
-                            Text("🌧️", fontSize = 16.sp)
-                        }
-                    }
                     IconButton(onClick = onViewScorecard) {
                         Icon(Icons.Default.Score, contentDescription = "Scorecard", tint = NeonBlue, modifier = Modifier.size(20.dp))
                     }
@@ -231,60 +227,6 @@ fun ScoringScreen(
 
                     ScoreHeader(uiState = uiState, onShare = { shareScore() },
                         popupLabel = popupLabel, popupColor = popupColor, popupKey = popupKey, popupBig = popupBig)
-
-                    // ── DLS LIVE BANNER ───────────────────────────────────
-                    if (uiState.dlsEnabled && uiState.dlsParScore != null) {
-                        val currentRuns = uiState.innings?.totalRuns ?: 0
-                        val parScore = uiState.dlsParScore!!
-                        val isAhead = currentRuns > parScore
-                        val isBehind = currentRuns < parScore
-                        val bannerColor = when {
-                            isAhead -> NeonGreen
-                            isBehind -> ErrorRed
-                            else -> AmberColor
-                        }
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(bannerColor.copy(alpha = 0.1f))
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text("🌧️ DLS PAR SCORE", color = AmberColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    Text(
-                                        when {
-                                            isAhead -> "AHEAD by ${currentRuns - parScore}"
-                                            isBehind -> "BEHIND by ${parScore - currentRuns}"
-                                            else -> "ON PAR"
-                                        },
-                                        color = bannerColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        "Par: $parScore",
-                                        color = AmberColor, fontSize = 18.sp, fontWeight = FontWeight.Bold
-                                    )
-                                    uiState.dlsTarget?.let {
-                                        Text("Target: $it", color = TextPrimary, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            val progress = if (parScore > 0) (currentRuns.toFloat() / parScore).coerceIn(0f, 1.5f) else 0f
-                            LinearProgressIndicator(
-                                progress = { progress.coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-                                color = bannerColor,
-                                trackColor = BorderColor
-                            )
-                        }
-                    }
 
                     Last6BallsRow(balls = uiState.last6Balls)
                     Spacer(modifier = Modifier.height(2.dp))
@@ -386,16 +328,24 @@ fun ScoringScreen(
 
             if (needBowler || showSelectBowler) {
                 val totalOvers = uiState.match?.totalOvers ?: 20
+                val maxPerBowler = viewModel.getMaxOversPerBowler(totalOvers)
                 val lastBowlerId = uiState.balls
                     .filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
                     .lastOrNull()?.bowlerId
-                PlayerSelectDialog(
-                    title = "Select Bowler (Max ${viewModel.getMaxOversPerBowler(totalOvers)} overs)",
-                    players = uiState.bowlingTeamPlayers.filter { player ->
-                        player.id != lastBowlerId &&
-                                viewModel.canBowlerBowl(player.id, totalOvers) &&
-                                player.role?.lowercase() !in listOf("wicketkeeper", "wicket keeper", "wicket_keeper")
-                    },
+                val eligibleBowlers = uiState.bowlingTeamPlayers.filter { player ->
+                    player.id != lastBowlerId &&
+                            viewModel.canBowlerBowl(player.id, totalOvers) &&
+                            player.role?.lowercase() !in listOf("wicketkeeper", "wicket keeper", "wicket_keeper")
+                }
+                // Compute remaining overs for each bowler
+                val bowlerOversMap = eligibleBowlers.associate { player ->
+                    val bowled = uiState.balls.count { it.bowlerId == player.id && it.extrasType != "wide" && it.extrasType != "no_ball" } / 6
+                    player.id to (maxPerBowler - bowled)
+                }
+                BowlerSelectDialog(
+                    title = "Select Bowler (Max $maxPerBowler overs)",
+                    players = eligibleBowlers,
+                    remainingOvers = bowlerOversMap,
                     onPlayerSelected = { viewModel.setBowler(it); showSelectBowler = false },
                     onDismiss = { showSelectBowler = false }
                 )
@@ -490,270 +440,11 @@ fun ScoringScreen(
                 )
             }
 
-            if (showDLSDialog) {
-                val totalOvers = uiState.match?.totalOvers ?: 20
-                val team1Score = if (isSecondInnings) {
-                    (uiState.dlsTarget ?: 1) - 1
-                } else {
-                    uiState.innings?.totalRuns ?: 0
-                }
-                DLSDialog(
-                    uiState = uiState,
-                    isSecondInnings = isSecondInnings,
-                    currentWickets = currentWickets,
-                    totalOvers = totalOvers,
-                    team1Score = team1Score,
-                    onApply = { t1Score, t1TotalOvers, t2TotalOvers, oversAtStop, wktsAtStop, oversAtRestart ->
-                        viewModel.enableDLS(
-                            team1Score = t1Score,
-                            team1TotalOvers = t1TotalOvers,
-                            team2TotalOvers = t2TotalOvers,
-                            oversRemainingAtStop = oversAtStop,
-                            wicketsLostAtStop = wktsAtStop,
-                            oversRemainingAtRestart = oversAtRestart
-                        )
-                        showDLSDialog = false
-                    },
-                    onDisable = { viewModel.disableDLS(); showDLSDialog = false },
-                    onDismiss = { showDLSDialog = false }
-                )
-            }
 
         } // end overlay Box
     }
 }
 
-
-@Composable
-fun DLSDialog(
-    uiState: ScoringUiState,
-    isSecondInnings: Boolean,
-    currentWickets: Int,
-    totalOvers: Int,
-    team1Score: Int,
-    onApply: (Int, Int, Int, Double, Int, Double) -> Unit,
-    onDisable: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    // sirf legal balls — wides/no-balls DLS mein count nahi hote
-    val ballsBowled = uiState.balls.count { it.extrasType != "wide" && it.extrasType != "no_ball" }
-    val oversBowledInt = ballsBowled / 6
-    val ballsInCurrentOver = ballsBowled % 6
-    val oversBowledDisplay = if (ballsInCurrentOver == 0) "$oversBowledInt.0" else "$oversBowledInt.$ballsInCurrentOver"
-
-    // Overs remaining BEFORE rain
-    val oversRemainingAtStop = totalOvers - oversBowledInt - (ballsInCurrentOver / 6.0)
-
-    var newTotalOversStr by remember { mutableStateOf("") }
-
-    val newTotalOvers = newTotalOversStr.toIntOrNull()
-    val oversAtRestart = if (newTotalOvers != null) {
-        (newTotalOvers - oversBowledInt - ballsInCurrentOver / 6.0).coerceAtLeast(0.0)
-    } else null
-
-    // Preview calculation
-    val previewResult = if (newTotalOvers != null && oversAtRestart != null && oversAtRestart >= 0) {
-        com.crickethub.ui.match.calculateDLS(
-            team1Score = team1Score,
-            team1TotalOvers = totalOvers,
-            team1Interruptions = emptyList(),
-            team2TotalOvers = totalOvers, // original overs — rain reduction interruption se hoti hai
-            team2Interruptions = listOf(
-                com.crickethub.ui.match.Interruption(
-                    id = 1,
-                    oversRemainingAtStop = oversRemainingAtStop,
-                    wicketsLostAtStop = currentWickets,
-                    oversRemainingAtRestart = oversAtRestart
-                )
-            )
-        )
-    } else null
-
-    val canApply = newTotalOvers != null && newTotalOvers < totalOvers && newTotalOvers > oversBowledInt
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF111827),
-        title = { Text("🌧️ Rain Delay — DLS", color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold) },
-        text = {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.heightIn(max = 560.dp)
-            ) {
-                if (uiState.dlsEnabled) {
-                    // ── Active ───────────────────────────────────────
-                    item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF10B981).copy(alpha = 0.08f))
-                                .border(1.dp, Color(0xFF10B981), RoundedCornerShape(10.dp))
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text("✅ DLS Active", color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
-                            HorizontalDivider(color = Color(0xFF1F2937))
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                Column {
-                                    Text("Current Par Score", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                    Text("(Updates every ball)", color = Color(0xFF9CA3AF), fontSize = 10.sp)
-                                }
-                                Text("${uiState.dlsParScore}", color = Color(0xFFF59E0B), fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                Text("Revised Target", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                Text("${uiState.dlsTarget}", color = Color(0xFF10B981), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                    item {
-                        Button(
-                            onClick = onDisable, modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                        ) { Text("Disable DLS", color = Color.White, fontWeight = FontWeight.Bold) }
-                    }
-                } else {
-                    // ── Match Info ───────────────────────────────────
-                    item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF030712))
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Text("Match at Interruption", color = Color(0xFF9CA3AF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            HorizontalDivider(color = Color(0xFF1F2937))
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text("Original overs", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                Text("$totalOvers", color = Color(0xFFF9FAFB), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            }
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text("Overs bowled", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                Text(oversBowledDisplay, color = Color(0xFFF9FAFB), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            }
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text("Wickets fallen", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                Text("$currentWickets", color = Color(0xFFF9FAFB), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            }
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text(if (isSecondInnings) "Chasing" else "Score", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                Text(
-                                    if (isSecondInnings) "Target: ${team1Score + 1}" else "$team1Score",
-                                    color = Color(0xFFF9FAFB), fontSize = 12.sp, fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    // ── Input ────────────────────────────────────────
-                    item {
-                        OutlinedTextField(
-                            value = newTotalOversStr,
-                            onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) newTotalOversStr = it },
-                            label = { Text("Revised overs (after rain reduction)") },
-                            placeholder = { Text("e.g. 35", color = Color(0xFF9CA3AF)) },
-                            supportingText = {
-                                Text(
-                                    "Match referee reduces overs from $totalOvers to how many?",
-                                    color = Color(0xFF9CA3AF), fontSize = 11.sp
-                                )
-                            },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color(0xFFF9FAFB), unfocusedTextColor = Color(0xFFF9FAFB),
-                                focusedBorderColor = Color(0xFFF59E0B), unfocusedBorderColor = Color(0xFF1F2937),
-                                cursorColor = Color(0xFFF59E0B), focusedLabelColor = Color(0xFFF59E0B),
-                                unfocusedLabelColor = Color(0xFF9CA3AF)
-                            )
-                        )
-                    }
-
-                    // ── Preview ──────────────────────────────────────
-                    if (previewResult != null) {
-                        item {
-                            Column(
-                                modifier = Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFFF59E0B).copy(alpha = 0.06f))
-                                    .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("DLS Calculation Preview", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                HorizontalDivider(color = Color(0xFF1F2937))
-                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                    Text("R1 — Team 1 resource", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                    Text("${"%.1f".format(previewResult.team1Resource)}%", color = Color(0xFFF9FAFB), fontSize = 12.sp)
-                                }
-                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                    Text("R2 — Team 2 resource", color = Color(0xFF9CA3AF), fontSize = 12.sp)
-                                    Text(
-                                        "${"%.1f".format(previewResult.team2Resource)}%",
-                                        color = if (previewResult.team2Resource < previewResult.team1Resource) Color(0xFFEF4444) else Color(0xFF10B981),
-                                        fontSize = 12.sp, fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                HorizontalDivider(color = Color(0xFF1F2937))
-                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                    Column {
-                                        Text("Revised Target", color = Color(0xFF10B981), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                        Text("in $newTotalOvers overs", color = Color(0xFF9CA3AF), fontSize = 11.sp)
-                                    }
-                                    Text("${previewResult.targetScore}", color = Color(0xFF10B981), fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                    Text("Par Score (tie)", color = Color(0xFFF59E0B), fontSize = 13.sp)
-                                    Text("${previewResult.parScore}", color = Color(0xFFF59E0B), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                }
-                                // Step by step
-                                previewResult.explanation.forEach { step ->
-                                    Text("• $step", color = Color(0xFF9CA3AF), fontSize = 10.sp)
-                                }
-                            }
-                        }
-                    } else if (newTotalOversStr.isNotEmpty()) {
-                        item {
-                            Text(
-                                when {
-                                    newTotalOvers == null -> "Valid number enter karo"
-                                    newTotalOvers >= totalOvers -> "Revised overs must be less than original ($totalOvers)"
-                                    newTotalOvers <= oversBowledInt -> "Revised overs must be more than overs already bowled ($oversBowledInt)"
-                                    else -> ""
-                                },
-                                color = Color(0xFFEF4444), fontSize = 12.sp
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            if (!uiState.dlsEnabled && canApply && oversAtRestart != null && newTotalOvers != null) {
-                Button(
-                    onClick = {
-                        onApply(
-                            team1Score,
-                            totalOvers,
-                            totalOvers, // team2TotalOvers = original overs
-                            oversRemainingAtStop,
-                            currentWickets,
-                            oversAtRestart
-                        )
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
-                ) { Text("Apply DLS", color = Color.Black, fontWeight = FontWeight.Bold) }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = Color(0xFF9CA3AF)) }
-        }
-    )
-}
-
-
-// ── SCORE HEADER ──────────────────────────────────────────────────────────────
 
 @Composable
 fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
@@ -936,12 +627,12 @@ fun Last6BallsRow(balls: List<String>) {
     ) {
         Text("This over:", color = TextSecondary, fontSize = 12.sp)
         balls.forEach { ball ->
-            val (bgColor, textColor) = when (ball) {
-                "W" -> ErrorRed to Color.White
-                "4" -> NeonBlue to Color.White
-                "6" -> NeonGreen to Color.Black
-                "Wd", "Nb" -> AmberColor to Color.Black
-                "0" -> SurfaceCard to TextSecondary
+            val (bgColor, textColor) = when {
+                ball.startsWith("W") -> ErrorRed to Color.White
+                ball == "4" -> NeonBlue to Color.White
+                ball == "6" -> NeonGreen to Color.Black
+                ball.startsWith("Wd") || ball.startsWith("Nb") -> AmberColor to Color.Black
+                ball == "0" -> SurfaceCard to TextSecondary
                 else -> SurfaceCard to TextPrimary
             }
             Box(
@@ -1131,6 +822,40 @@ fun PlayerSelectDialog(title: String, players: List<Player>, onPlayerSelected: (
                 }
                 if (players.isEmpty()) {
                     item { Text("No players available", color = TextSecondary, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+    )
+}
+
+@Composable
+fun BowlerSelectDialog(title: String, players: List<Player>, remainingOvers: Map<String, Int>, onPlayerSelected: (Player) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss, containerColor = SurfaceCard,
+        title = { Text(title, color = TextPrimary, fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 400.dp)) {
+                items(players) { player ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BackgroundDark).clickable { onPlayerSelected(player) }.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(NeonGreen.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                            Text(player.jerseyNo?.toString() ?: "-", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(player.fullName, color = TextPrimary, fontSize = 14.sp)
+                            player.role?.let { Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, color = TextSecondary, fontSize = 11.sp) }
+                        }
+                        val rem = remainingOvers[player.id] ?: 0
+                        Text("rem: $rem ov", color = if (rem <= 1) AmberColor else NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                if (players.isEmpty()) {
+                    item { Text("No bowlers available", color = TextSecondary, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center) }
                 }
             }
         },
@@ -1676,7 +1401,7 @@ fun ScoringBallTimeline(balls: List<Ball>) {
                 val overRuns = entry.value.sumOf { ballRuns(it) }
                 ScoringOverSeparator(entry.key + 1, overRuns)
             }
-            entry.value.sortedBy { it.ballNo }.forEach { ball ->
+            entry.value.reversed().forEach { ball ->
                 ScoringBallChip(ball)
             }
         }
@@ -1685,18 +1410,19 @@ fun ScoringBallTimeline(balls: List<Ball>) {
 
 @Composable
 private fun ScoringBallChip(ball: Ball) {
+    val runs = ball.runsOffBat + (ball.extrasRuns ?: 0)
     val label: String
     val color: Color
     when {
-        ball.isWicket && ball.wicketType != "retired_hurt" -> { label = "W"; color = ErrorRed }
+        ball.isWicket && ball.wicketType != "retired_hurt" -> { label = if (runs > 0) "W+$runs" else "W"; color = ErrorRed }
         ball.isSix -> { label = "6"; color = PurpleColor }
         ball.isBoundary -> { label = "4"; color = NeonBlue }
-        ball.extrasType == "wide" -> { label = "Wd"; color = AmberColor }
-        ball.extrasType == "no_ball" -> { label = "Nb"; color = AmberColor }
-        ball.extrasType == "bye" -> { label = "${ball.extrasRuns ?: 0}b"; color = SurfaceCard }
-        ball.extrasType == "leg_bye" -> { label = "${ball.extrasRuns ?: 0}lb"; color = SurfaceCard }
+        ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; label = if (r > 0) "Wd+$r" else "Wd"; color = AmberColor }
+        ball.extrasType == "no_ball" -> { label = if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"; color = AmberColor }
+        ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; label = if (b <= 1) "B" else "${b}B"; color = SurfaceCard }
+        ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; label = if (lb <= 1) "LB" else "${lb}LB"; color = SurfaceCard }
         ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = SurfaceCard }
-        else -> { label = "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"; color = SurfaceCard }
+        else -> { label = "$runs"; color = SurfaceCard }
     }
     Box(
         modifier = Modifier

@@ -52,7 +52,16 @@ fun PlayingXIScreen(
         try {
             val repo = PlayerRepository()
             val cached = repo.getPlayersByTeam(teamId)
-            players = cached
+            // Sort: Batsmen → Wicketkeeper → All-rounder → Bowler
+            players = cached.sortedBy { player ->
+                when (player.role?.lowercase()?.replace(" ", "_")) {
+                    "batsman", "batter", "top_order_batter", "middle_order_batter", "opening_batter" -> 0
+                    "wicketkeeper", "wicket_keeper", "wk_batter" -> 1
+                    "all_rounder", "allrounder", "batting_allrounder", "bowling_allrounder" -> 2
+                    "bowler", "fast_bowler", "spin_bowler", "medium_fast" -> 3
+                    else -> 4
+                }
+            }
         } catch (e: Exception) {
             error = e.message
         } finally {

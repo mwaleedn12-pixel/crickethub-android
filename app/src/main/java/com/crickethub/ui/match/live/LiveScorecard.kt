@@ -151,12 +151,12 @@ fun LiveScorecardScreen(
                 ) {
                     Text("This over:", color = TextSecondary, fontSize = 12.sp)
                     uiState.last6Balls.forEach { ball ->
-                        val (bgColor, textColor) = when (ball) {
-                            "W" -> ErrorRed to Color.White
-                            "4" -> NeonBlue to Color.White
-                            "6" -> NeonGreen to Color.Black
-                            "Wd", "Nb" -> AmberColor to Color.Black
-                            "0" -> SurfaceCard to TextSecondary
+                        val (bgColor, textColor) = when {
+                            ball.startsWith("W") -> ErrorRed to Color.White
+                            ball == "4" -> NeonBlue to Color.White
+                            ball == "6" -> NeonGreen to Color.Black
+                            ball.startsWith("Wd") || ball.startsWith("Nb") -> AmberColor to Color.Black
+                            ball == "0" || ball == "•" -> SurfaceCard to TextSecondary
                             else -> SurfaceCard to TextPrimary
                         }
                         Box(
@@ -256,7 +256,9 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         }
 
         // Batsmen
-        val battedList = uiState.batsmanStats.values.filter { it.balls > 0 || it.isOut }
+        // Show batsmen who faced balls, are out, or appeared at the crease (in any ball's batsmanId/nonStrikerId)
+        val appearedIds = uiState.balls.flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) }.toSet()
+        val battedList = uiState.batsmanStats.values.filter { it.balls > 0 || it.isOut || it.player.id in appearedIds }
         items(battedList) { stats ->
             Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
                 Row(
@@ -286,7 +288,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         }
 
         // Did not bat
-        val didNotBat = uiState.batsmanStats.values.filter { it.balls == 0 && !it.isOut }
+        val didNotBat = uiState.batsmanStats.values.filter { it.balls == 0 && !it.isOut && it.player.id !in appearedIds }
         if (didNotBat.isNotEmpty()) {
             item {
                 Column(
@@ -610,14 +612,17 @@ fun LiveOversTab(uiState: LiveScorecardUiState) {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        overBalls.sortedBy { it.ballNo }.forEach { ball ->
+                        overBalls.reversed().forEach { ball ->
+                            val totalR = ball.runsOffBat + (ball.extrasRuns ?: 0)
                             val label = when {
-                                ball.isWicket -> "W"; ball.isSix -> "6"
-                                ball.isBoundary -> "4"
-                                ball.extrasType == "wide" -> "Wd"
-                                ball.extrasType == "no_ball" -> "Nb"
+                                ball.isWicket && ball.wicketType != "retired_hurt" -> if (totalR > 0) "W+$totalR" else "W"
+                                ball.isSix -> "6"; ball.isBoundary -> "4"
+                                ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; if (r > 0) "Wd+$r" else "Wd" }
+                                ball.extrasType == "no_ball" -> if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"
+                                ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; if (b <= 1) "B" else "${b}B" }
+                                ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; if (lb <= 1) "LB" else "${lb}LB" }
                                 ball.runsOffBat == 0 && ball.extrasRuns == null -> "•"
-                                else -> "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"
+                                else -> "$totalR"
                             }
                             val bgColor = when {
                                 ball.isWicket -> ErrorRed; ball.isSix -> NeonGreen
@@ -997,7 +1002,7 @@ fun LiveBallTimeline(uiState: LiveScorecardUiState) {
                 val overRuns = entry.value.sumOf { ballRuns(it) }
                 LiveOverSeparator(entry.key + 1, overRuns)
             }
-            entry.value.sortedBy { it.ballNo }.forEach { ball ->
+            entry.value.reversed().forEach { ball ->
                 LiveBallChip(ball)
             }
         }
@@ -1006,18 +1011,19 @@ fun LiveBallTimeline(uiState: LiveScorecardUiState) {
 
 @Composable
 private fun LiveBallChip(ball: Ball) {
+    val runs = ball.runsOffBat + (ball.extrasRuns ?: 0)
     val label: String
     val color: androidx.compose.ui.graphics.Color
     when {
-        ball.isWicket && ball.wicketType != "retired_hurt" -> { label = "W"; color = ErrorRed }
+        ball.isWicket && ball.wicketType != "retired_hurt" -> { label = if (runs > 0) "W+$runs" else "W"; color = ErrorRed }
         ball.isSix -> { label = "6"; color = PurpleColor }
         ball.isBoundary -> { label = "4"; color = NeonBlue }
-        ball.extrasType == "wide" -> { label = "Wd"; color = AmberColor }
-        ball.extrasType == "no_ball" -> { label = "Nb"; color = AmberColor }
-        ball.extrasType == "bye" -> { label = "${ball.extrasRuns ?: 0}b"; color = SurfaceCard }
-        ball.extrasType == "leg_bye" -> { label = "${ball.extrasRuns ?: 0}lb"; color = SurfaceCard }
+        ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; label = if (r > 0) "Wd+$r" else "Wd"; color = AmberColor }
+        ball.extrasType == "no_ball" -> { label = if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"; color = AmberColor }
+        ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; label = if (b <= 1) "B" else "${b}B"; color = SurfaceCard }
+        ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; label = if (lb <= 1) "LB" else "${lb}LB"; color = SurfaceCard }
         ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = SurfaceCard }
-        else -> { label = "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"; color = SurfaceCard }
+        else -> { label = "$runs"; color = SurfaceCard }
     }
     Box(
         modifier = Modifier

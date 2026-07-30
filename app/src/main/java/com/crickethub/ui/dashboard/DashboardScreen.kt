@@ -54,34 +54,66 @@ fun DashboardScreen(
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                userEmail = SupabaseClient.client.auth.currentUserOrNull()?.email ?: ""
-                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id ?: ""
+                userEmail = SupabaseClient.client.auth.currentUserOrNull()?.email ?: "Guest"
+                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
 
-                val teams = SupabaseClient.client.postgrest["teams"]
-                    .select { filter { eq("created_by", userId) } }
-                    .decodeList<Team>()
+                suspend fun fetchList(table: String): List<Map<String, kotlinx.serialization.json.JsonElement>> {
+                    if (userId != null) {
+                        val byCreated = try {
+                            SupabaseClient.client.postgrest[table]
+                                .select { filter { eq("created_by", userId) } }
+                                .decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
+                        } catch (_: Exception) { emptyList() }
+                        if (byCreated.isNotEmpty()) return byCreated
+                        val byUser = try {
+                            SupabaseClient.client.postgrest[table]
+                                .select { filter { eq("user_id", userId) } }
+                                .decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
+                        } catch (_: Exception) { emptyList() }
+                        if (byUser.isNotEmpty()) return byUser
+                    }
+                    return try {
+                        SupabaseClient.client.postgrest[table].select()
+                            .decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
+                    } catch (_: Exception) { emptyList() }
+                }
+
+                val teams = try {
+                    if (userId != null) {
+                        val t = SupabaseClient.client.postgrest["teams"]
+                            .select { filter { eq("created_by", userId) } }.decodeList<Team>()
+                        t.ifEmpty { SupabaseClient.client.postgrest["teams"].select().decodeList<Team>() }
+                    } else SupabaseClient.client.postgrest["teams"].select().decodeList<Team>()
+                } catch (_: Exception) { emptyList<Team>() }
                 teamCount = teams.size
 
                 playerCount = try {
-                    var count = 0
-                    teams.forEach { team ->
-                        val players = SupabaseClient.client.postgrest["players"]
+                    if (teams.isEmpty()) 0
+                    else teams.sumOf { team ->
+                        try { SupabaseClient.client.postgrest["players"]
                             .select { filter { eq("team_id", team.id) } }
-                            .decodeList<com.crickethub.data.model.Player>()
-                        count += players.size
+                            .decodeList<com.crickethub.data.model.Player>().size
+                        } catch (_: Exception) { 0 }
                     }
-                    count
-                } catch (e: Exception) { 0 }
+                } catch (_: Exception) { 0 }
 
-                val matches = SupabaseClient.client.postgrest["matches"]
-                    .select { filter { eq("created_by", userId) } }
-                    .decodeList<Match>()
+                val matches = try {
+                    if (userId != null) {
+                        val m = SupabaseClient.client.postgrest["matches"]
+                            .select { filter { eq("created_by", userId) } }.decodeList<Match>()
+                        m.ifEmpty { SupabaseClient.client.postgrest["matches"].select().decodeList<Match>() }
+                    } else SupabaseClient.client.postgrest["matches"].select().decodeList<Match>()
+                } catch (_: Exception) { emptyList<Match>() }
                 matchCount = matches.size
                 recentMatches = matches.sortedByDescending { it.createdAt }.take(5)
 
-                val tournaments = SupabaseClient.client.postgrest["tournaments"]
-                    .select { filter { eq("created_by", userId) } }
-                    .decodeList<Tournament>()
+                val tournaments = try {
+                    if (userId != null) {
+                        val t = SupabaseClient.client.postgrest["tournaments"]
+                            .select { filter { eq("created_by", userId) } }.decodeList<Tournament>()
+                        t.ifEmpty { SupabaseClient.client.postgrest["tournaments"].select().decodeList<Tournament>() }
+                    } else SupabaseClient.client.postgrest["tournaments"].select().decodeList<Tournament>()
+                } catch (_: Exception) { emptyList<Tournament>() }
                 tournamentCount = tournaments.size
                 activeTournaments = tournaments.filter { it.status != "completed" }.take(3)
 
@@ -163,6 +195,44 @@ fun DashboardScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen.copy(alpha = 0.15f))
             ) {
                 Text("🔗  Join with Code", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+
+        // Feature cards
+        item {
+            Text("Features", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 8.dp))
+        }
+        item {
+            val features = listOf(
+                Triple("🏏", "Matches", "Create and score live matches"),
+                Triple("👥", "Teams", "Manage your teams and squads"),
+                Triple("🏆", "Tournaments", "Run tournaments with fixtures"),
+                Triple("📊", "Players", "Career batting & bowling records"),
+                Triple("⚔️", "Compare", "Head-to-head player comparison"),
+                Triple("🔗", "Join", "Enter a code to view shared content")
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                features.chunked(2).forEach { row ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { (emoji, title, desc) ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(SurfaceCard)
+                                    .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Column {
+                                    Text("$emoji $title", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(desc, color = TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                                }
+                            }
+                        }
+                        if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
 

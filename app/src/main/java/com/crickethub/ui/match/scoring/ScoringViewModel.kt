@@ -1083,14 +1083,35 @@ class ScoringViewModel : ViewModel() {
     }
     private fun generateCommentary(runs: Int, extrasType: String?, extrasRuns: Int?,
                                    isWicket: Boolean, wicketType: String?, batsmanName: String, bowlerName: String, fielderName: String? = null): String {
+        val header = "$bowlerName to $batsmanName"
         if (isWicket) return when (wicketType) {
-            "bowled" -> "BOWLED! $batsmanName b $bowlerName"; "caught" -> if (fielderName != null) "CAUGHT! c $fielderName b $bowlerName" else "CAUGHT! b $bowlerName"
-            "lbw" -> "LBW! lbw b $bowlerName"; "run_out" -> if (fielderName != null) "RUN OUT! run out ($fielderName)" else "RUN OUT!"
-            "stumped" -> if (fielderName != null) "STUMPED! st $fielderName b $bowlerName" else "STUMPED!"
-            "hit_wicket" -> "HIT WICKET! b $bowlerName"; "retired_hurt" -> "RETIRED HURT! ($batsmanName can return)"; else -> "OUT! b $bowlerName" }
+            "bowled" -> "$header, OUT! BOWLED! The stumps are rattled, $batsmanName b $bowlerName"
+            "caught" -> if (fielderName != null) "$header, OUT! CAUGHT! $fielderName takes the catch, c $fielderName b $bowlerName"
+            else "$header, OUT! CAUGHT & BOWLED! $bowlerName takes a sharp return catch"
+            "lbw" -> "$header, OUT! LBW! Struck on the pads, umpire raises the finger, lbw b $bowlerName"
+            "run_out" -> if (fielderName != null) "$header, OUT! RUN OUT! Direct hit from $fielderName, $batsmanName well short of the crease"
+            else "$header, OUT! RUN OUT! $batsmanName caught short of the crease"
+            "stumped" -> if (fielderName != null) "$header, OUT! STUMPED! Quick work by $fielderName behind the stumps"
+            else "$header, OUT! STUMPED! Lightning quick stumping"
+            "hit_wicket" -> "$header, OUT! HIT WICKET! $batsmanName loses balance and dislodges the bails"
+            "retired_hurt" -> "$header, RETIRED HURT! $batsmanName walks off, can return later"
+            else -> "$header, OUT! $batsmanName is dismissed by $bowlerName"
+        }
         if (extrasType != null) return when (extrasType) {
-            "wide" -> "Wide! ${(extrasRuns ?: 1) + runs} run(s)"; "no_ball" -> "No Ball! Free hit next!"
-            "bye" -> "${extrasRuns ?: 1} Bye(s)"; "leg_bye" -> "${extrasRuns ?: 1} Leg Bye(s)"; else -> "Extras" }
-        return when (runs) { 0 -> "Dot. $batsmanName defends"; 1 -> "$batsmanName takes a single"; 2 -> "Two runs!"; 3 -> "Three!"; 4 -> "FOUR! $batsmanName to the boundary!"; 6 -> "SIX! $batsmanName maximum!"; else -> "$runs runs" }
+            "wide" -> "$header, Wide ball! ${(extrasRuns ?: 1) + runs} runs added, strays down the leg side"
+            "no_ball" -> "$header, No ball! Free hit coming up${if (runs > 0) ", $batsmanName scores $runs off it" else ""}"
+            "bye" -> "$header, ${extrasRuns ?: 1} bye(s), beats bat and keeper"
+            "leg_bye" -> "$header, ${extrasRuns ?: 1} leg bye(s), off the pads"
+            else -> "$header, Extras"
+        }
+        return when (runs) {
+            0 -> "$header, no run. Good delivery, $batsmanName defends solidly"
+            1 -> "$header, 1 run. $batsmanName works it away for a single"
+            2 -> "$header, 2 runs. Good running between the wickets"
+            3 -> "$header, 3 runs. Excellent running, they come back for the third"
+            4 -> "$header, FOUR! $batsmanName finds the boundary, brilliant shot"
+            6 -> "$header, SIX! $batsmanName launches it over the ropes, maximum!"
+            else -> "$header, $runs runs"
+        }
     }
 }

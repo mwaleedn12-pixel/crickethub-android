@@ -217,14 +217,16 @@ class LiveScorecardViewModel : ViewModel() {
         val currentOverNo = if (legalBalls.isEmpty()) 0 else legalBalls.last().overNo
         val currentOverBalls = balls.filter { it.overNo == currentOverNo }
         return currentOverBalls.map { ball ->
+            val runs = ball.runsOffBat + (ball.extrasRuns ?: 0)
             when {
-                ball.isWicket -> "W"
-                ball.isSix -> "6"
-                ball.isBoundary -> "4"
-                ball.extrasType == "wide" -> "Wd"
-                ball.extrasType == "no_ball" -> "Nb"
+                ball.isWicket && ball.wicketType != "retired_hurt" -> if (runs > 0) "W+$runs" else "W"
+                ball.isSix -> "6"; ball.isBoundary -> "4"
+                ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; if (r > 0) "Wd+$r" else "Wd" }
+                ball.extrasType == "no_ball" -> if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"
+                ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; if (b <= 1) "B" else "${b}B" }
+                ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; if (lb <= 1) "LB" else "${lb}LB" }
                 ball.runsOffBat == 0 && ball.extrasRuns == null -> "0"
-                else -> "${ball.runsOffBat + (ball.extrasRuns ?: 0)}"
+                else -> "$runs"
             }
         }
     }
