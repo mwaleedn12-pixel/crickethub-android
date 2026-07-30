@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.crickethub.data.repository.AuthRepository
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +64,26 @@ class AuthViewModel : ViewModel() {
                 repository.login(email, password)
                 _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
             } catch (e: Exception) {
+                // On timeout or connection error, refresh the Supabase client and retry once
+                val isTimeout = e.message?.contains("timeout", ignoreCase = true) == true ||
+                        e.message?.contains("Unable to resolve host", ignoreCase = true) == true ||
+                        e.message?.contains("connect", ignoreCase = true) == true ||
+                        e is java.net.SocketTimeoutException ||
+                        e is java.net.ConnectException
+                if (isTimeout) {
+                    try {
+                        com.crickethub.data.remote.SupabaseClient.client.auth.refreshCurrentSession()
+                    } catch (_: Exception) { /* ignore refresh failure */ }
+                    try {
+                        repository.login(email, password)
+                        _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
+                        return@launch
+                    } catch (retryEx: Exception) {
+                        val msg = "Connection timed out. Please check your internet and try again."
+                        _uiState.update { it.copy(isLoading = false, error = msg) }
+                        return@launch
+                    }
+                }
                 val msg = when {
                     e.message?.contains("Invalid login") == true -> "Invalid email or password"
                     e.message?.contains("Email not confirmed") == true -> "Please verify your email first"

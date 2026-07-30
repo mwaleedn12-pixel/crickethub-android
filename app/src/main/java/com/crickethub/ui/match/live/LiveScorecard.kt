@@ -256,8 +256,9 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         }
 
         // Batsmen
-        // Show batsmen who faced balls, are out, or appeared at the crease (in any ball's batsmanId/nonStrikerId)
-        val appearedIds = uiState.balls.flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) }.toSet()
+        // Show batsmen who faced balls, are out, appeared at the crease, or are currently selected as striker/non-striker
+        val appearedIds = (uiState.balls.flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) } +
+                listOfNotNull(uiState.strikerId, uiState.nonStrikerId)).toSet()
         val battedList = uiState.batsmanStats.values.filter { it.balls > 0 || it.isOut || it.player.id in appearedIds }
         items(battedList) { stats ->
             Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
@@ -288,7 +289,9 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         }
 
         // Did not bat
-        val didNotBat = uiState.batsmanStats.values.filter { it.balls == 0 && !it.isOut && it.player.id !in appearedIds }
+        val didNotBat = uiState.batsmanStats.values.filter {
+            it.balls == 0 && !it.isOut && it.player.id !in appearedIds
+        }
         if (didNotBat.isNotEmpty()) {
             item {
                 Column(

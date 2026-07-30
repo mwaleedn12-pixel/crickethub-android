@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +47,8 @@ fun PlayersScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var playerToEdit by remember { mutableStateOf<Player?>(null) }
     var playerToDelete by remember { mutableStateOf<Player?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importSelectedTeamId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(teamId) { viewModel.loadPlayers(teamId) }
 
@@ -61,6 +66,12 @@ fun PlayersScreen(
                     fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     color = TextPrimary, modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = {
+                    viewModel.loadAllTeams()
+                    showImportDialog = true
+                }) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = "Import Player", tint = NeonBlue)
+                }
                 IconButton(onClick = { showAddDialog = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Add Player", tint = NeonGreen)
                 }
@@ -154,6 +165,128 @@ fun PlayersScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { playerToDelete = null }) {
+                        Text("Cancel", color = TextSecondary)
+                    }
+                }
+            )
+        }
+
+        // Import Player Dialog — two-step: pick team, then pick player
+        if (showImportDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showImportDialog = false
+                    importSelectedTeamId = null
+                    viewModel.clearImportPlayers()
+                },
+                containerColor = SurfaceCard,
+                title = {
+                    Text(
+                        if (importSelectedTeamId == null) "Select Team" else "Select Player",
+                        color = NeonBlue, fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.heightIn(max = 350.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        if (importSelectedTeamId == null) {
+                            // Step 1: Team list (exclude current team)
+                            val otherTeams = uiState.allTeams.filter { it.id != teamId }
+                            if (otherTeams.isEmpty()) {
+                                Text("No other teams found", color = TextSecondary, fontSize = 13.sp)
+                            } else {
+                                otherTeams.forEach { team ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(SurfaceCard)
+                                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                importSelectedTeamId = team.id
+                                                viewModel.loadImportTeamPlayers(team.id)
+                                            }
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(team.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
+                            }
+                        } else {
+                            // Step 2: Player list from selected team
+                            val players = uiState.importTeamPlayers
+                            if (players.isEmpty()) {
+                                Text("Loading players...", color = TextSecondary, fontSize = 13.sp)
+                            } else {
+                                // Exclude players already in the current team (by name match)
+                                val existingNames = uiState.players.map { it.fullName.lowercase() }.toSet()
+                                players.forEach { player ->
+                                    val alreadyExists = player.fullName.lowercase() in existingNames
+                                    val roleColor = when (player.role?.lowercase()) {
+                                        "batsman" -> NeonBlue; "bowler" -> ErrorRed
+                                        "allrounder" -> NeonGreen; "wicketkeeper" -> AmberColor
+                                        else -> TextSecondary
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (alreadyExists) BackgroundDark.copy(alpha = 0.5f) else SurfaceCard)
+                                            .border(1.dp, if (alreadyExists) BorderColor.copy(alpha = 0.3f) else BorderColor, RoundedCornerShape(8.dp))
+                                            .then(if (!alreadyExists) Modifier.clickable {
+                                                viewModel.importPlayer(player, teamId)
+                                                showImportDialog = false
+                                                importSelectedTeamId = null
+                                                viewModel.clearImportPlayers()
+                                            } else Modifier)
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                player.fullName,
+                                                color = if (alreadyExists) TextSecondary else TextPrimary,
+                                                fontSize = 14.sp, fontWeight = FontWeight.SemiBold
+                                            )
+                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                player.role?.let {
+                                                    Text(roleLabel(it), color = roleColor, fontSize = 10.sp)
+                                                }
+                                                Text(
+                                                    "${player.battingHand?.take(1)?.uppercase() ?: "R"}HB",
+                                                    color = TextSecondary, fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                        if (alreadyExists) {
+                                            Text("Already added", color = TextSecondary, fontSize = 10.sp)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (importSelectedTeamId != null) {
+                        TextButton(onClick = {
+                            importSelectedTeamId = null
+                            viewModel.clearImportPlayers()
+                        }) {
+                            Text("← Back to Teams", color = NeonBlue)
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showImportDialog = false
+                        importSelectedTeamId = null
+                        viewModel.clearImportPlayers()
+                    }) {
                         Text("Cancel", color = TextSecondary)
                     }
                 }

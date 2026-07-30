@@ -37,7 +37,6 @@ fun MatchesScreen(
     onMatchClick: (String) -> Unit,
     onViewScorecard: (String) -> Unit,
     onViewAnalytics: (String) -> Unit,
-    onDLSCalculator: () -> Unit = {},
     viewModel: MatchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -86,18 +85,6 @@ fun MatchesScreen(
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // DLS Calculator button
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                if (isDark) Color(0xFF1A3828) else Color(0xFFD1FAE5)
-                            )
-                            .clickable { onDLSCalculator() }
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        Text("🌧️ DLS", fontSize = 12.sp, color = greenDk, fontWeight = FontWeight.SemiBold)
-                    }
                     // New match button
                     Box(
                         modifier = Modifier

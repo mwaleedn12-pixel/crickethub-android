@@ -470,11 +470,27 @@ fun CricketHubApp() {
                 ScoringScreen(
                     matchId = matchId,
                     onBack = {
-                        navController.popBackStack("matches", false)
+                        // Try tournament_detail first (tournament → match_flow → scoring path).
+                        // If not on stack, try matches tab, then dashboard.
+                        val poppedToTournament = navController.popBackStack("tournament_detail/{tournamentId}", false)
+                        if (!poppedToTournament) {
+                            val poppedToMatches = navController.popBackStack("matches", false)
+                            if (!poppedToMatches) {
+                                navController.popBackStack("dashboard", false)
+                            }
+                        }
                     },
                     onInningsComplete = {
+                        // Pop to the right parent — tournament_detail if from tournament, matches otherwise
+                        val hasTournament = navController.currentBackStack.value.any {
+                            it.destination.route == "tournament_detail/{tournamentId}"
+                        }
                         navController.navigate("post_match/$matchId") {
-                            popUpTo("matches") { inclusive = false }
+                            if (hasTournament) {
+                                popUpTo("tournament_detail/{tournamentId}") { inclusive = false }
+                            } else {
+                                popUpTo("matches") { inclusive = false }
+                            }
                         }
                     },
                     onViewScorecard = { navController.navigate("live_scorecard/$matchId") },
@@ -576,7 +592,17 @@ fun CricketHubApp() {
                 val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
                 PostMatchScreen(
                     matchId = matchId,
-                    onBack = { navController.popBackStack() },
+                    onBack = {
+                        // Try to pop to tournament_detail first (handles Tournament → Match → PostMatch flow).
+                        // If no tournament_detail on the stack, try matches tab, then dashboard.
+                        val poppedToTournament = navController.popBackStack("tournament_detail/{tournamentId}", false)
+                        if (!poppedToTournament) {
+                            val poppedToMatches = navController.popBackStack("matches", false)
+                            if (!poppedToMatches) {
+                                navController.popBackStack("dashboard", false)
+                            }
+                        }
+                    },
                     onGoToMatches = {
                         navController.navigate("matches") {
                             popUpTo("matches") { inclusive = true }

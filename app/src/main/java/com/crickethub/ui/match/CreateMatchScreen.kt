@@ -59,7 +59,7 @@ fun CreateMatchScreen(
     var inningsBreak by remember { mutableStateOf("20") }
     var freeHitOnNoball by remember { mutableStateOf(true) }
     var superOverEnabled by remember { mutableStateOf(false) }
-    var dlsEnabled by remember { mutableStateOf(false) }
+    // DLS removed — future update
     var liveSharingEnabled by remember { mutableStateOf(false) }
     var isPublic by remember { mutableStateOf(true) }
 
@@ -304,7 +304,6 @@ fun CreateMatchScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 ToggleRow("Free Hit on No Ball", freeHitOnNoball) { freeHitOnNoball = it }
                                 ToggleRow("Super Over Enabled", superOverEnabled) { superOverEnabled = it }
-                                ToggleRow("DLS / Target Revision", dlsEnabled) { dlsEnabled = it }
                                 ToggleRow("Live Score Sharing", liveSharingEnabled) { liveSharingEnabled = it }
                                 ToggleRow("Public Match", isPublic) { isPublic = it }
                             }
@@ -442,7 +441,7 @@ fun CreateMatchScreen(
                                 inningsBreakMinutes = inningsBreak.toIntOrNull() ?: 20,
                                 superOverEnabled = superOverEnabled,
                                 freeHitOnNoball = freeHitOnNoball,
-                                dlsEnabled = dlsEnabled,
+                                dlsEnabled = false,
                                 maxOversPerBowler = maxOversPerBowler.toIntOrNull() ?: defaultMaxOversPerBowler,
                                 umpire1 = umpire1.trim().ifBlank { null },
                                 umpire2 = umpire2.trim().ifBlank { null },

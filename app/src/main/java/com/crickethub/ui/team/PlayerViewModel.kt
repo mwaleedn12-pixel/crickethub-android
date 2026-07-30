@@ -6,7 +6,9 @@ import com.crickethub.data.model.Player
 import com.crickethub.data.model.PlayerInsert
 import com.crickethub.data.model.PlayerStats
 import com.crickethub.data.model.PlayerUpdate
+import com.crickethub.data.model.Team
 import com.crickethub.data.repository.PlayerRepository
+import com.crickethub.data.repository.TeamRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,12 +20,16 @@ data class PlayerUiState(
     val currentPlayer: Player? = null,
     val playerStats: PlayerStats = PlayerStats(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    // Import player flow
+    val allTeams: List<Team> = emptyList(),
+    val importTeamPlayers: List<Player> = emptyList()
 )
 
 class PlayerViewModel : ViewModel() {
 
     private val playerRepository = PlayerRepository()
+    private val teamRepository = TeamRepository()
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -103,4 +109,60 @@ class PlayerViewModel : ViewModel() {
     }
 
     fun clearError() { _uiState.update { it.copy(error = null) } }
+
+    /** Load all teams (for the import-player team picker). */
+    fun loadAllTeams() {
+        viewModelScope.launch {
+            try {
+                val teams = teamRepository.getAllTeams()
+                _uiState.update { it.copy(allTeams = teams) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to load teams: ${e.message}") }
+            }
+        }
+    }
+
+    /** Load players for a specific team (for import selection). */
+    fun loadImportTeamPlayers(teamId: String) {
+        viewModelScope.launch {
+            try {
+                val players = playerRepository.getPlayersByTeam(teamId)
+                _uiState.update { it.copy(importTeamPlayers = players) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to load players: ${e.message}") }
+            }
+        }
+    }
+
+    /** Copy a player from another team into the current team. */
+    fun importPlayer(sourcePlayer: Player, targetTeamId: String) {
+        viewModelScope.launch {
+            try {
+                val insert = PlayerInsert(
+                    teamId = targetTeamId,
+                    fullName = sourcePlayer.fullName,
+                    nickname = sourcePlayer.nickname,
+                    jerseyNo = sourcePlayer.jerseyNo,
+                    dateOfBirth = sourcePlayer.dateOfBirth,
+                    gender = sourcePlayer.gender,
+                    country = sourcePlayer.country,
+                    city = sourcePlayer.city,
+                    battingHand = sourcePlayer.battingHand,
+                    bowlingHand = sourcePlayer.bowlingHand,
+                    bowlingStyle = sourcePlayer.bowlingStyle,
+                    role = sourcePlayer.role,
+                    availability = sourcePlayer.availability
+                )
+                playerRepository.createPlayer(insert)
+                loadPlayers(targetTeamId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Import failed: ${e.message}") }
+            }
+        }
+    }
+
+    /** Clear import team players when closing import dialog. */
+    fun clearImportPlayers() {
+        _uiState.update { it.copy(importTeamPlayers = emptyList()) }
+    }
 }

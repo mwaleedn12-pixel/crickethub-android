@@ -41,7 +41,10 @@ data class LiveScorecardUiState(
     val extrasTotal: Int = 0,
     val resultText: String = "",
     val shareableSlug: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    // Current crease players — so LiveScorecard can show 0(0) batsmen before any ball is bowled
+    val strikerId: String? = null,
+    val nonStrikerId: String? = null
 )
 
 /** Dismissals with no ball bowled — excluded from balls faced and the bowler's over. */
@@ -100,7 +103,9 @@ class LiveScorecardViewModel : ViewModel() {
                         balls = balls,
                         wides = innings.wides,
                         noBalls = innings.noBalls,
-                        extrasTotal = innings.extrasTotal
+                        extrasTotal = innings.extrasTotal,
+                        strikerId = scoringState.striker?.id,
+                        nonStrikerId = scoringState.nonStriker?.id
                     )
                 }
             } catch (e: Exception) {

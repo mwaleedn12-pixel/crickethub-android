@@ -289,7 +289,16 @@ class ScoringViewModel : ViewModel() {
 
         var bowler: Player? = null
         if (overComplete) {
-            reason.append("over complete -> ask bowler; ")
+            // Over is complete — normally we'd ask for a new bowler. But if the
+            // cache already holds the bowler the user selected for this new over
+            // (i.e. a bowler different from the one who bowled the completed over),
+            // keep it so the selection dialog doesn't flash on resume.
+            val prevBowlerId = (balls
+                .filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
+                .lastOrNull() ?: balls.last()).bowlerId
+            bowler = cached?.currentBowler?.takeIf { it.id != prevBowlerId }
+            if (bowler != null) reason.append("over complete -> cached bowler kept; ")
+            else reason.append("over complete -> ask bowler; ")
         } else {
             val lastLegal = balls
                 .filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
@@ -396,7 +405,9 @@ class ScoringViewModel : ViewModel() {
                 val (batName, bowlName, tourName) = headerNames(match, liveInnings.battingTeamId, liveInnings.bowlingTeamId)
                 _uiState.update { it.copy(
                     isLoading = false, match = match, innings = liveInnings, balls = balls,
-                    striker = striker, nonStriker = nonStriker, currentBowler = currentBowler,
+                    striker = striker ?: it.striker,
+                    nonStriker = nonStriker ?: it.nonStriker,
+                    currentBowler = currentBowler ?: it.currentBowler,
                     battingTeamPlayers = battingPlayers, bowlingTeamPlayers = bowlingPlayers,
                     batsmanStats = batsmanStats, bowlerStats = bowlerStats,
                     battingTeamName = batName, bowlingTeamName = bowlName, tournamentName = tourName,
