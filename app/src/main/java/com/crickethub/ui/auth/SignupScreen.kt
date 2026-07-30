@@ -398,11 +398,11 @@ fun SignupScreen(
             title = { Text("Verify Your Email", color = NeonGreen, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Enter the 6-digit code sent to ${uiState.otpEmail}",
+                    Text("Enter the OTP code sent to ${uiState.otpEmail}",
                         color = TextSecondary, fontSize = 13.sp)
                     OutlinedTextField(
                         value = otpCode,
-                        onValueChange = { if (it.length <= 6) otpCode = it },
+                        onValueChange = { if (it.length <= 8) otpCode = it },
                         label = { Text("OTP Code") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -419,7 +419,7 @@ fun SignupScreen(
             confirmButton = {
                 Button(
                     onClick = { viewModel.verifyOTP(uiState.otpEmail, otpCode) },
-                    enabled = otpCode.length == 6 && !uiState.isLoading,
+                    enabled = otpCode.length >= 6 && !uiState.isLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
                 ) {
                     if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)

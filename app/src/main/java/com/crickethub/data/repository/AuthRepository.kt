@@ -72,11 +72,19 @@ class AuthRepository {
     }
 
     // ── Forgot Password ───────────────────────────────────────────────────────
+    // resetPasswordForEmail triggers the "Reset Password" email template
+    // (the one with {{ .Token }}). signInWith(OTP) triggers "Magic Link" instead.
     suspend fun sendPasswordResetOTP(email: String) {
-        SupabaseClient.client.auth.signInWith(OTP) {
-            this.email = email
-            this.createUser = false
-        }
+        SupabaseClient.client.auth.resetPasswordForEmail(email)
+    }
+
+    // Verify a RECOVERY OTP (different from EMAIL type used for magic link/signup)
+    suspend fun verifyPasswordResetOTP(email: String, token: String) {
+        SupabaseClient.client.auth.verifyEmailOtp(
+            type = OtpType.Email.RECOVERY,
+            email = email,
+            token = token
+        )
     }
 
     suspend fun updatePassword(newPassword: String) {

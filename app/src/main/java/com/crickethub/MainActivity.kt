@@ -119,20 +119,33 @@ fun CricketHubApp() {
     val showBottomBar = currentRoute in bottomRoutes
     val scope = rememberCoroutineScope()
 
-    // Session check — if logged in go to dashboard
+    // ── Auth-aware start destination ──────────────────────────
+    // Check session BEFORE rendering NavHost so that:
+    //   • Theme change (Activity recreate) does NOT flash the login screen
+    //   • An unauthenticated user never lands on dashboard
+    var authChecked by remember { mutableStateOf(false) }
+    var startRoute by remember { mutableStateOf("login") }
+
     LaunchedEffect(Unit) {
-        scope.launch {
-            try {
-                val user = SupabaseClient.client.auth.currentUserOrNull()
-                if (user != null) {
-                    navController.navigate("dashboard") {
-                        popUpTo("login") { inclusive = true }
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Session: ${e.message}")
-            }
+        try {
+            val user = SupabaseClient.client.auth.currentUserOrNull()
+            startRoute = if (user != null) "dashboard" else "login"
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Session check: ${e.message}")
+            startRoute = "login"
         }
+        authChecked = true
+    }
+
+    // Show nothing until auth is resolved — prevents login flash on theme change
+    if (!authChecked) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(BackgroundDark),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = NeonGreen)
+        }
+        return
     }
 
     Scaffold(
@@ -167,7 +180,7 @@ fun CricketHubApp() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = "login",
+            startDestination = startRoute,
             modifier = Modifier.padding(paddingValues)
         ) {
             // ── Auth ─────────────────────────────────────
@@ -175,7 +188,7 @@ fun CricketHubApp() {
                 LoginScreen(
                     onLoginSuccess = {
                         navController.navigate("dashboard") {
-                            popUpTo("login") { inclusive = true }
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     onNavigateToSignup = { navController.navigate("signup") },
@@ -186,7 +199,7 @@ fun CricketHubApp() {
                 SignupScreen(
                     onSignupSuccess = {
                         navController.navigate("dashboard") {
-                            popUpTo("login") { inclusive = true }
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     onNavigateToLogin = { navController.popBackStack() }

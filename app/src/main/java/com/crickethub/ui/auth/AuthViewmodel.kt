@@ -156,7 +156,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                repository.verifyOTP(email, token)
+                repository.verifyPasswordResetOTP(email, token)
                 repository.updatePassword(newPassword)
                 _uiState.update { it.copy(isLoading = false, otpSent = false, otpVerified = true,
                     successMessage = "Password changed successfully!") }
