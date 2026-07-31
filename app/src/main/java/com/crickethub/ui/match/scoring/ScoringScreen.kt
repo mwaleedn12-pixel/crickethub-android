@@ -78,8 +78,21 @@ fun ScoringScreen(
         // If returning from background after 30+ seconds, refresh session and force reload
         val elapsed = System.currentTimeMillis() - lastResumeTime
         if (elapsed > 30_000) {
-            try { com.crickethub.data.remote.SupabaseClient.client.auth.refreshCurrentSession() }
-            catch (_: Exception) {}
+            // Try to refresh session — retry once on failure
+            var refreshed = false
+            for (attempt in 1..2) {
+                try {
+                    com.crickethub.data.remote.SupabaseClient.client.auth.refreshCurrentSession()
+                    refreshed = true
+                    break
+                } catch (e: Exception) {
+                    android.util.Log.w("CricketHub", "Session refresh attempt $attempt failed: ${e.message}")
+                    if (attempt == 1) kotlinx.coroutines.delay(1000)
+                }
+            }
+            if (!refreshed) {
+                android.util.Log.e("CricketHub", "Session refresh failed after 2 attempts, trying reload anyway")
+            }
             viewModel.resumeMatch(matchId, force = true)
         } else {
             viewModel.resumeMatch(matchId)

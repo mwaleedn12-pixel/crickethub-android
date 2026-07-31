@@ -6,6 +6,7 @@ import com.crickethub.data.model.Match
 import com.crickethub.data.model.MatchInsert
 import com.crickethub.data.model.PlayingXIInsert
 import com.crickethub.data.model.Team
+import com.crickethub.data.model.Tournament
 import com.crickethub.data.remote.SupabaseClient
 import com.crickethub.data.repository.MatchRepository
 import com.crickethub.data.repository.TeamRepository
@@ -23,7 +24,8 @@ data class MatchUiState(
     val currentMatch: Match? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val matchCreated: Boolean = false
+    val matchCreated: Boolean = false,
+    val tournamentNames: Map<String, String> = emptyMap()
 )
 
 class MatchViewModel : ViewModel() {
@@ -37,6 +39,7 @@ class MatchViewModel : ViewModel() {
     init {
         loadMatches()
         loadTeams() // ← FIX: teams bhi load karo taake match cards mein names show hon
+        loadTournamentNames()
     }
 
     fun deleteMatch(matchId: String) {
@@ -72,6 +75,20 @@ class MatchViewModel : ViewModel() {
                 _uiState.update { it.copy(teams = teams) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    private fun loadTournamentNames() {
+        viewModelScope.launch {
+            try {
+                val tournaments = SupabaseClient.client.postgrest["tournaments"]
+                    .select()
+                    .decodeList<Tournament>()
+                val nameMap = tournaments.associate { it.id to it.name }
+                _uiState.update { it.copy(tournamentNames = nameMap) }
+            } catch (e: Exception) {
+                android.util.Log.e("CricketHub", "Load tournament names: ${e.message}")
             }
         }
     }

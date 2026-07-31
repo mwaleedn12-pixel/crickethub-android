@@ -462,8 +462,8 @@ fun TFixturesTab(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── Setup section (before fixtures generated) ──
-        if (!fixturesGenerated) {
+        // ── Setup section (before fixtures generated, only after data has loaded) ──
+        if (!fixturesGenerated && uiState.detailLoaded) {
             // Teams
             item {
                 Column(

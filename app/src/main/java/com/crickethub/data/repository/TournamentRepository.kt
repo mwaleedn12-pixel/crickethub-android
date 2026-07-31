@@ -220,6 +220,9 @@ class TournamentRepository {
             }
         }
 
+        // Interleave fixtures so one team's matches don't cluster together
+        val interleaved = interleaveFixtures(specs)
+
         val matchType = tournament.matchType ?: "T20"
         val totalOvers = tournament.oversPerMatch ?: 20
         val playersPerSide = tournament.playersPerSide ?: 11
@@ -230,7 +233,7 @@ class TournamentRepository {
             else -> 10
         }
 
-        specs.forEachIndexed { index, spec ->
+        interleaved.forEachIndexed { index, spec ->
             try {
                 client.postgrest["matches"].insert(
                     MatchInsert(
@@ -257,6 +260,36 @@ class TournamentRepository {
         }
 
         return getTournamentFixtures(tournamentId)
+    }
+
+    /**
+     * Interleave fixtures so no team plays consecutive matches.
+     * Uses a greedy approach: pick the next fixture where neither
+     * team played in the previous fixture.
+     */
+    private fun interleaveFixtures(specs: List<FixtureSpec>): List<FixtureSpec> {
+        if (specs.size <= 2) return specs
+        val remaining = specs.toMutableList()
+        val result = mutableListOf<FixtureSpec>()
+        val lastTeams = mutableSetOf<String>()
+
+        while (remaining.isNotEmpty()) {
+            // Find a fixture where neither team played last
+            val idx = remaining.indexOfFirst { spec ->
+                spec.team1Id !in lastTeams && spec.team2Id !in lastTeams
+            }
+            val pick = if (idx >= 0) {
+                remaining.removeAt(idx)
+            } else {
+                // No ideal match — just take the first remaining
+                remaining.removeAt(0)
+            }
+            result.add(pick)
+            lastTeams.clear()
+            lastTeams.add(pick.team1Id)
+            lastTeams.add(pick.team2Id)
+        }
+        return result
     }
 
     /** Single Knockout: only first round (teams without byes) */

@@ -27,7 +27,8 @@ data class TournamentUiState(
     val teamDetails: List<Team> = emptyList(),
     val fixtures: List<Match> = emptyList(),
     val allTeams: List<Team> = emptyList(),
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
+    val detailLoaded: Boolean = false,
     val error: String? = null
 )
 
@@ -69,7 +70,7 @@ class TournamentViewModel : ViewModel() {
 
     fun loadTournamentDetail(tournamentId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, detailLoaded = false) }
             try {
                 val tournament = tournamentRepository.getTournamentById(tournamentId)
                 val tournamentTeams = tournamentRepository.getTournamentTeams(tournamentId)
@@ -91,6 +92,7 @@ class TournamentViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        detailLoaded = true,
                         currentTournament = tournament,
                         tournamentTeams = tournamentTeams,
                         teamDetails = teamDetails,

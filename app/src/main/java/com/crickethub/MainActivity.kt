@@ -6,8 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
@@ -34,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -137,13 +143,19 @@ fun CricketHubApp() {
         authChecked = true
     }
 
-    // Show nothing until auth is resolved — prevents login flash on theme change
+    // Show branded splash until auth is resolved — prevents login flash on theme change
     if (!authChecked) {
         Box(
             modifier = Modifier.fillMaxSize().background(BackgroundDark),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = NeonGreen)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("🏏", fontSize = 56.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("CricketHub", color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                CircularProgressIndicator(color = NeonGreen, modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
+            }
         }
         return
     }

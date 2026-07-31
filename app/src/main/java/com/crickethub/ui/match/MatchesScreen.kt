@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Score
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,13 +51,14 @@ fun MatchesScreen(
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
 
-    var selectedFilter by remember { mutableStateOf("All") }
-    val filters = listOf("All", "Live", "Upcoming", "Completed")
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    val filters = listOf("All", "Live", "Upcoming", "Completed", "Tournament")
 
     val filteredMatches = when (selectedFilter) {
         "Live"      -> uiState.matches.filter { it.status == "live" }
         "Upcoming"  -> uiState.matches.filter { it.status == "upcoming" || it.status == "scheduled" }
         "Completed" -> uiState.matches.filter { it.status == "completed" }
+        "Tournament" -> uiState.matches.filter { it.tournamentId != null }
         else        -> uiState.matches
     }
 
@@ -155,10 +157,12 @@ fun MatchesScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(filteredMatches) { match ->
+                        val tournamentName = match.tournamentId?.let { uiState.tournamentNames[it] }
                         MatchCard(
                             match = match,
                             team1Name = uiState.teams.find { it.id == match.team1Id }?.name ?: "Team 1",
                             team2Name = uiState.teams.find { it.id == match.team2Id }?.name ?: "Team 2",
+                            tournamentName = tournamentName,
                             isDark = isDark,
                             onClick = { onMatchClick(match.id) },
                             onViewScorecard = { onViewScorecard(match.id) },
@@ -179,6 +183,7 @@ fun MatchCard(
     match: Match,
     team1Name: String,
     team2Name: String,
+    tournamentName: String? = null,
     isDark: Boolean,
     onClick: () -> Unit,
     onViewScorecard: () -> Unit,
@@ -338,6 +343,24 @@ fun MatchCard(
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Tournament name badge ─────────────────────────────────
+            if (tournamentName != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF8B5CF6).copy(alpha = if (isDark) 0.15f else 0.10f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        "🏆 $tournamentName",
+                        color = Color(0xFF8B5CF6),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             // ── Teams row ─────────────────────────────────────────────
             Row(

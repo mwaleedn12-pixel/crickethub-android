@@ -329,11 +329,9 @@ class ScoringViewModel : ViewModel() {
             _uiState.value = cached.copy(isLoading = false, error = null)
         }
         if (force) {
-            // clear the finished innings so the new one loads onto a clean slate
-            _uiState.update { it.copy(innings = null, balls = emptyList(),
-                striker = null, nonStriker = null, currentBowler = null,
-                batsmanStats = emptyMap(), bowlerStats = emptyMap(),
-                inningsComplete = false, matchComplete = false) }
+            // Mark as loading but keep old data visible so the user doesn't see zeros.
+            // The state will be fully replaced once the DB load completes.
+            _uiState.update { it.copy(isLoading = true, inningsComplete = false, matchComplete = false) }
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = it.balls.isEmpty(), error = null) }
