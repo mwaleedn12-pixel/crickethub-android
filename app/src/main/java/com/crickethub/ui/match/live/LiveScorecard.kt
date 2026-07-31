@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -222,7 +223,48 @@ fun LiveScorecardScreen(
     }
 } // CricketAnimatedBackground
 
-// ── SCORECARD TAB ────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// HELPER: Determine batting order from ball data
+// Returns list of player IDs in the order they first appeared
+// at the crease (as batsmanId or nonStrikerId).
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Returns player IDs in crease-arrival order (batting number).
+ * Scans balls chronologically; the first time a player appears
+ * as batsmanId or nonStrikerId, that's their batting position.
+ */
+private fun battingOrderFromBalls(balls: List<Ball>, strikerId: String? = null, nonStrikerId: String? = null): List<String> {
+    val order = mutableListOf<String>()
+    val seen = mutableSetOf<String>()
+    // If striker/nonStriker are set but have no balls yet, add them first
+    listOfNotNull(strikerId, nonStrikerId).forEach { id ->
+        if (id !in seen) { seen.add(id); order.add(id) }
+    }
+    // Walk through balls chronologically
+    balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+        ball.batsmanId.let { id -> if (id !in seen) { seen.add(id); order.add(id) } }
+        ball.nonStrikerId?.let { id -> if (id !in seen) { seen.add(id); order.add(id) } }
+    }
+    return order
+}
+
+/**
+ * Returns bowler IDs in the order they first bowled.
+ */
+private fun bowlingOrderFromBalls(balls: List<Ball>): List<String> {
+    val order = mutableListOf<String>()
+    val seen = mutableSetOf<String>()
+    balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+        val id = ball.bowlerId
+        if (id !in seen) { seen.add(id); order.add(id) }
+    }
+    return order
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCORECARD TAB — shows completed innings ABOVE current innings
+// ══════════════════════════════════════════════════════════════
 
 @Composable
 fun LiveScorecardTab(uiState: LiveScorecardUiState) {
@@ -232,6 +274,13 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        // ── Completed innings (1st innings when viewing 2nd) ──
+        uiState.completedInnings.forEach { completed ->
+            completedInningsSection(completed)
+        }
+
+        // ── Current (live) innings ──
+
         // Ball-by-ball timeline (reverse chronological, over separators)
         item { LiveBallTimeline(uiState) }
 
@@ -255,12 +304,17 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
             }
         }
 
-        // Batsmen
-        // Show batsmen who faced balls, are out, appeared at the crease, or are currently selected as striker/non-striker
+        // Batsmen — sorted by batting order (crease arrival)
         val appearedIds = (uiState.balls.flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) } +
                 listOfNotNull(uiState.strikerId, uiState.nonStrikerId)).toSet()
         val battedList = uiState.batsmanStats.values.filter { it.balls > 0 || it.isOut || it.player.id in appearedIds }
-        items(battedList) { stats ->
+        // Sort by batting order (first to crease = position 1)
+        val batOrder = battingOrderFromBalls(uiState.balls, uiState.strikerId, uiState.nonStrikerId)
+        val sortedBattedList = battedList.sortedBy { stat ->
+            val idx = batOrder.indexOf(stat.player.id)
+            if (idx >= 0) idx else Int.MAX_VALUE
+        }
+        items(sortedBattedList) { stats ->
             Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -363,9 +417,13 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
             }
         }
 
-        // Bowlers
-        val bowlingList = uiState.bowlerStats.values.toList()
-        items(bowlingList) { stats ->
+        // Bowlers — sorted by bowling order (first to bowl = top)
+        val bowlOrder = bowlingOrderFromBalls(uiState.balls)
+        val sortedBowlingList = uiState.bowlerStats.values.toList().sortedBy { stat ->
+            val idx = bowlOrder.indexOf(stat.player.id)
+            if (idx >= 0) idx else Int.MAX_VALUE
+        }
+        items(sortedBowlingList) { stats ->
             Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -396,6 +454,185 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
             }
         }
     }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Completed innings section (reusable for each completed innings)
+// ══════════════════════════════════════════════════════════════
+
+private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
+    val inn = data.innings
+    val bowlerMap = data.bowlerStats.values.associate { it.player.id to it.player.fullName }
+    val inningsLabel = when (inn.inningsNo) {
+        1 -> "1st Innings"; 2 -> "2nd Innings"; else -> "${inn.inningsNo}th Innings"
+    }
+    val legalBalls = inn.totalBalls
+    val oversText = "${legalBalls / 6}.${legalBalls % 6}"
+
+    // Innings banner
+    item {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(NeonGreen.copy(alpha = 0.10f))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${data.battingTeamName} — $inningsLabel",
+                color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold
+            )
+            Text(
+                "${inn.totalRuns}/${inn.totalWickets} ($oversText)",
+                color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
+            )
+        }
+    }
+
+    // Batting header
+    item {
+        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+            Text(
+                data.battingTeamName,
+                color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text("BATTING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("B", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("4s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("6s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("SR", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+            }
+            HorizontalDivider(color = BorderColor)
+        }
+    }
+
+    // Batsmen in batting order (0(0) batsmen included via appearedIds)
+    val appearedIds = data.balls.flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) }.toSet()
+    val battedList = data.batsmanStats.values.filter { it.balls > 0 || it.isOut || it.player.id in appearedIds }
+    val batOrder = battingOrderFromBalls(data.balls)
+    val sortedBattedList = battedList.sortedBy { stat ->
+        val idx = batOrder.indexOf(stat.player.id)
+        if (idx >= 0) idx else Int.MAX_VALUE
+    }
+    items(sortedBattedList) { stats ->
+        Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stats.player.fullName,
+                        color = if (stats.isOut) TextSecondary else TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = if (!stats.isOut) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    Text(buildDismissalText(stats, bowlerMap), color = TextSecondary, fontSize = 10.sp)
+                }
+                Text("${stats.runs}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.balls}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.fours}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.sixes}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(stats.strikeRate)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+            }
+            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        }
+    }
+
+    // Did not bat
+    val didNotBat = data.batsmanStats.values.filter { it.balls == 0 && !it.isOut && it.player.id !in appearedIds }
+    if (didNotBat.isNotEmpty()) {
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text("Did Not Bat", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(didNotBat.joinToString(", ") { it.player.fullName }, color = TextSecondary, fontSize = 11.sp)
+            }
+            HorizontalDivider(color = BorderColor)
+        }
+    }
+
+    // Extras + Total
+    item {
+        Column(
+            modifier = Modifier.fillMaxWidth().background(SurfaceCard)
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Extras", color = TextSecondary, fontSize = 13.sp)
+                Text("(w ${data.wides}, nb ${data.noBalls}, b 0, lb 0)", color = TextSecondary, fontSize = 11.sp)
+                Text("${data.extrasTotal}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Total", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("$oversText Ov", color = TextSecondary, fontSize = 12.sp)
+                Text("${inn.totalRuns}/${inn.totalWickets}", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        HorizontalDivider(color = BorderColor)
+    }
+
+    // Bowling header
+    item {
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+            Text(
+                data.bowlingTeamName,
+                color = NeonBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text("BOWLING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("O", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("M", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("W", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("Eco", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+            }
+            HorizontalDivider(color = BorderColor)
+        }
+    }
+
+    // Bowlers in bowling order
+    val bowlOrder = bowlingOrderFromBalls(data.balls)
+    val sortedBowlingList = data.bowlerStats.values.toList().sortedBy { stat ->
+        val idx = bowlOrder.indexOf(stat.player.id)
+        if (idx >= 0) idx else Int.MAX_VALUE
+    }
+    items(sortedBowlingList) { stats ->
+        Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(stats.player.fullName, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Text(stats.overs, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.maidens}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.runs}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text(
+                    "${stats.wickets}",
+                    color = if (stats.wickets > 0) NeonGreen else TextSecondary,
+                    fontSize = 14.sp,
+                    fontWeight = if (stats.wickets > 0) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.width(28.dp), textAlign = TextAlign.End
+                )
+                Text("${"%.2f".format(stats.economy)}", color = when {
+                    stats.economy < 6 -> NeonGreen; stats.economy < 9 -> AmberColor; else -> ErrorRed
+                }, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+            }
+            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        }
+    }
+
+    // Spacer between completed innings and the next section
+    item { Spacer(modifier = Modifier.height(16.dp)) }
 }
 
 fun buildDismissalText(stats: BatsmanStats, bowlerMap: Map<String, String>): String {
@@ -445,11 +682,26 @@ fun buildFallOfWickets(uiState: LiveScorecardUiState): String {
     return fowList.joinToString("\n")
 }
 
-// ── COMMENTARY TAB ───────────────────────────────────────────
+// ── COMMENTARY TAB — shows both innings ─────────────────────
 
 @Composable
 fun LiveCommentaryTab(uiState: LiveScorecardUiState) {
-    if (uiState.commentary.isEmpty()) {
+    val allCommentary = mutableListOf<Pair<String?, String>>() // label, comment
+    // Current innings first (latest ball at top)
+    if (uiState.completedInnings.isNotEmpty() && uiState.commentary.isNotEmpty()) {
+        allCommentary.add("header" to "── ${uiState.battingTeamName} — Current Innings ──")
+    }
+    uiState.commentary.reversed().forEach { c -> allCommentary.add(null to c) }
+    // Completed innings after (most recent completed first, 1st innings at bottom)
+    uiState.completedInnings.reversed().forEach { completed ->
+        val inningsLabel = when (completed.innings.inningsNo) {
+            1 -> "1st Innings"; 2 -> "2nd Innings"; else -> "${completed.innings.inningsNo}th Innings"
+        }
+        allCommentary.add("header" to "── ${completed.battingTeamName} — $inningsLabel ──")
+        completed.commentary.reversed().forEach { c -> allCommentary.add(null to c) }
+    }
+
+    if (allCommentary.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No commentary yet", color = TextSecondary)
         }
@@ -459,8 +711,19 @@ fun LiveCommentaryTab(uiState: LiveScorecardUiState) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        items(uiState.commentary.reversed()) { comment ->
-            LiveCommentaryRow(text = comment)
+        items(allCommentary) { (label, text) ->
+            if (label == "header") {
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(NeonGreen.copy(alpha = 0.08f))
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text(text, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
+            } else {
+                LiveCommentaryRow(text = text)
+            }
         }
     }
 }
@@ -534,127 +797,158 @@ fun LiveCommentaryRow(text: String) {
     }
 }
 
-// ── OVERS TAB ────────────────────────────────────────────────
+// ── OVERS TAB — shows both innings ──────────────────────────
 
 @Composable
 fun LiveOversTab(uiState: LiveScorecardUiState) {
-    val overGroups = uiState.balls.groupBy { it.overNo }.toSortedMap()
-
-    if (overGroups.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No overs data yet", color = TextSecondary)
-        }
-        return
-    }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceCard)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text("Ov", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp))
-                Text("Runs", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                Text("Wkts", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                Text("Balls", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Text("RR", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+        // Completed innings overs first
+        uiState.completedInnings.forEach { completed ->
+            val inningsLabel = when (completed.innings.inningsNo) {
+                1 -> "1st Innings"; 2 -> "2nd Innings"; else -> "${completed.innings.inningsNo}th Innings"
             }
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NeonGreen.copy(alpha = 0.08f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text("${completed.battingTeamName} — $inningsLabel",
+                        color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            oversContent(completed.balls, completed.bowlerStats)
         }
 
-        items(overGroups.entries.toList()) { (overNo, overBalls) ->
-            val runsInOver = overBalls.sumOf { ball ->
-                when {
-                    ball.extrasType == "wide" -> (ball.extrasRuns ?: 1) + ball.runsOffBat
-                    ball.extrasType == "no_ball" -> 1 + ball.runsOffBat + (ball.extrasRuns ?: 0)
-                    else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
+        // Current innings overs
+        if (uiState.completedInnings.isNotEmpty() && uiState.balls.isNotEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NeonGreen.copy(alpha = 0.08f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text("${uiState.battingTeamName} — Current Innings",
+                        color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            val wicketsInOver = overBalls.count { it.isWicket && it.wicketType != "retired_hurt" }
-            val legalBalls = overBalls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
-            val rr = if (legalBalls.isNotEmpty()) runsInOver.toDouble() / legalBalls.size * 6 else 0.0
-            val bowlerName = uiState.bowlerStats.values.find { stats ->
-                overBalls.any { it.bowlerId == stats.player.id }
-            }?.player?.fullName ?: ""
+        }
+        oversContent(uiState.balls, uiState.bowlerStats)
+    }
+}
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceCard)
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
+private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<String, BowlerStats>) {
+    val overGroups = balls.groupBy { it.overNo }.toSortedMap()
+    if (overGroups.isEmpty()) return
+
+    item {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceCard)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text("Ov", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp))
+            Text("Runs", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+            Text("Wkts", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+            Text("Balls", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            Text("RR", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+        }
+    }
+
+    items(overGroups.entries.toList()) { (overNo, overBalls) ->
+        val runsInOver = overBalls.sumOf { ball ->
+            when {
+                ball.extrasType == "wide" -> (ball.extrasRuns ?: 1) + ball.runsOffBat
+                ball.extrasType == "no_ball" -> 1 + ball.runsOffBat + (ball.extrasRuns ?: 0)
+                else -> ball.runsOffBat + (ball.extrasRuns ?: 0)
+            }
+        }
+        val wicketsInOver = overBalls.count { it.isWicket && it.wicketType != "retired_hurt" }
+        val legalBalls = overBalls.filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
+        val rr = if (legalBalls.isNotEmpty()) runsInOver.toDouble() / legalBalls.size * 6 else 0.0
+        val bowlerName = bowlerStats.values.find { stats ->
+            overBalls.any { it.bowlerId == stats.player.id }
+        }?.player?.fullName ?: ""
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceCard)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    "${overNo + 1}",
+                    color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(32.dp)
+                )
+                Text(
+                    "$runsInOver",
+                    color = TextPrimary, fontSize = 14.sp,
+                    modifier = Modifier.width(40.dp), textAlign = TextAlign.Center
+                )
+                Text(
+                    if (wicketsInOver > 0) "$wicketsInOver" else "-",
+                    color = if (wicketsInOver > 0) ErrorRed else TextSecondary,
+                    fontSize = 14.sp,
+                    fontWeight = if (wicketsInOver > 0) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.width(40.dp), textAlign = TextAlign.Center
+                )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "${overNo + 1}",
-                        color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.width(32.dp)
-                    )
-                    Text(
-                        "$runsInOver",
-                        color = TextPrimary, fontSize = 14.sp,
-                        modifier = Modifier.width(40.dp), textAlign = TextAlign.Center
-                    )
-                    Text(
-                        if (wicketsInOver > 0) "$wicketsInOver" else "-",
-                        color = if (wicketsInOver > 0) ErrorRed else TextSecondary,
-                        fontSize = 14.sp,
-                        fontWeight = if (wicketsInOver > 0) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.width(40.dp), textAlign = TextAlign.Center
-                    )
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        overBalls.reversed().forEach { ball ->
-                            val totalR = ball.runsOffBat + (ball.extrasRuns ?: 0)
-                            val label = when {
-                                ball.isWicket && ball.wicketType != "retired_hurt" -> if (totalR > 0) "W+$totalR" else "W"
-                                ball.isSix -> "6"; ball.isBoundary -> "4"
-                                ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; if (r > 0) "Wd+$r" else "Wd" }
-                                ball.extrasType == "no_ball" -> if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"
-                                ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; if (b <= 1) "B" else "${b}B" }
-                                ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; if (lb <= 1) "LB" else "${lb}LB" }
-                                ball.runsOffBat == 0 && ball.extrasRuns == null -> "•"
-                                else -> "$totalR"
-                            }
-                            val bgColor = when {
-                                ball.isWicket -> ErrorRed; ball.isSix -> NeonGreen
-                                ball.isBoundary -> NeonBlue
-                                ball.extrasType in listOf("wide", "no_ball") -> AmberColor
-                                else -> BorderColor
-                            }
-                            Box(
-                                modifier = Modifier.size(24.dp).clip(CircleShape).background(bgColor),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(label, fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(2.dp))
+                    overBalls.reversed().forEach { ball ->
+                        val totalR = ball.runsOffBat + (ball.extrasRuns ?: 0)
+                        val label = when {
+                            ball.isWicket && ball.wicketType != "retired_hurt" -> if (totalR > 0) "W+$totalR" else "W"
+                            ball.isSix -> "6"; ball.isBoundary -> "4"
+                            ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; if (r > 0) "Wd+$r" else "Wd" }
+                            ball.extrasType == "no_ball" -> if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"
+                            ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; if (b <= 1) "B" else "${b}B" }
+                            ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; if (lb <= 1) "LB" else "${lb}LB" }
+                            ball.runsOffBat == 0 && ball.extrasRuns == null -> "•"
+                            else -> "$totalR"
                         }
+                        val bgColor = when {
+                            ball.isWicket -> ErrorRed; ball.isSix -> NeonGreen
+                            ball.isBoundary -> NeonBlue
+                            ball.extrasType in listOf("wide", "no_ball") -> AmberColor
+                            else -> BorderColor
+                        }
+                        Box(
+                            modifier = Modifier.size(24.dp).clip(CircleShape).background(bgColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(label, fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(2.dp))
                     }
-                    Text(
-                        "${"%.1f".format(rr)}",
-                        color = when {
-                            rr >= 12 -> ErrorRed; rr >= 8 -> AmberColor
-                            rr >= 6 -> NeonGreen; else -> TextSecondary
-                        },
-                        fontSize = 13.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End
-                    )
                 }
-                if (bowlerName.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("🎳 $bowlerName", color = TextSecondary, fontSize = 10.sp)
-                }
+                Text(
+                    "${"%.1f".format(rr)}",
+                    color = when {
+                        rr >= 12 -> ErrorRed; rr >= 8 -> AmberColor
+                        rr >= 6 -> NeonGreen; else -> TextSecondary
+                    },
+                    fontSize = 13.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End
+                )
+            }
+            if (bowlerName.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("🎳 $bowlerName", color = TextSecondary, fontSize = 10.sp)
             }
         }
     }
@@ -882,6 +1176,24 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
             ) {
                 Text("SCORE SUMMARY", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 HorizontalDivider(color = BorderColor)
+
+                // Show completed innings scores first
+                uiState.completedInnings.forEach { completed ->
+                    val inn = completed.innings
+                    val oversText = "${inn.totalBalls / 6}.${inn.totalBalls % 6}"
+                    val inningsLabel = when (inn.inningsNo) {
+                        1 -> "1st Inn"; 2 -> "2nd Inn"; else -> "${inn.inningsNo}th Inn"
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${completed.battingTeamName} ($inningsLabel)", color = TextSecondary, fontSize = 13.sp)
+                        Text(
+                            "${inn.totalRuns}/${inn.totalWickets} ($oversText ov)",
+                            color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // Current innings
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(uiState.battingTeamName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(

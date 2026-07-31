@@ -404,7 +404,7 @@ fun PMScorecardTab(cards: List<InningsCard>) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        cards.sortedByDescending { it.innings.inningsNo }.forEach { card ->
+        cards.sortedBy { it.innings.inningsNo }.forEach { card ->
             pmInningsSection(card)
         }
     }
@@ -457,8 +457,24 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
         }
     }
 
-    val battedList = card.batting.filter { it.balls > 0 || it.isOut }
-    items(battedList) { stats ->
+    // Include 0(0) batsmen who appeared at the crease + sort by batting order (crease arrival)
+    val appearedIds = card.balls.flatMap { listOfNotNull(it.batsmanId, it.nonStrikerId) }.toSet()
+    val battedList = card.batting.filter { it.balls > 0 || it.isOut || it.player.id in appearedIds }
+    // Sort by batting order: first to crease = position 1
+    val batOrder = run {
+        val order = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+        card.balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+            ball.batsmanId.let { id -> if (id !in seen) { seen.add(id); order.add(id) } }
+            ball.nonStrikerId?.let { id -> if (id !in seen) { seen.add(id); order.add(id) } }
+        }
+        order
+    }
+    val sortedBattedList = battedList.sortedBy { stat ->
+        val idx = batOrder.indexOf(stat.player.id)
+        if (idx >= 0) idx else Int.MAX_VALUE
+    }
+    items(sortedBattedList) { stats ->
         Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -483,7 +499,7 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
         }
     }
 
-    val didNotBat = card.batting.filter { it.balls == 0 && !it.isOut }
+    val didNotBat = card.batting.filter { it.balls == 0 && !it.isOut && it.player.id !in appearedIds }
     if (didNotBat.isNotEmpty() && !card.isSuperOver) {
         item {
             Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark).padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -531,7 +547,21 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
         }
     }
 
-    items(card.bowling) { stats ->
+    // Sort bowlers by bowling order: first bowler on top
+    val bowlOrder = run {
+        val order = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+        card.balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+            val id = ball.bowlerId
+            if (id !in seen) { seen.add(id); order.add(id) }
+        }
+        order
+    }
+    val sortedBowling = card.bowling.sortedBy { stat ->
+        val idx = bowlOrder.indexOf(stat.player.id)
+        if (idx >= 0) idx else Int.MAX_VALUE
+    }
+    items(sortedBowling) { stats ->
         Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -616,7 +646,7 @@ fun PMCommentaryTab(cards: List<InningsCard>) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        cards.sortedByDescending { it.innings.inningsNo }.forEach { card ->
+        cards.sortedBy { it.innings.inningsNo }.forEach { card ->
             if (card.balls.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(8.dp))

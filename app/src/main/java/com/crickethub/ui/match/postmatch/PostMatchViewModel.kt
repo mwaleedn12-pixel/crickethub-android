@@ -555,10 +555,22 @@ class PostMatchViewModel : ViewModel() {
                 fielderName = wicketBall?.fielderName,
                 bowlerOnWicket = wicketBall?.bowlerId
             )
-        }.sortedWith(
-            compareByDescending<BatsmanScorecard> { it.balls > 0 || it.isOut }
-                .thenByDescending { it.runs }
-        )
+        }.let { scorecards ->
+            // Sort by batting order (crease arrival), then did-not-bat at the end
+            val batOrder = run {
+                val order = mutableListOf<String>()
+                val seen = mutableSetOf<String>()
+                balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+                    ball.batsmanId.let { id -> if (id !in seen) { seen.add(id); order.add(id) } }
+                    ball.nonStrikerId?.let { id -> if (id !in seen) { seen.add(id); order.add(id) } }
+                }
+                order
+            }
+            scorecards.sortedBy { stat ->
+                val idx = batOrder.indexOf(stat.player.id)
+                if (idx >= 0) idx else Int.MAX_VALUE
+            }
+        }
     }
 
     private fun computeBowlingScorecard(
@@ -602,7 +614,22 @@ class PostMatchViewModel : ViewModel() {
                 wides = wides,
                 noBalls = noBalls
             )
-        }.sortedByDescending { it.wickets }
+        }.let { scorecards ->
+            // Sort by bowling order (first to bowl = top)
+            val bowlOrder = run {
+                val order = mutableListOf<String>()
+                val seen = mutableSetOf<String>()
+                balls.sortedWith(compareBy({ it.overNo }, { it.ballNo })).forEach { ball ->
+                    val id = ball.bowlerId
+                    if (id !in seen) { seen.add(id); order.add(id) }
+                }
+                order
+            }
+            scorecards.sortedBy { stat ->
+                val idx = bowlOrder.indexOf(stat.player.id)
+                if (idx >= 0) idx else Int.MAX_VALUE
+            }
+        }
     }
 
     private fun computeMotmCandidates(

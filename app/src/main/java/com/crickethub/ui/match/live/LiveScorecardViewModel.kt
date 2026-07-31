@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.BatsmanStats
 import com.crickethub.data.model.BowlerStats
+import com.crickethub.data.model.Innings
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.ScoringUiState
 import com.crickethub.data.model.Team
@@ -17,6 +18,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/**
+ * Holds a completed innings' full data so LiveScorecard can render
+ * previous innings above the live one (like PostMatchScreen does).
+ */
+data class CompletedInningsData(
+    val innings: Innings,
+    val balls: List<Ball>,
+    val batsmanStats: Map<String, BatsmanStats>,
+    val bowlerStats: Map<String, BowlerStats>,
+    val battingTeamName: String,
+    val bowlingTeamName: String,
+    val commentary: List<String>,
+    val wides: Int = 0,
+    val noBalls: Int = 0,
+    val extrasTotal: Int = 0
+)
 
 data class LiveScorecardUiState(
     val isLoading: Boolean = true,
@@ -44,7 +62,9 @@ data class LiveScorecardUiState(
     val error: String? = null,
     // Current crease players — so LiveScorecard can show 0(0) batsmen before any ball is bowled
     val strikerId: String? = null,
-    val nonStrikerId: String? = null
+    val nonStrikerId: String? = null,
+    // Completed innings (1st innings when viewing 2nd, etc.) — sorted by inningsNo ascending
+    val completedInnings: List<CompletedInningsData> = emptyList()
 )
 
 /** Dismissals with no ball bowled — excluded from balls faced and the bowler's over. */
@@ -85,6 +105,9 @@ class LiveScorecardViewModel : ViewModel() {
                 val battingTeamName = if (innings.battingTeamId == match.team1Id) team1Name else team2Name
                 val bowlingTeamName = if (innings.bowlingTeamId == match.team1Id) team1Name else team2Name
 
+                // Load completed innings (e.g. 1st innings when we're in 2nd)
+                val completedInningsData = loadCompletedInnings(match.id, innings.id, match.team1Id, team1Name, team2Name)
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -105,12 +128,55 @@ class LiveScorecardViewModel : ViewModel() {
                         noBalls = innings.noBalls,
                         extrasTotal = innings.extrasTotal,
                         strikerId = scoringState.striker?.id,
-                        nonStrikerId = scoringState.nonStriker?.id
+                        nonStrikerId = scoringState.nonStriker?.id,
+                        completedInnings = completedInningsData
                     )
                 }
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "UpdateFromScoring error: ${e.message}", e)
             }
+        }
+    }
+
+    /**
+     * Load all completed innings for a match (excluding the current live innings).
+     * Returns sorted by inningsNo ascending (1st innings first).
+     */
+    private suspend fun loadCompletedInnings(
+        matchId: String,
+        currentInningsId: String,
+        team1Id: String,
+        team1Name: String,
+        team2Name: String
+    ): List<CompletedInningsData> {
+        return try {
+            val allInnings = scoringRepository.getInningsByMatch(matchId)
+            val completed = allInnings.filter { it.status == "completed" && it.id != currentInningsId }
+                .sortedBy { it.inningsNo }
+
+            completed.map { inn ->
+                val innBalls = scoringRepository.getBallsByInnings(inn.id)
+                val batPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn.battingTeamId)
+                val bowlPlayers = scoringRepository.getPlayingXIPlayers(matchId, inn.bowlingTeamId)
+                val batName = if (inn.battingTeamId == team1Id) team1Name else team2Name
+                val bowlName = if (inn.bowlingTeamId == team1Id) team1Name else team2Name
+
+                CompletedInningsData(
+                    innings = inn,
+                    balls = innBalls,
+                    batsmanStats = computeBatsmanStats(innBalls, batPlayers),
+                    bowlerStats = computeBowlerStats(innBalls, bowlPlayers),
+                    battingTeamName = batName,
+                    bowlingTeamName = bowlName,
+                    commentary = computeCommentary(innBalls),
+                    wides = inn.wides,
+                    noBalls = inn.noBalls,
+                    extrasTotal = inn.extrasTotal
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CricketHub", "Load completed innings error: ${e.message}", e)
+            emptyList()
         }
     }
 
@@ -141,10 +207,11 @@ class LiveScorecardViewModel : ViewModel() {
                     .select { filter { eq("id", match.team2Id) } }
                     .decodeSingleOrNull<Team>()
 
-                val battingTeamName = if (currentInnings.battingTeamId == match.team1Id)
-                    team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
-                val bowlingTeamName = if (currentInnings.bowlingTeamId == match.team1Id)
-                    team1?.name ?: "Team 1" else team2?.name ?: "Team 2"
+                val team1Name = team1?.name ?: "Team 1"
+                val team2Name = team2?.name ?: "Team 2"
+
+                val battingTeamName = if (currentInnings.battingTeamId == match.team1Id) team1Name else team2Name
+                val bowlingTeamName = if (currentInnings.bowlingTeamId == match.team1Id) team1Name else team2Name
 
                 val balls = scoringRepository.getBallsByInnings(currentInnings.id)
                 val battingPlayers = scoringRepository.getPlayingXIPlayers(matchId, currentInnings.battingTeamId)
@@ -184,6 +251,11 @@ class LiveScorecardViewModel : ViewModel() {
                     else -> "UPCOMING"
                 }
 
+                // Load completed innings data for both-innings display
+                val completedInningsData = loadCompletedInnings(
+                    matchId, currentInnings.id, match.team1Id, team1Name, team2Name
+                )
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -207,7 +279,8 @@ class LiveScorecardViewModel : ViewModel() {
                         noBalls = currentInnings.noBalls,
                         extrasTotal = currentInnings.extrasTotal,
                         resultText = match.resultText ?: "",
-                        shareableSlug = match.shareableSlug
+                        shareableSlug = match.shareableSlug,
+                        completedInnings = completedInningsData
                     )
                 }
             } catch (e: Exception) {
