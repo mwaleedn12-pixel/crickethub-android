@@ -106,19 +106,58 @@ private val bottomTabs = listOf(
 private val bottomRoutes = bottomTabs.map { it.route }.toSet()
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        private const val PREFS_NAME = "crickethub_activity"
+        private const val KEY_LAST_ACTIVE = "last_active_at"
+        private const val INACTIVITY_LIMIT_MS = 6 * 60 * 60 * 1000L  // 6 hours
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent {
-            CricketHubTheme {
-                CricketHubApp()
+
+        // Check inactivity BEFORE rendering UI
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val lastActive = prefs.getLong(KEY_LAST_ACTIVE, 0L)
+        val now = System.currentTimeMillis()
+        val shouldAutoLogout = lastActive > 0 && (now - lastActive) > INACTIVITY_LIMIT_MS
+
+        if (shouldAutoLogout) {
+            MainScope().launch {
+                try {
+                    SupabaseClient.client.auth.signOut()
+                    android.util.Log.d("CricketHub", "Auto-logout: ${(now - lastActive) / 3600000}h inactive")
+                } catch (e: Exception) {
+                    android.util.Log.w("CricketHub", "Auto-logout signOut error: ${e.message}")
+                }
             }
         }
+
+        setContent {
+            CricketHubTheme {
+                CricketHubContent(forceLogin = shouldAutoLogout)
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Save timestamp when app goes to background
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit().putLong(KEY_LAST_ACTIVE, System.currentTimeMillis()).apply()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Update timestamp on resume too
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit().putLong(KEY_LAST_ACTIVE, System.currentTimeMillis()).apply()
     }
 }
 
 @Composable
-fun CricketHubApp() {
+fun CricketHubContent(forceLogin: Boolean = false) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -134,8 +173,12 @@ fun CricketHubApp() {
 
     LaunchedEffect(Unit) {
         try {
-            val user = SupabaseClient.client.auth.currentUserOrNull()
-            startRoute = if (user != null) "dashboard" else "login"
+            if (forceLogin) {
+                startRoute = "login"
+            } else {
+                val user = SupabaseClient.client.auth.currentUserOrNull()
+                startRoute = if (user != null) "dashboard" else "login"
+            }
         } catch (e: Exception) {
             android.util.Log.e("CricketHub", "Session check: ${e.message}")
             startRoute = "login"

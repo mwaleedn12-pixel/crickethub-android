@@ -36,6 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.ScoringUiState
+import com.crickethub.data.sync.SyncState
 // DLS removed — future update
 import io.github.jan.supabase.auth.auth
 import com.crickethub.ui.theme.*
@@ -51,6 +52,8 @@ fun ScoringScreen(
     viewModel: ScoringViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     var resumeKey by remember { mutableStateOf(0) }
 
     // Detect when we return to this screen
@@ -229,6 +232,36 @@ fun ScoringScreen(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text("● LIVE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    // Sync status indicator
+                    SyncIndicator(syncState = syncState)
+                }
+
+                // Offline banner
+                if (!isOnline) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(AmberColor.copy(alpha = 0.15f))
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (syncState == SyncState.PENDING) "⚡ Offline Mode — changes will sync when online"
+                            else "⚡ Offline Mode",
+                            color = AmberColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                } else if (syncState == SyncState.SYNCING) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(NeonBlue.copy(alpha = 0.1f))
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Text("Syncing...", color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
                 }
 
@@ -1738,4 +1771,29 @@ fun MissedChanceDialog(
             TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
         }
     )
+}
+@Composable
+private fun SyncIndicator(syncState: SyncState) {
+    val (color, label) = when (syncState) {
+        SyncState.SYNCED  -> NeonGreen to "Synced"
+        SyncState.SYNCING -> NeonBlue to "Syncing"
+        SyncState.PENDING -> AmberColor to "Pending"
+        SyncState.OFFLINE -> ErrorRed to "Offline"
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 6.dp, vertical = 3.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
 }

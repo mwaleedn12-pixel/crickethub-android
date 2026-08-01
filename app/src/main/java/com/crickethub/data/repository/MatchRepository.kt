@@ -1,5 +1,6 @@
 package com.crickethub.data.repository
 
+import com.crickethub.data.local.OfflineCache
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.Innings
 import com.crickethub.data.model.MatchInsert
@@ -20,31 +21,47 @@ class MatchRepository {
     private val matchCache = mutableMapOf<String, Match>()
     private val xiCache = mutableMapOf<String, List<PlayingXI>>()
 
+    private fun context() = com.crickethub.CricketHubApp.instance
+
     suspend fun getAllMatches(): List<Match> {
         val cached = matchesCache
         if (cached != null && System.currentTimeMillis() - matchesCacheTime < MATCHES_TTL_MS) {
             return cached
         }
-        return SupabaseClient.withRetry {
-            val matches = client.postgrest["matches"]
-                .select()
-                .decodeList<Match>()
-                .sortedByDescending { it.createdAt }
-            matchesCache = matches
-            matchesCacheTime = System.currentTimeMillis()
-            matches
+        return try {
+            SupabaseClient.withRetry {
+                val matches = client.postgrest["matches"]
+                    .select()
+                    .decodeList<Match>()
+                    .sortedByDescending { it.createdAt }
+                matchesCache = matches
+                matchesCacheTime = System.currentTimeMillis()
+                // Save to offline cache
+                OfflineCache.saveMatches(context(), matches)
+                matches
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "getAllMatches offline fallback: ${e.message}")
+            OfflineCache.getMatches(context())
         }
     }
 
     /** Paginated match list: returns [limit] matches starting at [offset]. */
     suspend fun getMatchesPaginated(limit: Int = 20, offset: Int = 0): List<Match> {
-        return SupabaseClient.withRetry {
-            client.postgrest["matches"]
-                .select {
-                    range(offset.toLong(), (offset + limit - 1).toLong())
-                }
-                .decodeList<Match>()
+        return try {
+            SupabaseClient.withRetry {
+                client.postgrest["matches"]
+                    .select {
+                        range(offset.toLong(), (offset + limit - 1).toLong())
+                    }
+                    .decodeList<Match>()
+                    .sortedByDescending { it.createdAt }
+            }
+        } catch (e: Exception) {
+            // Offline: return from cached full list with manual pagination
+            OfflineCache.getMatches(context())
                 .sortedByDescending { it.createdAt }
+                .drop(offset).take(limit)
         }
     }
 
@@ -56,10 +73,14 @@ class MatchRepository {
 
     suspend fun getMatchById(matchId: String): Match? {
         matchCache[matchId]?.let { return it }
-        return SupabaseClient.withRetry {
-            client.postgrest["matches"]
-                .select { filter { eq("id", matchId) } }
-                .decodeSingleOrNull<Match>()?.also { matchCache[matchId] = it }
+        return try {
+            SupabaseClient.withRetry {
+                client.postgrest["matches"]
+                    .select { filter { eq("id", matchId) } }
+                    .decodeSingleOrNull<Match>()?.also { matchCache[matchId] = it }
+            }
+        } catch (e: Exception) {
+            OfflineCache.getMatches(context()).find { it.id == matchId }
         }
     }
 

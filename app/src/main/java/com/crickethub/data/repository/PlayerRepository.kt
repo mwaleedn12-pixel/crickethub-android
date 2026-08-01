@@ -1,5 +1,6 @@
 package com.crickethub.data.repository
 
+import com.crickethub.data.local.OfflineCache
 import com.crickethub.data.model.Ball
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.PlayerInsert
@@ -16,18 +17,33 @@ class PlayerRepository {
     private val client = SupabaseClient.client
     private val playersCache = mutableMapOf<String, List<Player>>()
 
+    private fun context() = com.crickethub.CricketHubApp.instance
+
     suspend fun getPlayersByTeam(teamId: String): List<Player> {
-        return playersCache.getOrPut(teamId) {
-            client.postgrest["players"]
-                .select { filter { eq("team_id", teamId) } }
-                .decodeList()
+        return try {
+            playersCache.getOrPut(teamId) {
+                val players = client.postgrest["players"]
+                    .select { filter { eq("team_id", teamId) } }
+                    .decodeList<Player>()
+                // Save to offline cache
+                OfflineCache.savePlayersForTeam(context(), teamId, players)
+                players
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "getPlayersByTeam offline fallback: ${e.message}")
+            OfflineCache.getPlayersForTeam(context(), teamId)
         }
     }
 
     suspend fun getPlayerById(playerId: String): Player? {
-        return client.postgrest["players"]
-            .select { filter { eq("id", playerId) } }
-            .decodeSingleOrNull()
+        return try {
+            client.postgrest["players"]
+                .select { filter { eq("id", playerId) } }
+                .decodeSingleOrNull()
+        } catch (e: Exception) {
+            // Search all cached teams
+            OfflineCache.getAllPlayers(context()).find { it.id == playerId }
+        }
     }
 
     suspend fun createPlayer(player: PlayerInsert): Player {

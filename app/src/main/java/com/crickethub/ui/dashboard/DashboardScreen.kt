@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.sp
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.Tournament
+import com.crickethub.data.local.OfflineCache
 import com.crickethub.data.remote.SupabaseClient
+import androidx.compose.ui.platform.LocalContext
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
@@ -42,6 +44,7 @@ fun DashboardScreen(
     onLogout: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isLoading by remember { mutableStateOf(true) }
     var userEmail by remember { mutableStateOf("") }
     var teamCount by remember { mutableStateOf(0) }
@@ -50,9 +53,26 @@ fun DashboardScreen(
     var playerCount by remember { mutableStateOf(0) }
     var recentMatches by remember { mutableStateOf<List<Match>>(emptyList()) }
     var activeTournaments by remember { mutableStateOf<List<Tournament>>(emptyList()) }
+    var isOffline by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         scope.launch {
+            // 1. Load from cache FIRST so the UI shows data instantly
+            if (OfflineCache.hasData(context)) {
+                userEmail = OfflineCache.getUserEmail(context)
+                val cachedTeams = OfflineCache.getTeams(context)
+                teamCount = cachedTeams.size
+                playerCount = OfflineCache.getAllPlayers(context).size
+                val cachedMatches = OfflineCache.getMatches(context)
+                matchCount = cachedMatches.size
+                recentMatches = cachedMatches.sortedByDescending { it.createdAt }.take(5)
+                val cachedTournaments = OfflineCache.getTournaments(context)
+                tournamentCount = cachedTournaments.size
+                activeTournaments = cachedTournaments.filter { it.status != "completed" }.take(3)
+                isLoading = false  // Show cached data immediately
+            }
+
+            // 2. Try to fetch fresh data from Supabase
             try {
                 userEmail = SupabaseClient.client.auth.currentUserOrNull()?.email ?: "Guest"
                 val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
@@ -117,8 +137,27 @@ fun DashboardScreen(
                 tournamentCount = tournaments.size
                 activeTournaments = tournaments.filter { it.status != "completed" }.take(3)
 
+                isOffline = false
+
+                // 3. Save fresh data to cache for next offline use
+                OfflineCache.saveUserEmail(context, userEmail)
+                OfflineCache.saveTeams(context, teams)
+                OfflineCache.saveMatches(context, matches)
+                OfflineCache.saveTournaments(context, tournaments)
+                // Collect all players across teams for offline count
+                val allPlayers = teams.flatMap { team ->
+                    try {
+                        SupabaseClient.client.postgrest["players"]
+                            .select { filter { eq("team_id", team.id) } }
+                            .decodeList<com.crickethub.data.model.Player>()
+                    } catch (_: Exception) { emptyList() }
+                }
+                OfflineCache.saveAllPlayers(context, allPlayers)
+
             } catch (e: Exception) {
                 android.util.Log.e("CricketHub", "Dashboard error: ${e.message}", e)
+                isOffline = true
+                // Cache was already loaded above — if no cache, counts stay at 0
             } finally {
                 isLoading = false
             }
@@ -182,7 +221,7 @@ fun DashboardScreen(
                 QuickStatCard("Teams", "$teamCount", Icons.Default.Person, NeonGreen, Modifier.weight(1f))
                 QuickStatCard("Players", "$playerCount", Icons.Default.Person, NeonBlue, Modifier.weight(1f))
                 QuickStatCard("Matches", "$matchCount", Icons.Default.List, AmberColor, Modifier.weight(1f))
-                QuickStatCard("Tourneys", "$tournamentCount", Icons.Default.Star, PurpleColor, Modifier.weight(1f))
+                QuickStatCard("tourneys", "$tournamentCount", Icons.Default.Star, PurpleColor, Modifier.weight(1f))
             }
         }
 

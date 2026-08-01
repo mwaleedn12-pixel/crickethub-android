@@ -1,5 +1,6 @@
 package com.crickethub.data.repository
 
+import com.crickethub.data.local.OfflineCache
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.TeamInsert
 import com.crickethub.data.remote.SupabaseClient
@@ -15,18 +16,27 @@ class TeamRepository {
     private var teamsCacheTime: Long = 0L
     private val TEAMS_TTL_MS = 3 * 60 * 1000L  // 3 minutes
 
+    private fun context() = com.crickethub.CricketHubApp.instance
+
     suspend fun getAllTeams(): List<Team> {
         val cached = teamsCache
         if (cached != null && System.currentTimeMillis() - teamsCacheTime < TEAMS_TTL_MS) {
             return cached
         }
-        return SupabaseClient.withRetry {
-            val teams = client.postgrest["teams"]
-                .select()
-                .decodeList<Team>()
-            teamsCache = teams
-            teamsCacheTime = System.currentTimeMillis()
-            teams
+        return try {
+            SupabaseClient.withRetry {
+                val teams = client.postgrest["teams"]
+                    .select()
+                    .decodeList<Team>()
+                teamsCache = teams
+                teamsCacheTime = System.currentTimeMillis()
+                // Save to offline cache
+                OfflineCache.saveTeams(context(), teams)
+                teams
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "getAllTeams offline fallback: ${e.message}")
+            OfflineCache.getTeams(context())
         }
     }
 
@@ -37,16 +47,24 @@ class TeamRepository {
             val result = cached.filter { it.id in teamIds }
             if (result.size == teamIds.size) return result
         }
-        return client.postgrest["teams"]
-            .select { filter { isIn("id", teamIds) } }
-            .decodeList<Team>()
+        return try {
+            client.postgrest["teams"]
+                .select { filter { isIn("id", teamIds) } }
+                .decodeList<Team>()
+        } catch (e: Exception) {
+            OfflineCache.getTeams(context()).filter { it.id in teamIds }
+        }
     }
 
     suspend fun getTeamById(teamId: String): Team? {
         return teamsCache?.find { it.id == teamId }
-            ?: client.postgrest["teams"]
-                .select { filter { eq("id", teamId) } }
-                .decodeSingleOrNull()
+            ?: try {
+                client.postgrest["teams"]
+                    .select { filter { eq("id", teamId) } }
+                    .decodeSingleOrNull()
+            } catch (e: Exception) {
+                OfflineCache.getTeams(context()).find { it.id == teamId }
+            }
     }
 
     suspend fun createTeam(team: TeamInsert): Team {

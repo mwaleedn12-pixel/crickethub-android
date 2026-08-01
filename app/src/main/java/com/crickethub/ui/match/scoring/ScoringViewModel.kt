@@ -14,8 +14,11 @@ import com.crickethub.data.model.ScoringUiState
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.Tournament
 import com.crickethub.data.remote.SupabaseClient
+import com.crickethub.CricketHubApp
 import com.crickethub.data.repository.MatchRepository
+import com.crickethub.data.repository.OfflineScoringRepository
 import com.crickethub.data.repository.ScoringRepository
+import com.crickethub.data.sync.SyncState
 import com.crickethub.ui.match.Interruption
 import com.crickethub.ui.match.calculateDLS
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,10 +34,17 @@ import kotlinx.coroutines.launch
 private val NO_DELIVERY_WICKETS = setOf("timed_out", "retired_out", "retired_hurt")
 
 class ScoringViewModel : ViewModel() {
-    private val scoringRepository = ScoringRepository()
+    private val app = CricketHubApp.instance
+    private val scoringRepository = OfflineScoringRepository(app.database)
     private val matchRepository = MatchRepository()
     private val _uiState = MutableStateFlow(ScoringUiState())
     val uiState: StateFlow<ScoringUiState> = _uiState.asStateFlow()
+
+    /** Sync status exposed so the UI can show an indicator. */
+    val syncState: StateFlow<SyncState> = app.syncManager.syncState
+
+    /** Whether the device currently has internet. */
+    val isOnline: StateFlow<Boolean> = app.networkMonitor.isOnline
 
     companion object {
         // Cached UI state per match, survives ViewModel destruction on back-press
@@ -322,6 +332,8 @@ class ScoringViewModel : ViewModel() {
             return
         }
         isRestoring = true
+        // Trigger sync in case there are pending offline items
+        app.syncManager.triggerSync()
         // On a FORCED reload (innings transition) never restore the cache - it holds the
         // PREVIOUS innings and would flash its score/players onto the new innings.
         val cached = if (force) null else getSavedState(matchId)
