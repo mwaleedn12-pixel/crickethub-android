@@ -109,12 +109,12 @@ fun PostMatchScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
                 }
                 Text(
                     "Match Summary",
                     fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                    color = TextPrimary, modifier = Modifier.weight(1f)
+                    color = CH.textPrimary, modifier = Modifier.weight(1f)
                 )
                 ExportButton(onClick = { showExport = true })
                 IconButton(onClick = {
@@ -153,7 +153,7 @@ fun PostMatchScreen(
             // Tabs
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = SurfaceCard,
+                containerColor = CH.surface,
                 contentColor = NeonGreen,
                 edgePadding = 0.dp
             ) {
@@ -165,7 +165,7 @@ fun PostMatchScreen(
                             Text(
                                 tab, fontSize = 12.sp,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index) NeonGreen else TextSecondary
+                                color = if (selectedTab == index) NeonGreen else CH.textSecondary
                             )
                         }
                     )
@@ -230,12 +230,12 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 cards.forEachIndexed { index, card ->
-                    if (index > 0) HorizontalDivider(color = BorderColor)
+                    if (index > 0) HorizontalDivider(color = CH.border)
                     val accent = when {
                         card.isSuperOver -> AmberColor
                         card.innings.inningsNo == 1 -> NeonGreen
@@ -248,16 +248,16 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(card.battingTeamName, color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(card.label, color = TextSecondary, fontSize = 11.sp)
+                            Text(card.label, color = CH.textSecondary, fontSize = 11.sp)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(card.scoreText, color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Text("(${card.oversText} ov)", color = TextSecondary, fontSize = 12.sp)
+                            Text(card.scoreText, color = CH.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("(${card.oversText} ov)", color = CH.textSecondary, fontSize = 12.sp)
                         }
                     }
                 }
                 if (cards.isEmpty()) {
-                    Text("No innings data", color = TextSecondary, fontSize = 12.sp)
+                    Text("No innings data", color = CH.textSecondary, fontSize = 12.sp)
                 }
             }
         }
@@ -268,57 +268,57 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("AWARDS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor)
+                Text("AWARDS", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border)
 
                 uiState.selectedMotm?.let { motm ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("⭐ Player of the Match", color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(motm.fullName, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Text(motm.fullName, color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                         val motmCandidate = uiState.motmCandidates.find { it.player.id == motm.id }
                         motmCandidate?.let {
                             Column(horizontalAlignment = Alignment.End) {
-                                if (it.runs > 0) Text("${it.runs} runs", color = TextSecondary, fontSize = 12.sp)
-                                if (it.wickets > 0) Text("${it.wickets} wkts", color = TextSecondary, fontSize = 12.sp)
+                                if (it.runs > 0) Text("${it.runs} runs", color = CH.textSecondary, fontSize = 12.sp)
+                                if (it.wickets > 0) Text("${it.wickets} wkts", color = CH.textSecondary, fontSize = 12.sp)
                             }
                         }
                     }
                 }
 
                 uiState.bestBatter?.let {
-                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("🏏 Best Batter", color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(it.player.fullName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(it.player.fullName, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Text("${it.runs}(${it.balls})", color = NeonBlue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 uiState.bestBowler?.let {
-                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("🎳 Best Bowler", color = ErrorRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(it.player.fullName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(it.player.fullName, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Text("${it.wickets}/${it.runs}", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 uiState.bestPartnership?.let {
-                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text("🤝 Best Partnership", color = PurpleColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text("${it.name1} & ${it.name2}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("${it.name1} & ${it.name2}", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Text("${it.runs} (${it.balls})", color = PurpleColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
@@ -332,8 +332,8 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(SurfaceCard)
-                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .background(CH.surface)
+                        .border(1.dp, CH.border, RoundedCornerShape(12.dp))
                         .clickable { onOpenImpactList() }
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -343,10 +343,10 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🔥 IMPACT LIST", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("🔥 IMPACT LIST", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text("View all ›", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                    HorizontalDivider(color = BorderColor)
+                    HorizontalDivider(color = CH.border)
 
                     uiState.motmCandidates.take(5).forEachIndexed { index, candidate ->
                         Row(
@@ -356,19 +356,19 @@ fun PMResultTab(uiState: PostMatchUiState, onOpenImpactList: () -> Unit) {
                         ) {
                             Text(
                                 "${index + 1}",
-                                color = if (index == 0) AmberColor else TextSecondary,
+                                color = if (index == 0) AmberColor else CH.textSecondary,
                                 fontSize = 12.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.width(20.dp)
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     candidate.player.fullName,
-                                    color = TextPrimary, fontSize = 13.sp,
+                                    color = CH.textPrimary, fontSize = 13.sp,
                                     fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal
                                 )
                                 Text(
                                     impactSummaryText(candidate),
-                                    color = TextSecondary, fontSize = 10.sp
+                                    color = CH.textSecondary, fontSize = 10.sp
                                 )
                             }
                             Text(
@@ -396,7 +396,7 @@ fun impactSummaryText(candidate: MotmCandidate): String = buildString {
 fun PMScorecardTab(cards: List<InningsCard>) {
     if (cards.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No innings data", color = TextSecondary)
+            Text("No innings data", color = CH.textSecondary)
         }
         return
     }
@@ -433,27 +433,27 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
             )
             Text(
                 "${card.scoreText} (${card.oversText})",
-                color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
             )
         }
     }
 
     item {
-        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
             Text(
                 card.battingTeamName, color = NeonGreen, fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text("BATTING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("B", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("4s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("6s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("SR", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                Text("BATTING", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("R", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("B", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("4s", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("6s", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("SR", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
     }
 
@@ -475,7 +475,7 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
         if (idx >= 0) idx else Int.MAX_VALUE
     }
     items(sortedBattedList) { stats ->
-        Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.bg)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -483,67 +483,67 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         stats.player.fullName,
-                        color = if (stats.isOut) TextSecondary else TextPrimary,
+                        color = if (stats.isOut) CH.textSecondary else CH.textPrimary,
                         fontSize = 13.sp,
                         fontWeight = if (!stats.isOut) FontWeight.SemiBold else FontWeight.Normal
                     )
-                    Text(buildPostMatchDismissalText(stats, bowlerMap), color = TextSecondary, fontSize = 10.sp)
+                    Text(buildPostMatchDismissalText(stats, bowlerMap), color = CH.textSecondary, fontSize = 10.sp)
                 }
-                Text("${stats.runs}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.balls}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.fours}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.sixes}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${"%.1f".format(stats.strikeRate)}", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                Text("${stats.runs}", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.balls}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.fours}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.sixes}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(stats.strikeRate)}", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 
     val didNotBat = card.batting.filter { it.balls == 0 && !it.isOut && it.player.id !in appearedIds }
     if (didNotBat.isNotEmpty() && !card.isSuperOver) {
         item {
-            Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark).padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text("Did Not Bat", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Text(didNotBat.joinToString(", ") { it.player.fullName }, color = TextSecondary, fontSize = 11.sp)
+            Column(modifier = Modifier.fillMaxWidth().background(CH.bg).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text("Did Not Bat", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(didNotBat.joinToString(", ") { it.player.fullName }, color = CH.textSecondary, fontSize = 11.sp)
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
     }
 
     item {
-        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard).padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.surface).padding(horizontal = 16.dp, vertical = 10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Extras", color = TextSecondary, fontSize = 13.sp)
-                Text("(w ${innings.wides}, nb ${innings.noBalls}, b 0, lb 0)", color = TextSecondary, fontSize = 11.sp)
-                Text("${innings.extrasTotal}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Extras", color = CH.textSecondary, fontSize = 13.sp)
+                Text("(w ${innings.wides}, nb ${innings.noBalls}, b 0, lb 0)", color = CH.textSecondary, fontSize = 11.sp)
+                Text("${innings.extrasTotal}", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(6.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Total", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("${card.oversText} Ov", color = TextSecondary, fontSize = 12.sp)
-                Text(card.scoreText, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Total", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("${card.oversText} Ov", color = CH.textSecondary, fontSize = 12.sp)
+                Text(card.scoreText, color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
-        HorizontalDivider(color = BorderColor)
+        HorizontalDivider(color = CH.border)
     }
 
     item {
         Spacer(modifier = Modifier.height(8.dp))
-        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
             Text(
                 card.bowlingTeamName, color = NeonBlue, fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text("BOWLING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text("O", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("M", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("W", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("Eco", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                Text("BOWLING", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("O", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("M", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("R", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("W", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("Eco", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
     }
 
@@ -562,18 +562,18 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
         if (idx >= 0) idx else Int.MAX_VALUE
     }
     items(sortedBowling) { stats ->
-        Column(modifier = Modifier.fillMaxWidth().background(BackgroundDark)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.bg)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stats.player.fullName, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                Text(stats.overs, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.maidens}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.runs}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text(stats.player.fullName, color = CH.textPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Text(stats.overs, color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.maidens}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.runs}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
                 Text(
                     "${stats.wickets}",
-                    color = if (stats.wickets > 0) NeonGreen else TextSecondary,
+                    color = if (stats.wickets > 0) NeonGreen else CH.textSecondary,
                     fontSize = 14.sp,
                     fontWeight = if (stats.wickets > 0) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.width(28.dp), textAlign = TextAlign.End
@@ -582,7 +582,7 @@ private fun LazyListScope.pmInningsSection(card: InningsCard) {
                     stats.economy < 6 -> NeonGreen; stats.economy < 9 -> AmberColor; else -> ErrorRed
                 }, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 }
@@ -637,7 +637,7 @@ fun PMCommentaryTab(cards: List<InningsCard>) {
     val hasBalls = cards.any { it.balls.isNotEmpty() }
     if (!hasBalls) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No commentary available", color = TextSecondary)
+            Text("No commentary available", color = CH.textSecondary)
         }
         return
     }
@@ -679,10 +679,10 @@ fun PMCommentaryRow(ball: Ball) {
     }
     val outcomeColor = when {
         isWicket -> ErrorRed; isSix -> NeonGreen; isFour -> NeonBlue
-        isWide || isNoBall -> AmberColor; else -> SurfaceCard
+        isWide || isNoBall -> AmberColor; else -> CH.surface
     }
 
-    Column(modifier = Modifier.fillMaxWidth().background(if (isWicket) ErrorRed.copy(alpha = 0.05f) else BackgroundDark)) {
+    Column(modifier = Modifier.fillMaxWidth().background(if (isWicket) ErrorRed.copy(alpha = 0.05f) else CH.bg)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -690,22 +690,22 @@ fun PMCommentaryRow(ball: Ball) {
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(48.dp)) {
                 if (ball.ballNo > 0) {
-                    Text("${ball.overNo}.${ball.ballNo}", color = TextSecondary, fontSize = 10.sp)
+                    Text("${ball.overNo}.${ball.ballNo}", color = CH.textSecondary, fontSize = 10.sp)
                 }
                 Box(
                     modifier = Modifier.size(30.dp).clip(RoundedCornerShape(4.dp)).background(outcomeColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(outcomeText, color = if (outcomeColor == SurfaceCard) TextSecondary else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(outcomeText, color = if (outcomeColor == CH.surface) CH.textSecondary else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Text(
                 ball.commentary ?: "Ball ${ball.overNo}.${ball.ballNo}",
-                color = if (isWicket) ErrorRed else TextSecondary,
+                color = if (isWicket) ErrorRed else CH.textSecondary,
                 fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f)
             )
         }
-        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
     }
 }
 
@@ -716,7 +716,7 @@ fun PMOversTab(cards: List<InningsCard>) {
     val hasBalls = cards.any { it.balls.isNotEmpty() }
     if (!hasBalls) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No over data available", color = TextSecondary)
+            Text("No over data available", color = CH.textSecondary)
         }
         return
     }
@@ -758,12 +758,12 @@ fun PMOverRow(overNo: Int, overBalls: List<Ball>, bowling: List<BowlerScorecard>
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(SurfaceCard)
+            .background(CH.surface)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Ov ${overNo + 1}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp))
-            Text("$runsInOver${if (wicketsInOver > 0) "/$wicketsInOver" else ""}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp))
+            Text("Ov ${overNo + 1}", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp))
+            Text("$runsInOver${if (wicketsInOver > 0) "/$wicketsInOver" else ""}", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp))
             Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 overBalls.sortedBy { it.ballNo }.forEach { ball ->
                     val label = when {
@@ -774,7 +774,7 @@ fun PMOverRow(overNo: Int, overBalls: List<Ball>, bowling: List<BowlerScorecard>
                     }
                     val bgColor = when {
                         ball.isWicket -> ErrorRed; ball.isSix -> NeonGreen; ball.isBoundary -> NeonBlue
-                        ball.extrasType in listOf("wide", "no_ball") -> AmberColor; else -> BorderColor
+                        ball.extrasType in listOf("wide", "no_ball") -> AmberColor; else -> CH.border
                     }
                     Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(bgColor), contentAlignment = Alignment.Center) {
                         Text(label, fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -782,13 +782,13 @@ fun PMOverRow(overNo: Int, overBalls: List<Ball>, bowling: List<BowlerScorecard>
                     Spacer(modifier = Modifier.width(2.dp))
                 }
             }
-            Text("${"%.1f".format(rr)}", color = when { rr >= 12 -> ErrorRed; rr >= 9 -> AmberColor; rr >= 6 -> NeonGreen; else -> TextSecondary }, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+            Text("${"%.1f".format(rr)}", color = when { rr >= 12 -> ErrorRed; rr >= 9 -> AmberColor; rr >= 6 -> NeonGreen; else -> CH.textSecondary }, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
         }
         if (bowlerName.isNotEmpty()) {
-            Text("🎳 $bowlerName", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
+            Text("🎳 $bowlerName", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
         }
     }
-    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
 }
 
 // ── ANALYTICS TAB ────────────────────────────────────────────
@@ -815,7 +815,7 @@ fun PMAnalyticsTab(cards: List<InningsCard>) {
                         Text("", modifier = Modifier.width(80.dp), textAlign = TextAlign.Center)
                         Text(c2.battingTeamName, color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
                     }
-                    HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 6.dp))
+                    HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 6.dp))
                     PMCompareRow(stats1.runs.toString(), "Runs", stats2.runs.toString(), stats1.runs > stats2.runs)
                     PMCompareRow(stats1.fours.toString(), "Fours", stats2.fours.toString(), stats1.fours > stats2.fours)
                     PMCompareRow(stats1.sixes.toString(), "Sixes", stats2.sixes.toString(), stats1.sixes > stats2.sixes)
@@ -824,7 +824,7 @@ fun PMAnalyticsTab(cards: List<InningsCard>) {
                     PMCompareRow("${stats1.extras}", "Extras", "${stats2.extras}", stats1.extras < stats2.extras)
                     PMCompareRow("${"%.1f".format(stats1.boundaryPct)}%", "Boundary%", "${"%.1f".format(stats2.boundaryPct)}%", stats1.boundaryPct > stats2.boundaryPct)
                 } else {
-                    Text("Need both innings for comparison", color = TextSecondary, fontSize = 12.sp)
+                    Text("Need both innings for comparison", color = CH.textSecondary, fontSize = 12.sp)
                 }
             }
         }
@@ -837,13 +837,13 @@ fun PMAnalyticsTab(cards: List<InningsCard>) {
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(card.battingTeamName, color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(card.label, color = TextSecondary, fontSize = 10.sp)
+                                Text(card.label, color = CH.textSecondary, fontSize = 10.sp)
                             }
-                            Text("${card.scoreText} (${card.oversText})", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("${card.scoreText} (${card.oversText})", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("${stats.fours}x4  ${stats.sixes}x6", color = TextSecondary, fontSize = 11.sp)
+                            Text("${stats.fours}x4  ${stats.sixes}x6", color = CH.textSecondary, fontSize = 11.sp)
                         }
-                        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
                     }
                 }
             }
@@ -870,11 +870,11 @@ fun PMAnalyticsTab(cards: List<InningsCard>) {
                             val wkts = phaseBalls.count { it.isWicket && it.wicketType != "retired_hurt" }
                             val rr = if (legal > 0) runs * 6.0 / legal else 0.0
                             Column(
-                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(BackgroundDark).border(1.dp, BorderColor, RoundedCornerShape(8.dp)).padding(8.dp),
+                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(CH.bg).border(1.dp, CH.border, RoundedCornerShape(8.dp)).padding(8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(label, color = TextSecondary, fontSize = 10.sp)
-                                Text("$runs/$wkts", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(label, color = CH.textSecondary, fontSize = 10.sp)
+                                Text("$runs/$wkts", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Text("RR ${"%.1f".format(rr)}", color = NeonGreen, fontSize = 10.sp)
                             }
                         }
@@ -889,11 +889,11 @@ fun PMAnalyticsTab(cards: List<InningsCard>) {
                 val allWickets = cards.flatMap { it.balls }.filter { it.isWicket && it.wicketType != "retired_hurt" }
                 val groups = allWickets.groupBy { it.wicketType?.replace("_", " ")?.replaceFirstChar { c -> c.uppercase() } ?: "Unknown" }
                 if (groups.isEmpty()) {
-                    Text("No wickets yet", color = TextSecondary, fontSize = 12.sp)
+                    Text("No wickets yet", color = CH.textSecondary, fontSize = 12.sp)
                 } else {
                     groups.forEach { (type, balls) ->
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(type, color = TextPrimary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text(type, color = CH.textPrimary, fontSize = 12.sp, modifier = Modifier.weight(1f))
                             Box(modifier = Modifier.height(16.dp).width((balls.size * 30).dp.coerceAtMost(100.dp)).clip(RoundedCornerShape(4.dp)).background(ErrorRed.copy(alpha = 0.6f)))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("${balls.size}", color = ErrorRed, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp), textAlign = TextAlign.End)
@@ -923,7 +923,7 @@ fun PMAnalyticsTab(cards: List<InningsCard>) {
                         PMStatBox("NB", "$noBalls", ErrorRed, Modifier.weight(1f))
                         PMStatBox("B", "$byes", NeonBlue, Modifier.weight(1f))
                         PMStatBox("LB", "$legByes", PurpleColor, Modifier.weight(1f))
-                        PMStatBox("Tot", "$total", TextPrimary, Modifier.weight(1f))
+                        PMStatBox("Tot", "$total", CH.textPrimary, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -964,7 +964,7 @@ fun computeInningsStats(balls: List<Ball>): InningsQuickStats {
 fun PMPotmTab(uiState: PostMatchUiState, onSelectMotm: (Player) -> Unit) {
     if (uiState.motmCandidates.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No candidates available", color = TextSecondary)
+            Text("No candidates available", color = CH.textSecondary)
         }
         return
     }
@@ -976,28 +976,28 @@ fun PMPotmTab(uiState: PostMatchUiState, onSelectMotm: (Player) -> Unit) {
     ) {
         item {
             Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                Text("Impact List", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("Ranked by impact points — tap a player to set them as Player of the Match.", color = TextSecondary, fontSize = 11.sp)
+                Text("Impact List", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Ranked by impact points — tap a player to set them as Player of the Match.", color = CH.textSecondary, fontSize = 11.sp)
             }
         }
         itemsIndexed(uiState.motmCandidates) { index, candidate ->
             val isSelected = uiState.selectedMotm?.id == candidate.player.id
             Row(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) AmberColor.copy(alpha = 0.15f) else SurfaceCard)
-                    .border(1.dp, if (isSelected) AmberColor else BorderColor, RoundedCornerShape(10.dp))
+                    .background(if (isSelected) AmberColor.copy(alpha = 0.15f) else CH.surface)
+                    .border(1.dp, if (isSelected) AmberColor else CH.border, RoundedCornerShape(10.dp))
                     .clickable { onSelectMotm(candidate.player) }.padding(14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("${index + 1}", color = if (index == 0) AmberColor else TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
+                Text("${index + 1}", color = if (index == 0) AmberColor else CH.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(candidate.player.fullName, color = if (isSelected) AmberColor else TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(impactSummaryText(candidate), color = TextSecondary, fontSize = 12.sp)
+                    Text(candidate.player.fullName, color = if (isSelected) AmberColor else CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(impactSummaryText(candidate), color = CH.textSecondary, fontSize = 12.sp)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("%.1f".format(candidate.score), color = if (isSelected) AmberColor else NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(if (isSelected) "⭐ POTM" else "pts", color = TextSecondary, fontSize = 10.sp)
+                    Text(if (isSelected) "⭐ POTM" else "pts", color = CH.textSecondary, fontSize = 10.sp)
                 }
             }
         }
@@ -1009,10 +1009,10 @@ fun PMPotmTab(uiState: PostMatchUiState, onSelectMotm: (Player) -> Unit) {
 @Composable
 fun PMAnalyticsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SurfaceCard).border(1.dp, BorderColor, RoundedCornerShape(12.dp)).padding(14.dp)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(CH.surface).border(1.dp, CH.border, RoundedCornerShape(12.dp)).padding(14.dp)
     ) {
-        Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 8.dp))
+        Text(title, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 8.dp))
         content()
     }
 }
@@ -1020,19 +1020,19 @@ fun PMAnalyticsCard(title: String, content: @Composable ColumnScope.() -> Unit) 
 @Composable
 fun PMStatBox(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.clip(RoundedCornerShape(8.dp)).background(BackgroundDark).border(1.dp, BorderColor, RoundedCornerShape(8.dp)).padding(6.dp),
+        modifier = modifier.clip(RoundedCornerShape(8.dp)).background(CH.bg).border(1.dp, CH.border, RoundedCornerShape(8.dp)).padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        Text(label, color = TextSecondary, fontSize = 10.sp, textAlign = TextAlign.Center)
+        Text(label, color = CH.textSecondary, fontSize = 10.sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 fun PMCompareRow(val1: String, label: String, val2: String, val1Better: Boolean) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(val1, color = if (val1Better) NeonGreen else TextPrimary, fontSize = 13.sp, fontWeight = if (val1Better) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
-        Text(label, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-        Text(val2, color = if (!val1Better) NeonGreen else TextPrimary, fontSize = 13.sp, fontWeight = if (!val1Better) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(val1, color = if (val1Better) NeonGreen else CH.textPrimary, fontSize = 13.sp, fontWeight = if (val1Better) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
+        Text(label, color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+        Text(val2, color = if (!val1Better) NeonGreen else CH.textPrimary, fontSize = 13.sp, fontWeight = if (!val1Better) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
 }

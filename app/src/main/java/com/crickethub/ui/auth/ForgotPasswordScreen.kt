@@ -45,7 +45,7 @@ fun ForgotPasswordScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(CH.bg)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -56,13 +56,13 @@ fun ForgotPasswordScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
             }
             Text(
                 "Forgot Password",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = CH.textPrimary
             )
         }
 
@@ -76,13 +76,13 @@ fun ForgotPasswordScreen(
             "Reset your password",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = CH.textPrimary
         )
 
         Text(
             "Enter your email address and we'll send you a link to reset your password.",
             fontSize = 14.sp,
-            color = TextSecondary,
+            color = CH.textSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(vertical = 12.dp)
         )
@@ -107,7 +107,7 @@ fun ForgotPasswordScreen(
                     Text("✅", fontSize = 32.sp)
                     Text("Password Changed!", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Text("You can now login with your new password.",
-                        color = TextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+                        color = CH.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -133,9 +133,9 @@ fun ForgotPasswordScreen(
                 label = { Text("Enter OTP Code") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                    focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-                    focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                    focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                    focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
+                    focusedLabelColor = NeonGreen, unfocusedLabelColor = CH.textSecondary
                 )
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -146,13 +146,13 @@ fun ForgotPasswordScreen(
                 visualTransformation = if (showNewPassword) androidx.compose.ui.text.input.VisualTransformation.None
                 else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 trailingIcon = { IconButton(onClick = { showNewPassword = !showNewPassword }) {
-                    Icon(if (showNewPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = TextSecondary)
+                    Icon(if (showNewPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = CH.textSecondary)
                 }},
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                    focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-                    focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                    focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                    focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
+                    focusedLabelColor = NeonGreen, unfocusedLabelColor = CH.textSecondary
                 )
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -164,9 +164,9 @@ fun ForgotPasswordScreen(
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                    focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-                    focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                    focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                    focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
+                    focusedLabelColor = NeonGreen, unfocusedLabelColor = CH.textSecondary
                 )
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -176,7 +176,7 @@ fun ForgotPasswordScreen(
                     onClick = { viewModel.resetOTP(); otpCode = ""; newPassword = ""; confirmNewPassword = "" },
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CH.textSecondary)
                 ) { Text("Resend OTP") }
                 Button(
                     onClick = { if (newPassword == confirmNewPassword)
@@ -194,7 +194,7 @@ fun ForgotPasswordScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Text("Remember it now? ", color = TextSecondary, fontSize = 14.sp)
+                Text("Remember it now? ", color = CH.textSecondary, fontSize = 14.sp)
                 Text("Login", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onBack() })
             }
@@ -212,7 +212,7 @@ fun ForgotPasswordScreen(
             AuthTextField(
                 value = email, onValueChange = { email = it },
                 label = "Email address",
-                leadingIcon = { Icon(Icons.Default.Email, null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                leadingIcon = { Icon(Icons.Default.Email, null, tint = CH.textSecondary, modifier = Modifier.size(18.dp)) },
                 keyboardType = KeyboardType.Email
             )
 
@@ -231,7 +231,7 @@ fun ForgotPasswordScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Text("Remember it now? ", color = TextSecondary, fontSize = 14.sp)
+                Text("Remember it now? ", color = CH.textSecondary, fontSize = 14.sp)
                 Text("Login", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onBack() })
             }

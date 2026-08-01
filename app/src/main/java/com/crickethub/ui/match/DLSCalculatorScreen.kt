@@ -211,10 +211,10 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
     var interruptionOversRestart by remember { mutableStateOf("") }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+        focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
         cursorColor = NeonGreen, focusedLabelColor = NeonGreen,
-        unfocusedLabelColor = TextSecondary,
+        unfocusedLabelColor = CH.textSecondary,
         focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
@@ -223,24 +223,24 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
     if (showAddInterruption) {
         AlertDialog(
             onDismissRequest = { showAddInterruption = false },
-            containerColor = SurfaceCard,
+            containerColor = CH.surface,
             title = {
                 Text(
                     "Add Interruption — Team $addingForTeam",
-                    color = TextPrimary, fontWeight = FontWeight.Bold
+                    color = CH.textPrimary, fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "Enter details at the point rain stopped play:",
-                        color = TextSecondary, fontSize = 12.sp
+                        color = CH.textSecondary, fontSize = 12.sp
                     )
                     OutlinedTextField(
                         value = interruptionOversStop,
                         onValueChange = { interruptionOversStop = it },
                         label = { Text("Overs remaining when stopped") },
-                        placeholder = { Text("e.g. 31.0", color = TextSecondary) },
+                        placeholder = { Text("e.g. 31.0", color = CH.textSecondary) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = fieldColors
@@ -257,7 +257,7 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                         value = interruptionOversRestart,
                         onValueChange = { interruptionOversRestart = it },
                         label = { Text("Overs remaining at restart") },
-                        placeholder = { Text("e.g. 17.0", color = TextSecondary) },
+                        placeholder = { Text("e.g. 17.0", color = CH.textSecondary) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = fieldColors
@@ -298,24 +298,24 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
             },
             dismissButton = {
                 TextButton(onClick = { showAddInterruption = false }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = CH.textSecondary)
                 }
             }
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Column(modifier = Modifier.fillMaxSize().background(CH.bg)) {
         // Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
             }
             Text(
                 "DLS Calculator",
-                fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
+                fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary,
                 modifier = Modifier.weight(1f)
             )
             TextButton(
@@ -350,7 +350,7 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         "Uses official 2002 resource table. For ODIs: min 20 overs each. For T20: min 5 overs each.",
-                        color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp
+                        color = CH.textSecondary, fontSize = 12.sp, lineHeight = 18.sp
                     )
                 }
             }
@@ -361,12 +361,12 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(SurfaceCard)
+                        .background(CH.surface)
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text("🏏 Team 1 (Batting First)", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    HorizontalDivider(color = BorderColor)
+                    HorizontalDivider(color = CH.border)
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
@@ -388,15 +388,15 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                     }
 
                     // Interruptions
-                    Text("Rain interruptions during Team 1 innings:", color = TextSecondary, fontSize = 12.sp)
+                    Text("Rain interruptions during Team 1 innings:", color = CH.textSecondary, fontSize = 12.sp)
 
                     team1Interruptions.forEachIndexed { index, inter ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(BackgroundDark)
-                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                .background(CH.bg)
+                                .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                 .padding(10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -408,11 +408,11 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                                 )
                                 Text(
                                     "Stopped: ${inter.oversRemainingAtStop} ov left, ${inter.wicketsLostAtStop} wkts lost",
-                                    color = TextSecondary, fontSize = 11.sp
+                                    color = CH.textSecondary, fontSize = 11.sp
                                 )
                                 Text(
                                     "Restart: ${inter.oversRemainingAtRestart} ov remaining",
-                                    color = TextSecondary, fontSize = 11.sp
+                                    color = CH.textSecondary, fontSize = 11.sp
                                 )
                             }
                             IconButton(
@@ -449,12 +449,12 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(SurfaceCard)
+                        .background(CH.surface)
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text("🏏 Team 2 (Batting Second)", color = NeonBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    HorizontalDivider(color = BorderColor)
+                    HorizontalDivider(color = CH.border)
 
                     OutlinedTextField(
                         value = team2TotalOvers,
@@ -465,15 +465,15 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                         colors = fieldColors
                     )
 
-                    Text("Rain interruptions during Team 2 innings:", color = TextSecondary, fontSize = 12.sp)
+                    Text("Rain interruptions during Team 2 innings:", color = CH.textSecondary, fontSize = 12.sp)
 
                     team2Interruptions.forEachIndexed { index, inter ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(BackgroundDark)
-                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                .background(CH.bg)
+                                .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                 .padding(10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -485,11 +485,11 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                                 )
                                 Text(
                                     "Stopped: ${inter.oversRemainingAtStop} ov left, ${inter.wicketsLostAtStop} wkts lost",
-                                    color = TextSecondary, fontSize = 11.sp
+                                    color = CH.textSecondary, fontSize = 11.sp
                                 )
                                 Text(
                                     "Restart: ${inter.oversRemainingAtRestart} ov remaining",
-                                    color = TextSecondary, fontSize = 11.sp
+                                    color = CH.textSecondary, fontSize = 11.sp
                                 )
                             }
                             IconButton(
@@ -563,14 +563,14 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("R1 (Team 1)", color = TextSecondary, fontSize = 12.sp)
+                                Text("R1 (Team 1)", color = CH.textSecondary, fontSize = 12.sp)
                                 Text(
                                     "${String.format("%.1f", r.team1Resource)}%",
                                     color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold
                                 )
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("R2 (Team 2)", color = TextSecondary, fontSize = 12.sp)
+                                Text("R2 (Team 2)", color = CH.textSecondary, fontSize = 12.sp)
                                 Text(
                                     "${String.format("%.1f", r.team2Resource)}%",
                                     color = NeonBlue, fontSize = 18.sp, fontWeight = FontWeight.Bold
@@ -582,20 +582,20 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Par Score (Tie)", color = TextSecondary, fontSize = 12.sp)
+                                Text("Par Score (Tie)", color = CH.textSecondary, fontSize = 12.sp)
                                 Text(
                                     "${r.parScore}",
                                     color = AmberColor, fontSize = 28.sp, fontWeight = FontWeight.Bold
                                 )
-                                Text("Score to tie", color = TextSecondary, fontSize = 10.sp)
+                                Text("Score to tie", color = CH.textSecondary, fontSize = 10.sp)
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Target (Win)", color = TextSecondary, fontSize = 12.sp)
+                                Text("Target (Win)", color = CH.textSecondary, fontSize = 12.sp)
                                 Text(
                                     "${r.targetScore}",
                                     color = NeonGreen, fontSize = 28.sp, fontWeight = FontWeight.Bold
                                 )
-                                Text("Score to win", color = TextSecondary, fontSize = 10.sp)
+                                Text("Score to win", color = CH.textSecondary, fontSize = 10.sp)
                             }
                         }
 
@@ -603,7 +603,7 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
 
                         Text(
                             "Method: ${r.method}",
-                            color = TextSecondary, fontSize = 11.sp, lineHeight = 16.sp
+                            color = CH.textSecondary, fontSize = 11.sp, lineHeight = 16.sp
                         )
 
                         // Show/hide explanation
@@ -622,7 +622,7 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(BackgroundDark)
+                                    .background(CH.bg)
                                     .padding(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -633,7 +633,7 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                                         modifier = Modifier.padding(vertical = 1.dp)
                                     ) {
                                         Text("${index + 1}.", color = NeonGreen, fontSize = 11.sp, modifier = Modifier.width(20.dp))
-                                        Text(step, color = TextSecondary, fontSize = 11.sp, lineHeight = 16.sp)
+                                        Text(step, color = CH.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
                                     }
                                 }
                             }
@@ -647,12 +647,12 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(SurfaceCard)
+                            .background(CH.surface)
                             .padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Quick Reference", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        HorizontalDivider(color = BorderColor)
+                        Text("Quick Reference", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        HorizontalDivider(color = CH.border)
 
                         val t1s = team1Score.toIntOrNull() ?: 0
                         val t2o = team2TotalOvers.toIntOrNull() ?: 50
@@ -665,8 +665,8 @@ fun DLSCalculatorScreen(onBack: () -> Unit) {
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("$t2o ov, $wickets wkt${if (wickets != 1) "s" else ""} lost:", color = TextSecondary, fontSize = 12.sp)
-                                Text("Par: $par | Target: ${par + 1}", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text("$t2o ov, $wickets wkt${if (wickets != 1) "s" else ""} lost:", color = CH.textSecondary, fontSize = 12.sp)
+                                Text("Par: $par | Target: ${par + 1}", color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -704,24 +704,24 @@ fun DLSResourceTableView() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
+            .background(CH.surface)
             .padding(12.dp)
     ) {
         Text(
             "DLS Resource Table (Standard Edition)",
-            color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
+            color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
         )
-        Text("% resources remaining", color = TextSecondary, fontSize = 11.sp)
+        Text("% resources remaining", color = CH.textSecondary, fontSize = 11.sp)
         Spacer(modifier = Modifier.height(8.dp))
 
         // Header row
         Row(modifier = Modifier.fillMaxWidth()) {
-            Text("Ov", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp))
+            Text("Ov", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp))
             listOf("0W", "1W", "2W", "3W", "4W", "5W", "6W", "7W", "8W", "9W").forEach { header ->
-                Text(header, color = TextSecondary, fontSize = 10.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(header, color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
             }
         }
-        HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 4.dp))
+        HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 4.dp))
 
         // Show key overs
         listOf(50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1).forEach { overs ->
@@ -735,7 +735,7 @@ fun DLSResourceTableView() {
             ) {
                 Text(
                     "$overs",
-                    color = if (isHighlighted) NeonGreen else TextSecondary,
+                    color = if (isHighlighted) NeonGreen else CH.textSecondary,
                     fontSize = 10.sp,
                     fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.width(28.dp)
@@ -743,7 +743,7 @@ fun DLSResourceTableView() {
                 resources.forEach { value ->
                     Text(
                         String.format("%.1f", value),
-                        color = TextPrimary, fontSize = 9.sp,
+                        color = CH.textPrimary, fontSize = 9.sp,
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center
                     )
@@ -754,7 +754,7 @@ fun DLSResourceTableView() {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             "W = Wickets Lost. 10W = 0 wickets lost (all in hand). G50 = $G50 (used when R2 > R1)",
-            color = TextSecondary, fontSize = 10.sp, lineHeight = 14.sp
+            color = CH.textSecondary, fontSize = 10.sp, lineHeight = 14.sp
         )
     }
 }

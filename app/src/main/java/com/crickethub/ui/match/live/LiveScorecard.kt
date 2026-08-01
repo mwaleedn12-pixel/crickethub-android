@@ -55,12 +55,12 @@ fun LiveScorecardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "${uiState.battingTeamName} vs ${uiState.bowlingTeamName}",
-                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary,
                         maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     Text(
@@ -68,7 +68,7 @@ fun LiveScorecardScreen(
                         fontSize = 11.sp,
                         color = when (uiState.matchStatus) {
                             "LIVE" -> NeonGreen
-                            "COMPLETED" -> TextSecondary
+                            "COMPLETED" -> CH.textSecondary
                             else -> AmberColor
                         }
                     )
@@ -101,7 +101,7 @@ fun LiveScorecardScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(
@@ -112,15 +112,15 @@ fun LiveScorecardScreen(
                     Column {
                         Text(
                             "${uiState.totalRuns}/${uiState.totalWickets}",
-                            fontSize = 32.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                            fontSize = 32.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary
                         )
                         Text(
                             "(${uiState.currentOver}.${uiState.currentBall} ov)",
-                            color = TextSecondary, fontSize = 13.sp
+                            color = CH.textSecondary, fontSize = 13.sp
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("CRR", color = TextSecondary, fontSize = 11.sp)
+                        Text("CRR", color = CH.textSecondary, fontSize = 11.sp)
                         Text(
                             "${"%.2f".format(uiState.currentRunRate)}",
                             color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold
@@ -137,7 +137,7 @@ fun LiveScorecardScreen(
                                 color = if ((uiState.requiredRunRate ?: 0.0) > uiState.currentRunRate) ErrorRed else NeonGreen,
                                 fontSize = 12.sp
                             )
-                            Text("T: ${uiState.target}", color = TextSecondary, fontSize = 11.sp)
+                            Text("T: ${uiState.target}", color = CH.textSecondary, fontSize = 11.sp)
                         }
                     }
                 }
@@ -150,22 +150,22 @@ fun LiveScorecardScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("This over:", color = TextSecondary, fontSize = 12.sp)
+                    Text("This over:", color = CH.textSecondary, fontSize = 12.sp)
                     uiState.last6Balls.forEach { ball ->
                         val (bgColor, textColor) = when {
                             ball.startsWith("W") -> ErrorRed to Color.White
                             ball == "4" -> NeonBlue to Color.White
                             ball == "6" -> NeonGreen to Color.Black
                             ball.startsWith("Wd") || ball.startsWith("Nb") -> AmberColor to Color.Black
-                            ball == "0" || ball == "•" -> SurfaceCard to TextSecondary
-                            else -> SurfaceCard to TextPrimary
+                            ball == "0" || ball == "•" -> CH.surface to CH.textSecondary
+                            else -> CH.surface to CH.textPrimary
                         }
                         Box(
                             modifier = Modifier
                                 .size(30.dp)
                                 .clip(CircleShape)
                                 .background(bgColor)
-                                .border(1.dp, BorderColor, CircleShape),
+                                .border(1.dp, CH.border, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(ball, color = textColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -177,7 +177,7 @@ fun LiveScorecardScreen(
             // Tabs
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = SurfaceCard,
+                containerColor = CH.surface,
                 contentColor = NeonGreen,
                 edgePadding = 0.dp
             ) {
@@ -189,7 +189,7 @@ fun LiveScorecardScreen(
                             Text(
                                 tab, fontSize = 12.sp,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index) NeonGreen else TextSecondary
+                                color = if (selectedTab == index) NeonGreen else CH.textSecondary
                             )
                         }
                     )
@@ -201,7 +201,7 @@ fun LiveScorecardScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("⚠️", fontSize = 40.sp)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(uiState.error ?: "Unknown error", color = TextSecondary, fontSize = 14.sp,
+                        Text(uiState.error ?: "Unknown error", color = CH.textSecondary, fontSize = 14.sp,
                             textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
                     }
                 }
@@ -286,21 +286,21 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
 
         // Batting header
         item {
-            Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+            Column(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
                 Text(
                     uiState.battingTeamName,
                     color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Text("BATTING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                    Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("B", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("4s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("6s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("SR", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                    Text("BATTING", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text("R", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("B", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("4s", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("6s", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("SR", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
                 }
-                HorizontalDivider(color = BorderColor)
+                HorizontalDivider(color = CH.border)
             }
         }
 
@@ -315,7 +315,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
             if (idx >= 0) idx else Int.MAX_VALUE
         }
         items(sortedBattedList) { stats ->
-            Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+            Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -323,22 +323,22 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             stats.player.fullName,
-                            color = if (stats.isOut) TextSecondary else TextPrimary,
+                            color = if (stats.isOut) CH.textSecondary else CH.textPrimary,
                             fontSize = 13.sp,
                             fontWeight = if (!stats.isOut) FontWeight.SemiBold else FontWeight.Normal
                         )
                         Text(
                             buildDismissalText(stats, bowlerMap),
-                            color = TextSecondary, fontSize = 10.sp
+                            color = CH.textSecondary, fontSize = 10.sp
                         )
                     }
-                    Text("${stats.runs}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("${stats.balls}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("${stats.fours}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("${stats.sixes}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("${"%.1f".format(stats.strikeRate)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                    Text("${stats.runs}", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.balls}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.fours}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.sixes}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${"%.1f".format(stats.strikeRate)}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
                 }
-                HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                HorizontalDivider(color = CH.border, thickness = 0.5.dp)
             }
         }
 
@@ -349,35 +349,35 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         if (didNotBat.isNotEmpty()) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+                    modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text("Did Not Bat", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text(didNotBat.joinToString(", ") { it.player.fullName }, color = TextSecondary, fontSize = 11.sp)
+                    Text("Did Not Bat", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(didNotBat.joinToString(", ") { it.player.fullName }, color = CH.textSecondary, fontSize = 11.sp)
                 }
-                HorizontalDivider(color = BorderColor)
+                HorizontalDivider(color = CH.border)
             }
         }
 
         // Extras + Total
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().background(SurfaceCard)
+                modifier = Modifier.fillMaxWidth().background(CH.surface)
                     .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Extras", color = TextSecondary, fontSize = 13.sp)
-                    Text("(w ${uiState.wides}, nb ${uiState.noBalls}, b 0, lb 0)", color = TextSecondary, fontSize = 11.sp)
-                    Text("${uiState.extrasTotal}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Extras", color = CH.textSecondary, fontSize = 13.sp)
+                    Text("(w ${uiState.wides}, nb ${uiState.noBalls}, b 0, lb 0)", color = CH.textSecondary, fontSize = 11.sp)
+                    Text("${uiState.extrasTotal}", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("${uiState.currentOver}.${uiState.currentBall} Ov", color = TextSecondary, fontSize = 12.sp)
-                    Text("${uiState.totalRuns}/${uiState.totalWickets}", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Total", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("${uiState.currentOver}.${uiState.currentBall} Ov", color = CH.textSecondary, fontSize = 12.sp)
+                    Text("${uiState.totalRuns}/${uiState.totalWickets}", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
 
         // Fall of Wickets
@@ -385,35 +385,35 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
         if (fow.isNotEmpty()) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+                    modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text("Fall of Wickets", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Fall of Wickets", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(fow, color = TextSecondary, fontSize = 11.sp, lineHeight = 18.sp)
+                    Text(fow, color = CH.textSecondary, fontSize = 11.sp, lineHeight = 18.sp)
                 }
-                HorizontalDivider(color = BorderColor)
+                HorizontalDivider(color = CH.border)
             }
         }
 
         // Bowling header
         item {
             Spacer(modifier = Modifier.height(8.dp))
-            Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+            Column(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
                 Text(
                     uiState.bowlingTeamName,
                     color = NeonBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Text("BOWLING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                    Text("O", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("M", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("W", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("Eco", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                    Text("BOWLING", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text("O", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("M", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("R", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("W", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("Eco", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
                 }
-                HorizontalDivider(color = BorderColor)
+                HorizontalDivider(color = CH.border)
             }
         }
 
@@ -424,18 +424,18 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
             if (idx >= 0) idx else Int.MAX_VALUE
         }
         items(sortedBowlingList) { stats ->
-            Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+            Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(stats.player.fullName, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                    Text(stats.overs, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("${stats.maidens}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text("${stats.runs}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text(stats.player.fullName, color = CH.textPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(stats.overs, color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.maidens}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                    Text("${stats.runs}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
                     Text(
                         "${stats.wickets}",
-                        color = if (stats.wickets > 0) NeonGreen else TextSecondary,
+                        color = if (stats.wickets > 0) NeonGreen else CH.textSecondary,
                         fontSize = 14.sp,
                         fontWeight = if (stats.wickets > 0) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier.width(28.dp), textAlign = TextAlign.End
@@ -450,7 +450,7 @@ fun LiveScorecardTab(uiState: LiveScorecardUiState) {
                         fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End
                     )
                 }
-                HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                HorizontalDivider(color = CH.border, thickness = 0.5.dp)
             }
         }
     }
@@ -485,28 +485,28 @@ private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
             )
             Text(
                 "${inn.totalRuns}/${inn.totalWickets} ($oversText)",
-                color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold
             )
         }
     }
 
     // Batting header
     item {
-        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
             Text(
                 data.battingTeamName,
                 color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text("BATTING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("B", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("4s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("6s", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("SR", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                Text("BATTING", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("R", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("B", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("4s", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("6s", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("SR", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
     }
 
@@ -519,7 +519,7 @@ private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
         if (idx >= 0) idx else Int.MAX_VALUE
     }
     items(sortedBattedList) { stats ->
-        Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+        Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -527,19 +527,19 @@ private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         stats.player.fullName,
-                        color = if (stats.isOut) TextSecondary else TextPrimary,
+                        color = if (stats.isOut) CH.textSecondary else CH.textPrimary,
                         fontSize = 13.sp,
                         fontWeight = if (!stats.isOut) FontWeight.SemiBold else FontWeight.Normal
                     )
-                    Text(buildDismissalText(stats, bowlerMap), color = TextSecondary, fontSize = 10.sp)
+                    Text(buildDismissalText(stats, bowlerMap), color = CH.textSecondary, fontSize = 10.sp)
                 }
-                Text("${stats.runs}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.balls}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.fours}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.sixes}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${"%.1f".format(stats.strikeRate)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+                Text("${stats.runs}", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.balls}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.fours}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.sixes}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(stats.strikeRate)}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 
@@ -548,55 +548,55 @@ private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
     if (didNotBat.isNotEmpty()) {
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+                modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text("Did Not Bat", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Text(didNotBat.joinToString(", ") { it.player.fullName }, color = TextSecondary, fontSize = 11.sp)
+                Text("Did Not Bat", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(didNotBat.joinToString(", ") { it.player.fullName }, color = CH.textSecondary, fontSize = 11.sp)
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
     }
 
     // Extras + Total
     item {
         Column(
-            modifier = Modifier.fillMaxWidth().background(SurfaceCard)
+            modifier = Modifier.fillMaxWidth().background(CH.surface)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Extras", color = TextSecondary, fontSize = 13.sp)
-                Text("(w ${data.wides}, nb ${data.noBalls}, b 0, lb 0)", color = TextSecondary, fontSize = 11.sp)
-                Text("${data.extrasTotal}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Extras", color = CH.textSecondary, fontSize = 13.sp)
+                Text("(w ${data.wides}, nb ${data.noBalls}, b 0, lb 0)", color = CH.textSecondary, fontSize = 11.sp)
+                Text("${data.extrasTotal}", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(6.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Total", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("$oversText Ov", color = TextSecondary, fontSize = 12.sp)
-                Text("${inn.totalRuns}/${inn.totalWickets}", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Total", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("$oversText Ov", color = CH.textSecondary, fontSize = 12.sp)
+                Text("${inn.totalRuns}/${inn.totalWickets}", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
-        HorizontalDivider(color = BorderColor)
+        HorizontalDivider(color = CH.border)
     }
 
     // Bowling header
     item {
         Spacer(modifier = Modifier.height(8.dp))
-        Column(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+        Column(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
             Text(
                 data.bowlingTeamName,
                 color = NeonBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text("BOWLING", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text("O", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("M", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("R", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("W", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("Eco", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                Text("BOWLING", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("O", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("M", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("R", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("W", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("Eco", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
         }
     }
 
@@ -607,18 +607,18 @@ private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
         if (idx >= 0) idx else Int.MAX_VALUE
     }
     items(sortedBowlingList) { stats ->
-        Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+        Column(modifier = Modifier.fillMaxWidth().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stats.player.fullName, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                Text(stats.overs, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.maidens}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${stats.runs}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text(stats.player.fullName, color = CH.textPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Text(stats.overs, color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.maidens}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${stats.runs}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
                 Text(
                     "${stats.wickets}",
-                    color = if (stats.wickets > 0) NeonGreen else TextSecondary,
+                    color = if (stats.wickets > 0) NeonGreen else CH.textSecondary,
                     fontSize = 14.sp,
                     fontWeight = if (stats.wickets > 0) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.width(28.dp), textAlign = TextAlign.End
@@ -627,7 +627,7 @@ private fun LazyListScope.completedInningsSection(data: CompletedInningsData) {
                     stats.economy < 6 -> NeonGreen; stats.economy < 9 -> AmberColor; else -> ErrorRed
                 }, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 
@@ -703,7 +703,7 @@ fun LiveCommentaryTab(uiState: LiveScorecardUiState) {
 
     if (allCommentary.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No commentary yet", color = TextSecondary)
+            Text("No commentary yet", color = CH.textSecondary)
         }
         return
     }
@@ -750,7 +750,7 @@ fun LiveCommentaryRow(text: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isWicket) ErrorRed.copy(alpha = 0.05f) else BackgroundDark)
+            .background(if (isWicket) ErrorRed.copy(alpha = 0.05f) else CH.bg)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -759,7 +759,7 @@ fun LiveCommentaryRow(text: String) {
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(48.dp)) {
                 if (overBall.contains(".")) {
-                    Text(overBall, color = TextSecondary, fontSize = 11.sp)
+                    Text(overBall, color = CH.textSecondary, fontSize = 11.sp)
                 }
                 Box(
                     modifier = Modifier
@@ -770,7 +770,7 @@ fun LiveCommentaryRow(text: String) {
                                 isWicket -> ErrorRed; isSix -> NeonGreen
                                 isFour -> NeonBlue
                                 outcome in listOf("Wd", "Nb") -> AmberColor
-                                else -> SurfaceCard
+                                else -> CH.surface
                             }
                         ),
                     contentAlignment = Alignment.Center
@@ -780,7 +780,7 @@ fun LiveCommentaryRow(text: String) {
                         color = when {
                             isWicket || isSix || isFour -> Color.White
                             outcome in listOf("Wd", "Nb") -> Color.Black
-                            else -> TextSecondary
+                            else -> CH.textSecondary
                         },
                         fontSize = 11.sp, fontWeight = FontWeight.Bold
                     )
@@ -788,12 +788,12 @@ fun LiveCommentaryRow(text: String) {
             }
             Text(
                 description.ifEmpty { text },
-                color = if (isWicket) ErrorRed else TextSecondary,
+                color = if (isWicket) ErrorRed else CH.textSecondary,
                 fontSize = 13.sp, lineHeight = 18.sp,
                 modifier = Modifier.weight(1f)
             )
         }
-        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
     }
 }
 
@@ -851,14 +851,14 @@ private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<Strin
         Row(
             modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(SurfaceCard)
+                .background(CH.surface)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            Text("Ov", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp))
-            Text("Runs", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-            Text("Wkts", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-            Text("Balls", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-            Text("RR", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+            Text("Ov", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp))
+            Text("Runs", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+            Text("Wkts", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+            Text("Balls", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            Text("RR", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
         }
     }
 
@@ -881,7 +881,7 @@ private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<Strin
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(SurfaceCard)
+                .background(CH.surface)
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Row(
@@ -890,17 +890,17 @@ private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<Strin
             ) {
                 Text(
                     "${overNo + 1}",
-                    color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(32.dp)
                 )
                 Text(
                     "$runsInOver",
-                    color = TextPrimary, fontSize = 14.sp,
+                    color = CH.textPrimary, fontSize = 14.sp,
                     modifier = Modifier.width(40.dp), textAlign = TextAlign.Center
                 )
                 Text(
                     if (wicketsInOver > 0) "$wicketsInOver" else "-",
-                    color = if (wicketsInOver > 0) ErrorRed else TextSecondary,
+                    color = if (wicketsInOver > 0) ErrorRed else CH.textSecondary,
                     fontSize = 14.sp,
                     fontWeight = if (wicketsInOver > 0) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.width(40.dp), textAlign = TextAlign.Center
@@ -926,7 +926,7 @@ private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<Strin
                             ball.isWicket -> ErrorRed; ball.isSix -> NeonGreen
                             ball.isBoundary -> NeonBlue
                             ball.extrasType in listOf("wide", "no_ball") -> AmberColor
-                            else -> BorderColor
+                            else -> CH.border
                         }
                         Box(
                             modifier = Modifier.size(24.dp).clip(CircleShape).background(bgColor),
@@ -941,14 +941,14 @@ private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<Strin
                     "${"%.1f".format(rr)}",
                     color = when {
                         rr >= 12 -> ErrorRed; rr >= 8 -> AmberColor
-                        rr >= 6 -> NeonGreen; else -> TextSecondary
+                        rr >= 6 -> NeonGreen; else -> CH.textSecondary
                     },
                     fontSize = 13.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End
                 )
             }
             if (bowlerName.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("🎳 $bowlerName", color = TextSecondary, fontSize = 10.sp)
+                Text("🎳 $bowlerName", color = CH.textSecondary, fontSize = 10.sp)
             }
         }
     }
@@ -960,7 +960,7 @@ private fun LazyListScope.oversContent(balls: List<Ball>, bowlerStats: Map<Strin
 fun LivePartnershipTab(uiState: LiveScorecardUiState) {
     if (uiState.balls.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No partnership data yet", color = TextSecondary)
+            Text("No partnership data yet", color = CH.textSecondary)
         }
         return
     }
@@ -1026,7 +1026,7 @@ fun LivePartnershipTab(uiState: LiveScorecardUiState) {
                     Text("Current Partnership", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("$b1Name & $b2Name", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("$b1Name & $b2Name", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         Text("$pRuns ($pBalls)", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1034,7 +1034,7 @@ fun LivePartnershipTab(uiState: LiveScorecardUiState) {
                         Text("4s: $pFours", color = NeonBlue, fontSize = 12.sp)
                         Text("6s: $pSixes", color = NeonGreen, fontSize = 12.sp)
                         val rr = if (pBalls > 0) pRuns.toDouble() / pBalls * 6 else 0.0
-                        Text("RR: ${"%.2f".format(rr)}", color = TextSecondary, fontSize = 12.sp)
+                        Text("RR: ${"%.2f".format(rr)}", color = CH.textSecondary, fontSize = 12.sp)
                     }
                 }
             }
@@ -1045,7 +1045,7 @@ fun LivePartnershipTab(uiState: LiveScorecardUiState) {
             item {
                 Text(
                     "Previous Partnerships",
-                    color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    color = CH.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -1053,18 +1053,18 @@ fun LivePartnershipTab(uiState: LiveScorecardUiState) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(SurfaceCard)
+                        .background(CH.surface)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("${p.batter1} & ${p.batter2}", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text("4s: ${p.fours}  6s: ${p.sixes}", color = TextSecondary, fontSize = 11.sp)
+                        Text("${p.batter1} & ${p.batter2}", color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text("4s: ${p.fours}  6s: ${p.sixes}", color = CH.textSecondary, fontSize = 11.sp)
                     }
                     Text(
                         "${p.runs} (${p.balls})",
-                        color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                        color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -1093,7 +1093,7 @@ fun LiveMvpTab(uiState: LiveScorecardUiState) {
 
     if (mvpList.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No MVP data yet", color = TextSecondary)
+            Text("No MVP data yet", color = CH.textSecondary)
         }
         return
     }
@@ -1104,32 +1104,32 @@ fun LiveMvpTab(uiState: LiveScorecardUiState) {
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         item {
-            Text("Impact Players", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+            Text("Impact Players", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(SurfaceCard).padding(horizontal = 12.dp, vertical = 6.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(CH.surface).padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Text("Player", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text("Impact", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
-                Text("Runs", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
-                Text("Wkts", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
-                Text("SR/Eco", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
+                Text("Player", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("Impact", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
+                Text("Runs", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                Text("Wkts", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                Text("SR/Eco", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
             }
         }
         items(mvpList) { entry ->
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(entry.name, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(entry.name, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${"%.1f".format(entry.score)}", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
-                Text("${entry.runs}", color = if (entry.runs >= 50) AmberColor else TextPrimary, fontSize = 13.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
-                Text(if (entry.wickets > 0) "${entry.wickets}" else "-", color = if (entry.wickets >= 3) ErrorRed else TextPrimary, fontSize = 13.sp, fontWeight = if (entry.wickets >= 3) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                Text("${entry.runs}", color = if (entry.runs >= 50) AmberColor else CH.textPrimary, fontSize = 13.sp, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                Text(if (entry.wickets > 0) "${entry.wickets}" else "-", color = if (entry.wickets >= 3) ErrorRed else CH.textPrimary, fontSize = 13.sp, fontWeight = if (entry.wickets >= 3) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
                 Text(
                     if (entry.wickets > 0 && entry.eco < 99) "${"%.1f".format(entry.eco)}" else "${"%.0f".format(entry.sr)}",
-                    color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End
+                    color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End
                 )
             }
         }
@@ -1150,16 +1150,16 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(16.dp)
             ) {
-                Text("STATUS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("STATUS", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     uiState.resultText.ifEmpty {
                         if (uiState.matchStatus == "LIVE") "Match in progress..." else uiState.matchStatus
                     },
-                    color = if (uiState.resultText.isNotEmpty()) NeonGreen else TextSecondary,
+                    color = if (uiState.resultText.isNotEmpty()) NeonGreen else CH.textSecondary,
                     fontSize = 16.sp, fontWeight = FontWeight.Bold
                 )
             }
@@ -1170,12 +1170,12 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("SCORE SUMMARY", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor)
+                Text("SCORE SUMMARY", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border)
 
                 // Show completed innings scores first
                 uiState.completedInnings.forEach { completed ->
@@ -1185,41 +1185,41 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
                         1 -> "1st Inn"; 2 -> "2nd Inn"; else -> "${inn.inningsNo}th Inn"
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${completed.battingTeamName} ($inningsLabel)", color = TextSecondary, fontSize = 13.sp)
+                        Text("${completed.battingTeamName} ($inningsLabel)", color = CH.textSecondary, fontSize = 13.sp)
                         Text(
                             "${inn.totalRuns}/${inn.totalWickets} ($oversText ov)",
-                            color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                            color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
                 // Current innings
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(uiState.battingTeamName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(uiState.battingTeamName, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(
                         "${uiState.totalRuns}/${uiState.totalWickets} (${uiState.currentOver}.${uiState.currentBall} ov)",
-                        color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                        color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
                     )
                 }
                 if (uiState.target != null) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Target", color = TextSecondary, fontSize = 13.sp)
+                        Text("Target", color = CH.textSecondary, fontSize = 13.sp)
                         Text("${uiState.target}", color = AmberColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Runs needed", color = TextSecondary, fontSize = 13.sp)
+                        Text("Runs needed", color = CH.textSecondary, fontSize = 13.sp)
                         Text("${uiState.target!! - uiState.totalRuns} off ${uiState.ballsLeft} balls", color = ErrorRed, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
-                HorizontalDivider(color = BorderColor)
+                HorizontalDivider(color = CH.border)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("CRR", color = TextSecondary, fontSize = 11.sp)
+                        Text("CRR", color = CH.textSecondary, fontSize = 11.sp)
                         Text("${"%.2f".format(uiState.currentRunRate)}", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                     uiState.requiredRunRate?.let {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("RRR", color = TextSecondary, fontSize = 11.sp)
+                            Text("RRR", color = CH.textSecondary, fontSize = 11.sp)
                             Text("${"%.2f".format(it)}", color = if (it > uiState.currentRunRate) ErrorRed else NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -1232,29 +1232,29 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("TOP PERFORMERS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor)
+                Text("TOP PERFORMERS", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border)
                 val topBat = uiState.batsmanStats.values.maxByOrNull { it.runs }
                 topBat?.let {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("🏏 Top Scorer", color = TextSecondary, fontSize = 11.sp)
-                            Text(it.player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("🏏 Top Scorer", color = CH.textSecondary, fontSize = 11.sp)
+                            Text(it.player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Text("${it.runs}(${it.balls})", color = AmberColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 val topBowl = uiState.bowlerStats.values.filter { it.wickets > 0 }.maxByOrNull { it.wickets }
                 topBowl?.let {
-                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("🎳 Top Bowler", color = TextSecondary, fontSize = 11.sp)
-                            Text(it.player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("🎳 Top Bowler", color = CH.textSecondary, fontSize = 11.sp)
+                            Text(it.player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Text("${it.wickets}/${it.runs}", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
@@ -1267,23 +1267,23 @@ fun LiveSummaryTab(uiState: LiveScorecardUiState) {
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceCard)
+                    .background(CH.surface)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("EXTRAS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor)
+                Text("EXTRAS", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Wides", color = TextSecondary, fontSize = 11.sp)
-                        Text("${uiState.wides}", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Wides", color = CH.textSecondary, fontSize = 11.sp)
+                        Text("${uiState.wides}", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No Balls", color = TextSecondary, fontSize = 11.sp)
-                        Text("${uiState.noBalls}", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("No Balls", color = CH.textSecondary, fontSize = 11.sp)
+                        Text("${uiState.noBalls}", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Total Extras", color = TextSecondary, fontSize = 11.sp)
+                        Text("Total Extras", color = CH.textSecondary, fontSize = 11.sp)
                         Text("${uiState.extrasTotal}", color = AmberColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -1307,7 +1307,7 @@ fun LiveBallTimeline(uiState: LiveScorecardUiState) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BackgroundDark)
+            .background(CH.bg)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1335,10 +1335,10 @@ private fun LiveBallChip(ball: Ball) {
         ball.isBoundary -> { label = "4"; color = NeonBlue }
         ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; label = if (r > 0) "Wd+$r" else "Wd"; color = AmberColor }
         ball.extrasType == "no_ball" -> { label = if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"; color = AmberColor }
-        ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; label = if (b <= 1) "B" else "${b}B"; color = SurfaceCard }
-        ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; label = if (lb <= 1) "LB" else "${lb}LB"; color = SurfaceCard }
-        ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = SurfaceCard }
-        else -> { label = "$runs"; color = SurfaceCard }
+        ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; label = if (b <= 1) "B" else "${b}B"; color = CH.surface }
+        ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; label = if (lb <= 1) "LB" else "${lb}LB"; color = CH.surface }
+        ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = CH.surface }
+        else -> { label = "$runs"; color = CH.surface }
     }
     Box(
         modifier = Modifier
@@ -1352,7 +1352,7 @@ private fun LiveBallChip(ball: Ball) {
     ) {
         Text(
             label,
-            color = if (color == SurfaceCard) TextPrimary else Color.White,
+            color = if (color == CH.surface) CH.textPrimary else Color.White,
             fontSize = 13.sp, fontWeight = FontWeight.Bold
         )
     }
@@ -1366,11 +1366,11 @@ private fun LiveOverSeparator(overNumber: Int, runs: Int) {
                 .padding(horizontal = 6.dp)
                 .width(1.dp)
                 .height(34.dp)
-                .background(BorderColor)
+                .background(CH.border)
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(ordinalOver(overNumber), color = TextSecondary, fontSize = 10.sp)
-            Text("$runs RUNS", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(ordinalOver(overNumber), color = CH.textSecondary, fontSize = 10.sp)
+            Text("$runs RUNS", color = CH.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.width(6.dp))
     }

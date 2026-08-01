@@ -55,6 +55,7 @@ fun ScoringScreen(
     val syncState by viewModel.syncState.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     var resumeKey by remember { mutableStateOf(0) }
+    val isDark = isSystemInDarkTheme()
 
     // Detect when we return to this screen
     // navBackStackEntry removed
@@ -164,7 +165,7 @@ fun ScoringScreen(
             milestoneColor = milestone.second
             milestoneKey++
         } else {
-            val (label, color) = ballPopupLabel(last)
+            val (label, color) = ballPopupLabel(last, isDark)
             popupLabel = label
             popupColor = color
             popupKey++
@@ -201,12 +202,12 @@ fun ScoringScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
                     }
                     Text(
                         "Live Scoring",
                         fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                        color = TextPrimary, modifier = Modifier.weight(1f)
+                        color = CH.textPrimary, modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = onViewScorecard) {
                         Icon(Icons.Default.Score, contentDescription = "Scorecard", tint = NeonBlue, modifier = Modifier.size(20.dp))
@@ -400,10 +401,10 @@ fun ScoringScreen(
             if (uiState.showSuperOverDecision) {
                 AlertDialog(
                     onDismissRequest = { },
-                    containerColor = SurfaceCard,
+                    containerColor = CH.surface,
                     title = { Text("Super Over Tied!", color = AmberColor, fontWeight = FontWeight.Bold) },
                     text = { Text("The super over ended level. How do you want to resolve it?",
-                        color = TextSecondary, fontSize = 14.sp) },
+                        color = CH.textSecondary, fontSize = 14.sp) },
                     confirmButton = {
                         TextButton(onClick = { viewModel.startAnotherSuperOver(matchId) }) {
                             Text("Play Another", color = NeonGreen, fontWeight = FontWeight.Bold)
@@ -412,7 +413,7 @@ fun ScoringScreen(
                     dismissButton = {
                         Row {
                             TextButton(onClick = { viewModel.resolveSuperOverAsComplete() }) {
-                                Text("Declare Tie", color = TextSecondary)
+                                Text("Declare Tie", color = CH.textSecondary)
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             TextButton(onClick = { viewModel.resolveByBoundaryCount(matchId) }) {
@@ -508,7 +509,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
         else -> "P2"
     }
 
-    Box(modifier = Modifier.fillMaxWidth().background(SurfaceCard)) {
+    Box(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
 
             // ── Match info bar: tournament • Match N • format • venue ──
@@ -521,7 +522,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                 match?.venue?.takeIf { it.isNotBlank() }?.let { add(it) }
             }
             if (infoBits.isNotEmpty()) {
-                Text(infoBits.joinToString("  •  "), color = TextSecondary, fontSize = 11.sp, maxLines = 1)
+                Text(infoBits.joinToString("  •  "), color = CH.textSecondary, fontSize = 11.sp, maxLines = 1)
             }
             if (uiState.tournamentName?.isNotBlank() == true || infoBits.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -543,7 +544,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             "${uiState.totalRuns}/${uiState.totalWickets}",
-                            fontSize = 44.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                            fontSize = 44.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.padding(bottom = 6.dp)) {
@@ -567,7 +568,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                     if (isSuperOver) {
                         Text("SUPER OVER", color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     } else {
-                        match?.let { Text("${it.totalOvers} ov", color = TextSecondary, fontSize = 12.sp) }
+                        match?.let { Text("${it.totalOvers} ov", color = CH.textSecondary, fontSize = 12.sp) }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     TextButton(onClick = onShare, colors = ButtonDefaults.textButtonColors(contentColor = NeonGreen)) {
@@ -577,7 +578,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = BorderColor)
+            HorizontalDivider(color = CH.border)
             Spacer(modifier = Modifier.height(8.dp))
 
             // ── Stats row: CRR always; chase shows Target + RRR, 1st innings shows Projected ──
@@ -600,7 +601,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
             // ── Match status line (chase only) ──
             headerStatusLine(uiState)?.let {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(it, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         // Celebratory ball-result overlay across the header band
@@ -617,7 +618,7 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
 @Composable
 private fun HeaderStat(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
     Row(verticalAlignment = Alignment.Bottom) {
-        Text("$label ", color = TextSecondary, fontSize = 11.sp)
+        Text("$label ", color = CH.textSecondary, fontSize = 11.sp)
         Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -644,20 +645,20 @@ fun HeaderContextRow(uiState: ScoringUiState) {
             verticalAlignment = Alignment.Top
         ) {
             Column {
-                Text("Partnership", color = TextSecondary, fontSize = 10.sp)
-                Text("${p.runs} (${p.balls})", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Partnership", color = CH.textSecondary, fontSize = 10.sp)
+                Text("${p.runs} (${p.balls})", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             uiState.lastWicket?.let { lw ->
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Last Wkt  ${lw.score}/${lw.wicket}", color = ErrorRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("${lw.batsmanName} (${lw.dismissal})", color = TextSecondary, fontSize = 10.sp, maxLines = 1)
+                    Text("${lw.batsmanName} (${lw.dismissal})", color = CH.textSecondary, fontSize = 10.sp, maxLines = 1)
                 }
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             "Extras ${inn.extrasTotal}  (Wd ${inn.wides}  Nb ${inn.noBalls}  B ${inn.byes}  Lb ${inn.legByes})",
-            color = TextSecondary, fontSize = 10.sp
+            color = CH.textSecondary, fontSize = 10.sp
         )
     }
 }
@@ -671,18 +672,18 @@ fun Last6BallsRow(balls: List<String>) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("This over:", color = TextSecondary, fontSize = 12.sp)
+        Text("This over:", color = CH.textSecondary, fontSize = 12.sp)
         balls.forEach { ball ->
             val (bgColor, textColor) = when {
                 ball.startsWith("W") -> ErrorRed to Color.White
                 ball == "4" -> NeonBlue to Color.White
                 ball == "6" -> NeonGreen to Color.Black
                 ball.startsWith("Wd") || ball.startsWith("Nb") -> AmberColor to Color.Black
-                ball == "0" -> SurfaceCard to TextSecondary
-                else -> SurfaceCard to TextPrimary
+                ball == "0" -> CH.surface to CH.textSecondary
+                else -> CH.surface to CH.textPrimary
             }
             Box(
-                modifier = Modifier.size(32.dp).clip(CircleShape).background(bgColor).border(1.dp, BorderColor, CircleShape),
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(bgColor).border(1.dp, CH.border, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(ball, color = textColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -706,8 +707,8 @@ fun CurrentBatsmenRow(
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(
             modifier = Modifier
-                .weight(1f).clip(RoundedCornerShape(8.dp)).background(SurfaceCard)
-                .border(1.dp, if (strikerClickable) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                .weight(1f).clip(RoundedCornerShape(8.dp)).background(CH.surface)
+                .border(1.dp, if (strikerClickable) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                 .then(if (strikerClickable) Modifier.clickable { onChangeStriker() } else Modifier)
                 .padding(10.dp)
         ) {
@@ -716,31 +717,31 @@ fun CurrentBatsmenRow(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     striker?.fullName ?: "Select Batsman",
-                    color = if (striker != null) TextPrimary else TextSecondary,
+                    color = if (striker != null) CH.textPrimary else CH.textSecondary,
                     fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
                 )
             }
             striker?.let { s ->
                 batsmanStats[s.id]?.let { stats ->
-                    Text("${stats.runs}(${stats.balls}) 4s:${stats.fours} 6s:${stats.sixes} SR:${"%.1f".format(stats.strikeRate)}", color = TextSecondary, fontSize = 10.sp)
+                    Text("${stats.runs}(${stats.balls}) 4s:${stats.fours} 6s:${stats.sixes} SR:${"%.1f".format(stats.strikeRate)}", color = CH.textSecondary, fontSize = 10.sp)
                 }
             }
         }
         Column(
             modifier = Modifier
-                .weight(1f).clip(RoundedCornerShape(8.dp)).background(SurfaceCard)
-                .border(1.dp, if (nonStrikerClickable) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                .weight(1f).clip(RoundedCornerShape(8.dp)).background(CH.surface)
+                .border(1.dp, if (nonStrikerClickable) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                 .then(if (nonStrikerClickable) Modifier.clickable { onChangeNonStriker() } else Modifier)
                 .padding(10.dp)
         ) {
             Text(
                 nonStriker?.fullName ?: "Select Non-Striker",
-                color = if (nonStriker != null) TextPrimary else TextSecondary,
+                color = if (nonStriker != null) CH.textPrimary else CH.textSecondary,
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
             )
             nonStriker?.let { ns ->
                 batsmanStats[ns.id]?.let { stats ->
-                    Text("${stats.runs}(${stats.balls}) 4s:${stats.fours} 6s:${stats.sixes}", color = TextSecondary, fontSize = 10.sp)
+                    Text("${stats.runs}(${stats.balls}) 4s:${stats.fours} 6s:${stats.sixes}", color = CH.textSecondary, fontSize = 10.sp)
                 }
             }
         }
@@ -759,17 +760,17 @@ fun CurrentBowlerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(8.dp))
-            .background(SurfaceCard)
-            .border(1.dp, if (bowlerClickable) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+            .background(CH.surface)
+            .border(1.dp, if (bowlerClickable) NeonGreen else CH.border, RoundedCornerShape(8.dp))
             .then(if (bowlerClickable) Modifier.clickable { onChangeBowler() } else Modifier)
             .padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(bowler?.fullName ?: "Select Bowler", color = if (bowler != null) TextPrimary else TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(bowler?.fullName ?: "Select Bowler", color = if (bowler != null) CH.textPrimary else CH.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         bowler?.let { b ->
             bowlerStats[b.id]?.let { stats ->
-                Text("${stats.overs} M:${stats.maidens} R:${stats.runs} W:${stats.wickets} Eco:${"%.1f".format(stats.economy)}", color = TextSecondary, fontSize = 11.sp)
+                Text("${stats.overs} M:${stats.maidens} R:${stats.runs} W:${stats.wickets} Eco:${"%.1f".format(stats.economy)}", color = CH.textSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -792,8 +793,8 @@ fun ScoringButtons(
     Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(0, 1, 2, 3, 4, 5, 6).forEach { runs ->
-                val bgColor = when (runs) { 4 -> NeonBlue.copy(alpha = 0.8f); 6 -> NeonGreen.copy(alpha = 0.8f); 5 -> PurpleColor.copy(alpha = 0.8f); else -> Color(0xFF1A3828) }
-                val textColor = when (runs) { 4, 5, 6 -> Color.White; 0 -> Color(0xFF6EE7B7); else -> Color(0xFFECFDF5) }
+                val bgColor = when (runs) { 4 -> NeonBlue.copy(alpha = 0.8f); 6 -> NeonGreen.copy(alpha = 0.8f); 5 -> PurpleColor.copy(alpha = 0.8f); else -> Color(0xFF262626) }
+                val textColor = when (runs) { 4, 5, 6 -> Color.White; 0 -> Color(0xFFC4C9D4); else -> Color(0xFFF2F2F0) }
                 Button(
                     onClick = { onRuns(runs) }, enabled = !isLoading,
                     modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp),
@@ -819,7 +820,7 @@ fun ScoringButtons(
             Button(
                 onClick = onUndo, enabled = !isLoading,
                 modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard, contentColor = TextSecondary)
+                colors = ButtonDefaults.buttonColors(containerColor = CH.surface, contentColor = CH.textSecondary)
             ) { Text("UNDO", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -847,13 +848,13 @@ fun ScoringButtons(
 @Composable
 fun PlayerSelectDialog(title: String, players: List<Player>, onPlayerSelected: (Player) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
-        onDismissRequest = onDismiss, containerColor = SurfaceCard,
-        title = { Text(title, color = TextPrimary, fontWeight = FontWeight.Bold) },
+        onDismissRequest = onDismiss, containerColor = CH.surface,
+        title = { Text(title, color = CH.textPrimary, fontWeight = FontWeight.Bold) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 400.dp)) {
                 items(players) { player ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BackgroundDark).clickable { onPlayerSelected(player) }.padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.bg).clickable { onPlayerSelected(player) }.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(NeonGreen.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
@@ -861,31 +862,31 @@ fun PlayerSelectDialog(title: String, players: List<Player>, onPlayerSelected: (
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(player.fullName, color = TextPrimary, fontSize = 14.sp)
-                            player.role?.let { Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, color = TextSecondary, fontSize = 11.sp) }
+                            Text(player.fullName, color = CH.textPrimary, fontSize = 14.sp)
+                            player.role?.let { Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, color = CH.textSecondary, fontSize = 11.sp) }
                         }
                     }
                 }
                 if (players.isEmpty()) {
-                    item { Text("No players available", color = TextSecondary, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center) }
+                    item { Text("No players available", color = CH.textSecondary, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center) }
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) } }
     )
 }
 
 @Composable
 fun BowlerSelectDialog(title: String, players: List<Player>, remainingOvers: Map<String, Int>, onPlayerSelected: (Player) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
-        onDismissRequest = onDismiss, containerColor = SurfaceCard,
-        title = { Text(title, color = TextPrimary, fontWeight = FontWeight.Bold) },
+        onDismissRequest = onDismiss, containerColor = CH.surface,
+        title = { Text(title, color = CH.textPrimary, fontWeight = FontWeight.Bold) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 400.dp)) {
                 items(players) { player ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BackgroundDark).clickable { onPlayerSelected(player) }.padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.bg).clickable { onPlayerSelected(player) }.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(NeonGreen.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
@@ -893,20 +894,20 @@ fun BowlerSelectDialog(title: String, players: List<Player>, remainingOvers: Map
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(player.fullName, color = TextPrimary, fontSize = 14.sp)
-                            player.role?.let { Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, color = TextSecondary, fontSize = 11.sp) }
+                            Text(player.fullName, color = CH.textPrimary, fontSize = 14.sp)
+                            player.role?.let { Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, color = CH.textSecondary, fontSize = 11.sp) }
                         }
                         val rem = remainingOvers[player.id] ?: 0
                         Text("rem: $rem ov", color = if (rem <= 1) AmberColor else NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 if (players.isEmpty()) {
-                    item { Text("No bowlers available", color = TextSecondary, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center) }
+                    item { Text("No bowlers available", color = CH.textSecondary, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center) }
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) } }
     )
 }
 
@@ -940,11 +941,11 @@ fun WicketDialog(
         "hit_ball_twice" to "Hit Ball Twice"
     )
     AlertDialog(
-        onDismissRequest = onDismiss, containerColor = SurfaceCard,
+        onDismissRequest = onDismiss, containerColor = CH.surface,
         title = { Text("Wicket!", color = ErrorRed, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 480.dp)) {
-                item { Text("How was the batsman dismissed?", color = TextSecondary, fontSize = 13.sp) }
+                item { Text("How was the batsman dismissed?", color = CH.textSecondary, fontSize = 13.sp) }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         wicketTypes.chunked(2).forEach { row ->
@@ -953,12 +954,12 @@ fun WicketDialog(
                                     val selected = selectedType == value
                                     Box(
                                         modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                                            .background(if (selected) ErrorRed.copy(alpha = 0.2f) else BackgroundDark)
-                                            .border(1.dp, if (selected) ErrorRed else BorderColor, RoundedCornerShape(8.dp))
+                                            .background(if (selected) ErrorRed.copy(alpha = 0.2f) else CH.bg)
+                                            .border(1.dp, if (selected) ErrorRed else CH.border, RoundedCornerShape(8.dp))
                                             .clickable { selectedType = value }.padding(10.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(label, color = if (selected) ErrorRed else TextSecondary, fontSize = 12.sp,
+                                        Text(label, color = if (selected) ErrorRed else CH.textSecondary, fontSize = 12.sp,
                                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center)
                                     }
                                 }
@@ -969,15 +970,15 @@ fun WicketDialog(
                 }
                 if (selectedType == "run_out") {
                     item {
-                        Text("Who got run out?", color = TextSecondary, fontSize = 12.sp)
+                        Text("Who got run out?", color = CH.textSecondary, fontSize = 12.sp)
                         Spacer(Modifier.height(4.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { nonStrikerOut = false }, modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (!nonStrikerOut) ErrorRed else SurfaceCard)
-                            ) { Text("Striker", color = if (!nonStrikerOut) Color.White else TextSecondary, fontSize = 12.sp) }
+                                colors = ButtonDefaults.buttonColors(containerColor = if (!nonStrikerOut) ErrorRed else CH.surface)
+                            ) { Text("Striker", color = if (!nonStrikerOut) Color.White else CH.textSecondary, fontSize = 12.sp) }
                             Button(onClick = { nonStrikerOut = true }, modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (nonStrikerOut) ErrorRed else SurfaceCard)
-                            ) { Text("Non-Striker", color = if (nonStrikerOut) Color.White else TextSecondary, fontSize = 12.sp) }
+                                colors = ButtonDefaults.buttonColors(containerColor = if (nonStrikerOut) ErrorRed else CH.surface)
+                            ) { Text("Non-Striker", color = if (nonStrikerOut) Color.White else CH.textSecondary, fontSize = 12.sp) }
                         }
                     }
                 }
@@ -988,7 +989,7 @@ fun WicketDialog(
                                 label = { Text("Stumped by (Keeper) ✓") }, singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                                    focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
                                     focusedBorderColor = NeonGreen, unfocusedBorderColor = NeonGreen,
                                     focusedLabelColor = NeonGreen, unfocusedLabelColor = NeonGreen
                                 )
@@ -1002,16 +1003,16 @@ fun WicketDialog(
                                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                                     isError = fielderName.isBlank(),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                                        focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderColor,
-                                        focusedLabelColor = ErrorRed, unfocusedLabelColor = TextSecondary
+                                        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                                        focusedBorderColor = ErrorRed, unfocusedBorderColor = CH.border,
+                                        focusedLabelColor = ErrorRed, unfocusedLabelColor = CH.textSecondary
                                     )
                                 )
                                 ExposedDropdownMenu(expanded = dropExpanded, onDismissRequest = { dropExpanded = false },
-                                    modifier = Modifier.background(SurfaceCard)) {
+                                    modifier = Modifier.background(CH.surface)) {
                                     bowlingTeamPlayers.forEach { player ->
                                         DropdownMenuItem(
-                                            text = { Text(player.fullName, color = TextPrimary) },
+                                            text = { Text(player.fullName, color = CH.textPrimary) },
                                             onClick = { fielderName = player.fullName; dropExpanded = false }
                                         )
                                     }
@@ -1023,9 +1024,9 @@ fun WicketDialog(
                                 singleLine = true, isError = fielderName.isBlank(),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                                    focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderColor,
-                                    focusedLabelColor = ErrorRed, unfocusedLabelColor = TextSecondary
+                                    focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                                    focusedBorderColor = ErrorRed, unfocusedBorderColor = CH.border,
+                                    focusedLabelColor = ErrorRed, unfocusedLabelColor = CH.textSecondary
                                 )
                             )
                         }
@@ -1040,17 +1041,17 @@ fun WicketDialog(
                     ) { Text("🤕 Retired Hurt (can bat again)", color = AmberColor, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
                 }
                 item {
-                    Text("Runs before wicket:", color = TextSecondary, fontSize = 13.sp)
+                    Text("Runs before wicket:", color = CH.textSecondary, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         (0..4).forEach { r ->
                             Box(
                                 modifier = Modifier.size(40.dp).clip(CircleShape)
-                                    .background(if (runsBeforeWicket == r) NeonGreen.copy(alpha = 0.3f) else BackgroundDark)
-                                    .border(1.dp, if (runsBeforeWicket == r) NeonGreen else BorderColor, CircleShape)
+                                    .background(if (runsBeforeWicket == r) NeonGreen.copy(alpha = 0.3f) else CH.bg)
+                                    .border(1.dp, if (runsBeforeWicket == r) NeonGreen else CH.border, CircleShape)
                                     .clickable { runsBeforeWicket = r },
                                 contentAlignment = Alignment.Center
-                            ) { Text(r.toString(), color = if (runsBeforeWicket == r) NeonGreen else TextSecondary, fontWeight = FontWeight.Bold) }
+                            ) { Text(r.toString(), color = if (runsBeforeWicket == r) NeonGreen else CH.textSecondary, fontWeight = FontWeight.Bold) }
                         }
                     }
                 }
@@ -1069,7 +1070,7 @@ fun WicketDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
             ) { Text("Confirm", color = Color.White) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) } }
     )
 }
 
@@ -1080,7 +1081,7 @@ fun ExtrasDialog(onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
     var selectedType by remember { mutableStateOf<String?>(null) }
     var runs by remember { mutableStateOf(0) }
     AlertDialog(
-        onDismissRequest = onDismiss, containerColor = SurfaceCard,
+        onDismissRequest = onDismiss, containerColor = CH.surface,
         title = { Text("Extras", color = AmberColor, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1089,17 +1090,17 @@ fun ExtrasDialog(onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
                         val selected = selectedType == value
                         Box(
                             modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                                .background(if (selected) AmberColor.copy(alpha = 0.2f) else BackgroundDark)
-                                .border(1.dp, if (selected) AmberColor else BorderColor, RoundedCornerShape(8.dp))
+                                .background(if (selected) AmberColor.copy(alpha = 0.2f) else CH.bg)
+                                .border(1.dp, if (selected) AmberColor else CH.border, RoundedCornerShape(8.dp))
                                 .clickable { selectedType = value; if (value == "no_ball" && runs == 5) runs = 4 }.padding(8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(label, color = if (selected) AmberColor else TextSecondary, fontSize = 12.sp,
+                            Text(label, color = if (selected) AmberColor else CH.textSecondary, fontSize = 12.sp,
                                 textAlign = TextAlign.Center, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
                 }
-                Text("Runs:", color = TextSecondary, fontSize = 13.sp)
+                Text("Runs:", color = CH.textSecondary, fontSize = 13.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     // No-ball: 0,1,2,3,4,6 (can't run 5, but can hit a six).
                     // Others: 0..6.
@@ -1107,11 +1108,11 @@ fun ExtrasDialog(onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
                     runOptions.forEach { r ->
                         Box(
                             modifier = Modifier.size(40.dp).clip(CircleShape)
-                                .background(if (runs == r) AmberColor.copy(alpha = 0.3f) else BackgroundDark)
-                                .border(1.dp, if (runs == r) AmberColor else BorderColor, CircleShape)
+                                .background(if (runs == r) AmberColor.copy(alpha = 0.3f) else CH.bg)
+                                .border(1.dp, if (runs == r) AmberColor else CH.border, CircleShape)
                                 .clickable { runs = r },
                             contentAlignment = Alignment.Center
-                        ) { Text(r.toString(), color = if (runs == r) AmberColor else TextSecondary, fontWeight = FontWeight.Bold) }
+                        ) { Text(r.toString(), color = if (runs == r) AmberColor else CH.textSecondary, fontWeight = FontWeight.Bold) }
                     }
                 }
             }
@@ -1120,7 +1121,7 @@ fun ExtrasDialog(onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
             Button(onClick = { selectedType?.let { onConfirm(it, runs) } }, enabled = selectedType != null,
                 colors = ButtonDefaults.buttonColors(containerColor = AmberColor)) { Text("Confirm", color = Color.Black) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) } }
     )
 }
 
@@ -1130,20 +1131,20 @@ fun ExtrasDialog(onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
 fun PenaltyRunsDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var selectedTeam by remember { mutableStateOf("batting") }
     AlertDialog(
-        onDismissRequest = onDismiss, containerColor = SurfaceCard,
+        onDismissRequest = onDismiss, containerColor = CH.surface,
         title = { Text("+5 Penalty Runs", color = AmberColor, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Award 5 penalty runs to:", color = TextSecondary, fontSize = 13.sp)
+                Text("Award 5 penalty runs to:", color = CH.textSecondary, fontSize = 13.sp)
                 listOf("batting" to "Batting Team", "bowling" to "Bowling Team").forEach { (value, label) ->
                     val selected = selectedTeam == value
                     Row(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                            .background(if (selected) AmberColor.copy(alpha = 0.15f) else BackgroundDark)
-                            .border(1.dp, if (selected) AmberColor else BorderColor, RoundedCornerShape(8.dp))
+                            .background(if (selected) AmberColor.copy(alpha = 0.15f) else CH.bg)
+                            .border(1.dp, if (selected) AmberColor else CH.border, RoundedCornerShape(8.dp))
                             .clickable { selectedTeam = value }.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
-                    ) { Text(label, color = if (selected) AmberColor else TextSecondary, fontSize = 14.sp) }
+                    ) { Text(label, color = if (selected) AmberColor else CH.textSecondary, fontSize = 14.sp) }
                 }
             }
         },
@@ -1152,7 +1153,7 @@ fun PenaltyRunsDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
                 Text("Add Penalty", color = Color.Black, fontWeight = FontWeight.Bold)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) } }
     )
 }
 
@@ -1163,7 +1164,7 @@ fun ManualEditDialog(currentRuns: Int, currentWickets: Int, onDismiss: () -> Uni
     var runs by remember { mutableStateOf(currentRuns.toString()) }
     var wickets by remember { mutableStateOf(currentWickets.toString()) }
     AlertDialog(
-        onDismissRequest = onDismiss, containerColor = SurfaceCard,
+        onDismissRequest = onDismiss, containerColor = CH.surface,
         title = { Text("Manual Score Edit", color = NeonBlue, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1172,18 +1173,18 @@ fun ManualEditDialog(currentRuns: Int, currentWickets: Int, onDismiss: () -> Uni
                     value = runs, onValueChange = { if (it.all { c -> c.isDigit() }) runs = it },
                     label = { Text("Total Runs") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = NeonBlue, unfocusedBorderColor = BorderColor,
-                        cursorColor = NeonBlue, focusedLabelColor = NeonBlue, unfocusedLabelColor = TextSecondary
+                        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                        focusedBorderColor = NeonBlue, unfocusedBorderColor = CH.border,
+                        cursorColor = NeonBlue, focusedLabelColor = NeonBlue, unfocusedLabelColor = CH.textSecondary
                     )
                 )
                 OutlinedTextField(
                     value = wickets, onValueChange = { if (it.all { c -> c.isDigit() } && (it.toIntOrNull() ?: 0) <= 10) wickets = it },
                     label = { Text("Wickets") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = NeonBlue, unfocusedBorderColor = BorderColor,
-                        cursorColor = NeonBlue, focusedLabelColor = NeonBlue, unfocusedLabelColor = TextSecondary
+                        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                        focusedBorderColor = NeonBlue, unfocusedBorderColor = CH.border,
+                        cursorColor = NeonBlue, focusedLabelColor = NeonBlue, unfocusedLabelColor = CH.textSecondary
                     )
                 )
             }
@@ -1194,17 +1195,17 @@ fun ManualEditDialog(currentRuns: Int, currentWickets: Int, onDismiss: () -> Uni
                 colors = ButtonDefaults.buttonColors(containerColor = NeonBlue)
             ) { Text("Update Score", color = Color.White, fontWeight = FontWeight.Bold) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) } }
     )
 }
-// ── Ball popup label + colour, derived from the recorded ball ──────────────────
-private fun ballPopupLabel(ball: com.crickethub.data.model.Ball): Pair<String, androidx.compose.ui.graphics.Color> {
-    val green = androidx.compose.ui.graphics.Color(0xFF34D399)
-    val blue = androidx.compose.ui.graphics.Color(0xFF3B82F6)
-    val purple = androidx.compose.ui.graphics.Color(0xFF8B5CF6)
-    val red = androidx.compose.ui.graphics.Color(0xFFEF4444)
-    val amber = androidx.compose.ui.graphics.Color(0xFFF59E0B)
-    val grey = androidx.compose.ui.graphics.Color(0xFF9CA3AF)
+// ── Ball popup label + colour — themed for Charcoal+Platinum / Ivory+Slate ──
+private fun ballPopupLabel(ball: com.crickethub.data.model.Ball, isDark: Boolean): Pair<String, androidx.compose.ui.graphics.Color> {
+    val run    = if (isDark) androidx.compose.ui.graphics.Color(0xFFC4C9D4) else androidx.compose.ui.graphics.Color(0xFF566073)
+    val four   = if (isDark) androidx.compose.ui.graphics.Color(0xFF2FA57A) else androidx.compose.ui.graphics.Color(0xFF0F6B4C)
+    val six    = if (isDark) androidx.compose.ui.graphics.Color(0xFFD4C5A0) else androidx.compose.ui.graphics.Color(0xFFA5622A)
+    val wicket = if (isDark) androidx.compose.ui.graphics.Color(0xFFFF5470) else androidx.compose.ui.graphics.Color(0xFFC23B4F)
+    val dot    = if (isDark) androidx.compose.ui.graphics.Color(0xFF5A5A5A) else androidx.compose.ui.graphics.Color(0xFF9A927E)
+    val extra  = androidx.compose.ui.graphics.Color(0xFFF59E0B)
 
     // Wicket takes priority
     if (ball.isWicket) {
@@ -1223,35 +1224,35 @@ private fun ballPopupLabel(ball: com.crickethub.data.model.Ball): Pair<String, a
             "hit_ball_twice" -> "HIT TWICE!"
             else -> "OUT!"
         }
-        return label to (if (ball.wicketType == "retired_hurt") amber else red)
+        return label to (if (ball.wicketType == "retired_hurt") extra else wicket)
     }
 
     // Extras
     when (ball.extrasType) {
         "wide" -> {
-            // extrasRuns = 1 penalty + runs ran. Show ran runs only when > 0.
             val ran = (ball.extrasRuns ?: 1) - 1
-            return (if (ran > 0) "WIDE +$ran" else "WIDE") to amber
+            return (if (ran > 0) "WIDE +$ran" else "WIDE") to extra
         }
         "no_ball" -> {
-            // runsOffBat = runs the batsman scored. Show only when > 0.
             val ran = ball.runsOffBat
-            return (if (ran > 0) "NO BALL +$ran" else "NO BALL") to amber
+            return (if (ran > 0) "NO BALL +$ran" else "NO BALL") to extra
         }
-        "bye" -> return ("BYE +${ball.extrasRuns ?: 1}") to grey
-        "leg_bye" -> return ("LEG BYE +${ball.extrasRuns ?: 1}") to grey
-        "penalty" -> return ("PENALTY +${ball.extrasRuns ?: 5}") to amber
+        "bye" -> return ("BYE +${ball.extrasRuns ?: 1}") to dot
+        "leg_bye" -> return ("LEG BYE +${ball.extrasRuns ?: 1}") to dot
+        "penalty" -> return ("PENALTY +${ball.extrasRuns ?: 5}") to extra
     }
 
     // Runs off bat
     return when (ball.runsOffBat) {
-        0 -> "DOT" to grey
-        4 -> "FOUR!" to blue
-        6 -> "SIX!" to green
-        else -> "+${ball.runsOffBat}" to green
+        0 -> "DOT" to dot
+        4 -> "FOUR!" to four
+        6 -> "SIX!" to six
+        else -> "+${ball.runsOffBat}" to run
     }
 }
 
+// HTML-style ball popup: no box/border, just bold text with shadow.
+// Scales up (0.6 → 1.15 → 1.0), floats upward, fades out.
 @Composable
 private fun BallPopup(
     label: String?,
@@ -1266,43 +1267,51 @@ private fun BallPopup(
     LaunchedEffect(triggerKey) {
         if (triggerKey == 0) return@LaunchedEffect
         visible = true
-        kotlinx.coroutines.delay(if (big) 1900 else 850)
+        kotlinx.coroutines.delay(if (big) 1900 else 900)
         visible = false
     }
 
     val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (visible) 1f else 0.4f,
+        targetValue = if (visible) 1f else 0.6f,
         animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = if (big) 0.38f else 0.5f,
+            dampingRatio = if (big) 0.35f else 0.45f,
             stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
         ),
         label = "popupScale"
     )
     val alpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(180),
+        animationSpec = androidx.compose.animation.core.tween(if (visible) 120 else 300),
         label = "popupAlpha"
+    )
+    val offsetY by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (visible) 0f else -120f,
+        animationSpec = if (visible)
+            androidx.compose.animation.core.spring(
+                dampingRatio = 0.5f,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            )
+        else
+            androidx.compose.animation.core.tween(400),
+        label = "popupOffsetY"
     )
 
     if (alpha > 0.01f) {
-        Box(
+        Text(
+            text = label,
+            color = color,
+            fontSize = if (big) 34.sp else 40.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
             modifier = modifier
                 .graphicsLayer {
-                    this.scaleX = scale; this.scaleY = scale; this.alpha = alpha
+                    this.scaleX = scale
+                    this.scaleY = scale
+                    this.alpha = alpha
+                    this.translationY = offsetY
+                    this.shadowElevation = 16f
                 }
-                .clip(RoundedCornerShape(20.dp))
-                .background(color.copy(alpha = if (big) 0.22f else 0.18f))
-                .border(if (big) 3.dp else 2.dp, color, RoundedCornerShape(20.dp))
-                .padding(horizontal = if (big) 28.dp else 32.dp, vertical = 18.dp)
-        ) {
-            Text(
-                text = label,
-                color = color,
-                fontSize = if (big) 34.sp else 40.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center
-            )
-        }
+        )
     }
 }
 
@@ -1465,10 +1474,10 @@ private fun ScoringBallChip(ball: Ball) {
         ball.isBoundary -> { label = "4"; color = NeonBlue }
         ball.extrasType == "wide" -> { val r = (ball.extrasRuns ?: 1) - 1; label = if (r > 0) "Wd+$r" else "Wd"; color = AmberColor }
         ball.extrasType == "no_ball" -> { label = if (ball.runsOffBat > 0) "Nb+${ball.runsOffBat}" else "Nb"; color = AmberColor }
-        ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; label = if (b <= 1) "B" else "${b}B"; color = SurfaceCard }
-        ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; label = if (lb <= 1) "LB" else "${lb}LB"; color = SurfaceCard }
-        ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = SurfaceCard }
-        else -> { label = "$runs"; color = SurfaceCard }
+        ball.extrasType == "bye" -> { val b = ball.extrasRuns ?: 0; label = if (b <= 1) "B" else "${b}B"; color = CH.surface }
+        ball.extrasType == "leg_bye" -> { val lb = ball.extrasRuns ?: 0; label = if (lb <= 1) "LB" else "${lb}LB"; color = CH.surface }
+        ball.runsOffBat == 0 && ball.extrasRuns == null -> { label = "•"; color = CH.surface }
+        else -> { label = "$runs"; color = CH.surface }
     }
     Box(
         modifier = Modifier
@@ -1482,7 +1491,7 @@ private fun ScoringBallChip(ball: Ball) {
     ) {
         Text(
             label,
-            color = if (color == SurfaceCard) TextPrimary else Color.White,
+            color = if (color == CH.surface) CH.textPrimary else Color.White,
             fontSize = 13.sp, fontWeight = FontWeight.Bold
         )
     }
@@ -1496,11 +1505,11 @@ private fun ScoringOverSeparator(overNumber: Int, runs: Int) {
                 .padding(horizontal = 6.dp)
                 .width(1.dp)
                 .height(32.dp)
-                .background(BorderColor)
+                .background(CH.border)
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(scoringOrdinalOver(overNumber), color = TextSecondary, fontSize = 10.sp)
-            Text("$runs RUNS", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(scoringOrdinalOver(overNumber), color = CH.textSecondary, fontSize = 10.sp)
+            Text("$runs RUNS", color = CH.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.width(6.dp))
     }
@@ -1536,7 +1545,7 @@ fun ScoringPlayersTable(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(SurfaceCard)
+            .background(CH.surface)
             .padding(vertical = 6.dp)
     ) {
         // Batters header
@@ -1544,17 +1553,17 @@ fun ScoringPlayersTable(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("BATTER", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("BATTER", color = CH.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             TableHead("R"); TableHead("B"); TableHead("4s"); TableHead("6s"); TableHead("SR", 42.dp); TableHead("vB", 40.dp)
         }
-        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
 
         BatterTableRow(uiState.striker, uiState.batsmanStats, true, uiState.balls, bowlerId, strikerClickable, onChangeStriker)
-        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         BatterTableRow(uiState.nonStriker, uiState.batsmanStats, false, uiState.balls, bowlerId, nonStrikerClickable, onChangeNonStriker)
 
         Spacer(modifier = Modifier.height(2.dp))
-        HorizontalDivider(color = BorderColor)
+        HorizontalDivider(color = CH.border)
         Spacer(modifier = Modifier.height(2.dp))
 
         // Bowler header
@@ -1562,23 +1571,23 @@ fun ScoringPlayersTable(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("BOWLER", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("BOWLER", color = CH.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             TableHead("O", 34.dp); TableHead("M"); TableHead("R"); TableHead("W"); TableHead("Eco", 42.dp)
             TableHead("0s"); TableHead("4s"); TableHead("6s")
         }
-        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         BowlerTableRow(uiState.currentBowler, uiState.bowlerStats, uiState.balls, bowlerClickable, onChangeBowler)
     }
 }
 
 @Composable
 private fun RowScope.TableHead(label: String, width: Dp = 28.dp) {
-    Text(label, color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+    Text(label, color = CH.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold,
         textAlign = TextAlign.End, modifier = Modifier.width(width))
 }
 
 @Composable
-private fun RowScope.TableCell(text: String, width: Dp = 28.dp, color: Color = TextPrimary, bold: Boolean = false) {
+private fun RowScope.TableCell(text: String, width: Dp = 28.dp, color: Color = CH.textPrimary, bold: Boolean = false) {
     Text(text, color = color, fontSize = 12.sp,
         fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
         textAlign = TextAlign.End, modifier = Modifier.width(width))
@@ -1623,20 +1632,20 @@ private fun BatterTableRow(
             }
             Text(
                 player?.fullName ?: if (isStriker) "Select Batsman" else "Select Non-Striker",
-                color = if (player != null) TextPrimary else NeonGreen,
+                color = if (player != null) CH.textPrimary else NeonGreen,
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
             )
             player?.let {
-                Text("  ${handAbbrev(it.battingHand)}", color = TextSecondary, fontSize = 10.sp)
+                Text("  ${handAbbrev(it.battingHand)}", color = CH.textSecondary, fontSize = 10.sp)
             }
         }
         val s = player?.let { stats[it.id] }
         if (s != null) {
-            TableCell("${s.runs}", 28.dp, TextPrimary, true)
+            TableCell("${s.runs}", 28.dp, CH.textPrimary, true)
             TableCell("${s.balls}")
             TableCell("${s.fours}")
             TableCell("${s.sixes}")
-            TableCell("%.1f".format(s.strikeRate), 42.dp, TextSecondary)
+            TableCell("%.1f".format(s.strikeRate), 42.dp, CH.textSecondary)
             // vs current bowler
             val vb = player.let { p ->
                 val pb = balls.filter { it.batsmanId == p.id && it.bowlerId == bowlerId }
@@ -1644,7 +1653,7 @@ private fun BatterTableRow(
                 val b = pb.count { it.extrasType != "wide" }
                 "$r($b)"
             }
-            TableCell(vb, 40.dp, TextSecondary)
+            TableCell(vb, 40.dp, CH.textSecondary)
         } else {
             TableCell("-"); TableCell("-"); TableCell("-"); TableCell("-"); TableCell("-", 42.dp); TableCell("-", 40.dp)
         }
@@ -1663,29 +1672,29 @@ private fun BowlerTableRow(
     Row(modifier = rowMod, verticalAlignment = Alignment.CenterVertically) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(bowler?.fullName ?: "Select Bowler",
-                color = if (bowler != null) TextPrimary else NeonGreen,
+                color = if (bowler != null) CH.textPrimary else NeonGreen,
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
             bowler?.let { bw ->
                 val code = bowlingCode(bw.bowlingHand, bw.bowlingStyle)
                 if (code.isNotBlank()) {
-                    Text("  $code", color = TextSecondary, fontSize = 10.sp, maxLines = 1, softWrap = false)
+                    Text("  $code", color = CH.textSecondary, fontSize = 10.sp, maxLines = 1, softWrap = false)
                 }
             }
         }
         val s = bowler?.let { stats[it.id] }
         if (s != null) {
-            TableCell(s.overs, 34.dp, TextPrimary, true)
+            TableCell(s.overs, 34.dp, CH.textPrimary, true)
             TableCell("${s.maidens}")
             TableCell("${s.runs}")
             TableCell("${s.wickets}")
-            TableCell("%.1f".format(s.economy), 42.dp, TextSecondary)
+            TableCell("%.1f".format(s.economy), 42.dp, CH.textSecondary)
             val bb = bowler.let { p -> balls.filter { it.bowlerId == p.id } }
             val dots = bb.count { it.runsOffBat == 0 && it.extrasRuns == null && !it.isWicket }
             val fours = bb.count { it.isBoundary && !it.isSix }
             val sixes = bb.count { it.isSix }
-            TableCell("$dots", 28.dp, TextSecondary)
-            TableCell("$fours", 28.dp, TextSecondary)
-            TableCell("$sixes", 28.dp, TextSecondary)
+            TableCell("$dots", 28.dp, CH.textSecondary)
+            TableCell("$fours", 28.dp, CH.textSecondary)
+            TableCell("$sixes", 28.dp, CH.textSecondary)
         } else {
             TableCell("-", 34.dp); TableCell("-"); TableCell("-"); TableCell("-"); TableCell("-", 42.dp)
             TableCell("-"); TableCell("-"); TableCell("-")
@@ -1712,11 +1721,11 @@ fun MissedChanceDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SurfaceCard,
-        title = { Text("Missed Chance", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        containerColor = CH.surface,
+        title = { Text("Missed Chance", color = CH.textPrimary, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text("Type", color = TextSecondary, fontSize = 12.sp)
+                Text("Type", color = CH.textSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 types.forEach { (key, label) ->
                     val sel = type == key
@@ -1724,17 +1733,17 @@ fun MissedChanceDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (sel) AmberColor.copy(alpha = 0.2f) else BackgroundDark)
-                            .border(1.dp, if (sel) AmberColor else BorderColor, RoundedCornerShape(8.dp))
+                            .background(if (sel) AmberColor.copy(alpha = 0.2f) else CH.bg)
+                            .border(1.dp, if (sel) AmberColor else CH.border, RoundedCornerShape(8.dp))
                             .clickable { type = key }
                             .padding(10.dp)
                     ) {
-                        Text(label, color = if (sel) AmberColor else TextPrimary, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
+                        Text(label, color = if (sel) AmberColor else CH.textPrimary, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Text("Fielder (required)", color = TextSecondary, fontSize = 12.sp)
+                Text("Fielder (required)", color = CH.textSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 Column(
                     modifier = Modifier
@@ -1747,12 +1756,12 @@ fun MissedChanceDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (sel) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
-                                .border(1.dp, if (sel) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                .background(if (sel) NeonGreen.copy(alpha = 0.2f) else CH.bg)
+                                .border(1.dp, if (sel) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                                 .clickable { selected = p }
                                 .padding(10.dp)
                         ) {
-                            Text(p.fullName, color = if (sel) NeonGreen else TextPrimary, fontSize = 13.sp)
+                            Text(p.fullName, color = if (sel) NeonGreen else CH.textPrimary, fontSize = 13.sp)
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                     }
@@ -1764,11 +1773,11 @@ fun MissedChanceDialog(
                 onClick = { val t = type; val p = selected; if (t != null && p != null) onConfirm(p, t) },
                 enabled = ready
             ) {
-                Text("Record", color = if (ready) NeonGreen else TextSecondary, fontWeight = FontWeight.Bold)
+                Text("Record", color = if (ready) NeonGreen else CH.textSecondary, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) }
         }
     )
 }

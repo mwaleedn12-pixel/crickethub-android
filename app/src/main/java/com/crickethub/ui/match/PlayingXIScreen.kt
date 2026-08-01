@@ -75,7 +75,7 @@ fun PlayingXIScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(CH.bg)
     ) {
         Row(
             modifier = Modifier
@@ -89,7 +89,7 @@ fun PlayingXIScreen(
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = TextPrimary
+                        tint = CH.textPrimary
                     )
                 }
                 Column {
@@ -97,9 +97,9 @@ fun PlayingXIScreen(
                         "Playing $playersPerSide",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = CH.textPrimary
                     )
-                    Text(teamName, fontSize = 13.sp, color = TextSecondary)
+                    Text(teamName, fontSize = 13.sp, color = CH.textSecondary)
                 }
             }
             Text(
@@ -132,7 +132,7 @@ fun PlayingXIScreen(
             ) {
                 Text(
                     "No players in this team.\nAdd players first.",
-                    color = TextSecondary,
+                    color = CH.textSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -160,7 +160,7 @@ fun PlayingXIScreen(
                                     isCaptain -> AmberColor.copy(alpha = 0.12f)
                                     isKeeper -> NeonBlue.copy(alpha = 0.12f)
                                     isSelected -> NeonGreen.copy(alpha = 0.1f)
-                                    else -> SurfaceCard
+                                    else -> CH.surface
                                 }
                             )
                             .border(
@@ -169,7 +169,7 @@ fun PlayingXIScreen(
                                     isCaptain -> AmberColor
                                     isKeeper -> NeonBlue
                                     isSelected -> NeonGreen
-                                    else -> BorderColor
+                                    else -> CH.border
                                 },
                                 RoundedCornerShape(12.dp)
                             )
@@ -219,7 +219,7 @@ fun PlayingXIScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         player.fullName,
-                                        color = TextPrimary,
+                                        color = CH.textPrimary,
                                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                         fontSize = 15.sp
                                     )
@@ -244,7 +244,7 @@ fun PlayingXIScreen(
                                 }
                                 player.role?.let {
                                     Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() },
-                                        color = TextSecondary, fontSize = 12.sp)
+                                        color = CH.textSecondary, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -337,7 +337,7 @@ fun PlayingXIScreen(
                             keeperId == null -> "Select Wicket Keeper (WK)"
                             else -> "Confirm XI"
                         },
-                        color = if (canSave) Color.Black else TextSecondary,
+                        color = if (canSave) Color.Black else CH.textSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )

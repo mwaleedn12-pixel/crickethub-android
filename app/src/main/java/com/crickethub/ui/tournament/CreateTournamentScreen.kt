@@ -53,25 +53,25 @@ fun CreateTournamentScreen(
     }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+        focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
         cursorColor = NeonGreen, focusedLabelColor = NeonGreen,
-        unfocusedLabelColor = TextSecondary,
+        unfocusedLabelColor = CH.textSecondary,
         focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Column(modifier = Modifier.fillMaxSize().background(CH.bg)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
             }
             Text(
                 "Create Tournament",
-                fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary
             )
         }
 
@@ -99,7 +99,7 @@ fun CreateTournamentScreen(
 
             // Format selector
             item {
-                Text("Format", color = TextSecondary, fontSize = 13.sp)
+                Text("Format", color = CH.textSecondary, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(6.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     TOURNAMENT_FORMATS.chunked(2).forEach { row ->
@@ -113,15 +113,15 @@ fun CreateTournamentScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
-                                        .border(1.dp, if (isSelected) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else CH.bg)
+                                        .border(1.dp, if (isSelected) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                                         .clickable { selectedFormat = format }
                                         .padding(vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         format,
-                                        color = if (isSelected) NeonGreen else TextSecondary,
+                                        color = if (isSelected) NeonGreen else CH.textSecondary,
                                         fontSize = 11.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         textAlign = TextAlign.Center
@@ -136,7 +136,7 @@ fun CreateTournamentScreen(
 
             // Match Type
             item {
-                Text("Match Type", color = TextSecondary, fontSize = 13.sp)
+                Text("Match Type", color = CH.textSecondary, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("T20", "ODI", "Test", "T10", "Custom").forEach { type ->
@@ -144,8 +144,8 @@ fun CreateTournamentScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
-                                .border(1.dp, if (isSelected) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else CH.bg)
+                                .border(1.dp, if (isSelected) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                                 .clickable {
                                     matchType = type
                                     totalOvers = when (type) {
@@ -158,7 +158,7 @@ fun CreateTournamentScreen(
                         ) {
                             Text(
                                 type,
-                                color = if (isSelected) NeonGreen else TextSecondary,
+                                color = if (isSelected) NeonGreen else CH.textSecondary,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )

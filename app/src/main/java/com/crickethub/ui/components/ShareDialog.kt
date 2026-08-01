@@ -96,11 +96,11 @@ Open CricketHub app → Menu → Join with Code → Enter: $code
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0D2018),
+        containerColor = CH.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Share, null, tint = NeonGreen, modifier = Modifier.size(20.dp))
-                Text("Share $resourceName", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Share $resourceName", color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         },
         text = {
@@ -139,7 +139,7 @@ Open CricketHub app → Menu → Join with Code → Enter: $code
                         }
                     )
 
-                    HorizontalDivider(color = BorderColor)
+                    HorizontalDivider(color = CH.border)
 
                     // Edit Link
                     ShareLinkCard(
@@ -172,7 +172,7 @@ Open CricketHub app → Menu → Join with Code → Enter: $code
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = TextSecondary)
+                Text("Close", color = CH.textSecondary)
             }
         }
     )
@@ -201,7 +201,7 @@ fun ShareLinkCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF030F08))
+                    .background(Color(0xFF0A0A0A))
                     .border(1.dp, iconColor.copy(0.5f), RoundedCornerShape(8.dp))
                     .padding(12.dp),
                 contentAlignment = Alignment.Center
@@ -221,7 +221,7 @@ fun ShareLinkCard(
                     onClick = { onCopy(link.code) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CH.textSecondary)
                 ) {
                     Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))

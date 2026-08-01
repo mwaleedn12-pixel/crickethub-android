@@ -106,11 +106,11 @@ fun PlayerComparisonScreen(
         }
         AlertDialog(
             onDismissRequest = { pickingSlot = 0; searchQuery = "" },
-            containerColor = SurfaceCard,
+            containerColor = CH.surface,
             title = {
                 Text(
                     if (pickingSlot == 1) "Select Player 1" else "Select Player 2",
-                    color = TextPrimary, fontWeight = FontWeight.Bold
+                    color = CH.textPrimary, fontWeight = FontWeight.Bold
                 )
             },
             text = {
@@ -123,13 +123,13 @@ fun PlayerComparisonScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
+                            focusedTextColor = CH.textPrimary,
+                            unfocusedTextColor = CH.textPrimary,
                             focusedBorderColor = NeonGreen,
-                            unfocusedBorderColor = BorderColor,
+                            unfocusedBorderColor = CH.border,
                             cursorColor = NeonGreen,
                             focusedLabelColor = NeonGreen,
-                            unfocusedLabelColor = TextSecondary
+                            unfocusedLabelColor = CH.textSecondary
                         )
                     )
                     LazyColumn(
@@ -142,8 +142,8 @@ fun PlayerComparisonScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(BackgroundDark)
-                                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                    .background(CH.bg)
+                                    .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                     .clickable {
                                         if (pickingSlot == 1) player1 = player else player2 = player
                                         pickingSlot = 0; searchQuery = ""
@@ -164,10 +164,10 @@ fun PlayerComparisonScreen(
                                     )
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                     Text(
                                         "${team?.name ?: "No team"} • ${player.role?.replaceFirstChar { it.uppercase() } ?: "Player"}",
-                                        color = TextSecondary, fontSize = 11.sp
+                                        color = CH.textSecondary, fontSize = 11.sp
                                     )
                                 }
                             }
@@ -175,7 +175,7 @@ fun PlayerComparisonScreen(
                         if (filtered.isEmpty()) {
                             item {
                                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                    Text("No players found", color = TextSecondary)
+                                    Text("No players found", color = CH.textSecondary)
                                 }
                             }
                         }
@@ -185,7 +185,7 @@ fun PlayerComparisonScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { pickingSlot = 0; searchQuery = "" }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = CH.textSecondary)
                 }
             }
         )
@@ -194,7 +194,7 @@ fun PlayerComparisonScreen(
     // ── UI ──
     Column(
         modifier = Modifier.fillMaxSize()
-            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
     ) {
         // Header
         Row(
@@ -202,9 +202,9 @@ fun PlayerComparisonScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, "Back", tint = TextPrimary)
+                Icon(Icons.Default.ArrowBack, "Back", tint = CH.textPrimary)
             }
-            Text("Player Comparison", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Text("Player Comparison", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary)
         }
 
         // Player slots
@@ -242,8 +242,8 @@ fun PlayerComparisonScreen(
         if (stats1 == null || stats2 == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Person, null, tint = TextSecondary, modifier = Modifier.size(48.dp))
-                    Text("Select two players to compare", color = TextSecondary, fontSize = 14.sp)
+                    Icon(Icons.Default.Person, null, tint = CH.textSecondary, modifier = Modifier.size(48.dp))
+                    Text("Select two players to compare", color = CH.textSecondary, fontSize = 14.sp)
                 }
             }
             return@Column
@@ -252,7 +252,7 @@ fun PlayerComparisonScreen(
         // Tabs
         ScrollableTabRow(
             selectedTabIndex = selectedTab,
-            containerColor = SurfaceCard,
+            containerColor = CH.surface,
             contentColor = NeonGreen,
             edgePadding = 0.dp
         ) {
@@ -264,7 +264,7 @@ fun PlayerComparisonScreen(
                         Text(
                             tab, fontSize = 13.sp,
                             fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == idx) NeonGreen else TextSecondary
+                            color = if (selectedTab == idx) NeonGreen else CH.textSecondary
                         )
                     }
                 )
@@ -295,8 +295,8 @@ fun PlayerSlot(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
-            .border(1.dp, if (player != null) color.copy(alpha = 0.4f) else BorderColor, RoundedCornerShape(12.dp))
+            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
+            .border(1.dp, if (player != null) color.copy(alpha = 0.4f) else CH.border, RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -319,13 +319,13 @@ fun PlayerSlot(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             player?.fullName ?: label,
-            color = if (player != null) TextPrimary else TextSecondary,
+            color = if (player != null) CH.textPrimary else CH.textSecondary,
             fontSize = 12.sp, fontWeight = FontWeight.Bold,
             maxLines = 1, overflow = TextOverflow.Ellipsis
         )
         Text(
             if (player != null) (team?.name ?: "—") else "Tap to select",
-            color = TextSecondary, fontSize = 10.sp,
+            color = CH.textSecondary, fontSize = 10.sp,
             maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
@@ -445,13 +445,14 @@ fun RadarComparisonTab(s1: PlayerStats, s2: PlayerStats, n1: String, n2: String)
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Overall Comparison", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Overall Comparison", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
 
+                val canvasBorder = CH.border
                 Canvas(modifier = Modifier.size(260.dp)) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f
@@ -470,7 +471,7 @@ fun RadarComparisonTab(s1: PlayerStats, s2: PlayerStats, n1: String, n2: String)
                             if (i == 0) gridPath.moveTo(x, y) else gridPath.lineTo(x, y)
                         }
                         gridPath.close()
-                        drawPath(gridPath, BorderColor, style = Stroke(width = 0.8f))
+                        drawPath(gridPath, canvasBorder, style = Stroke(width = 0.8f))
                     }
 
                     // Axis lines + labels
@@ -478,7 +479,7 @@ fun RadarComparisonTab(s1: PlayerStats, s2: PlayerStats, n1: String, n2: String)
                         val angle = -PI.toFloat() / 2 + i * angleStep
                         val ex = cx + radius * cos(angle)
                         val ey = cy + radius * sin(angle)
-                        drawLine(BorderColor, Offset(cx, cy), Offset(ex, ey), strokeWidth = 0.5f)
+                        drawLine(canvasBorder, Offset(cx, cy), Offset(ex, ey), strokeWidth = 0.5f)
 
                         // Label
                         val lx = cx + (radius + 16.dp.toPx()) * cos(angle)
@@ -534,11 +535,11 @@ fun RadarComparisonTab(s1: PlayerStats, s2: PlayerStats, n1: String, n2: String)
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(Modifier.size(12.dp, 3.dp).background(NeonGreen))
-                        Text(n1, color = TextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(n1, color = CH.textSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(Modifier.size(12.dp, 3.dp).background(NeonBlue))
-                        Text(n2, color = TextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(n2, color = CH.textSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -549,11 +550,11 @@ fun RadarComparisonTab(s1: PlayerStats, s2: PlayerStats, n1: String, n2: String)
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                     .padding(16.dp)
             ) {
-                Text("Head to Head Summary", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 8.dp))
+                Text("Head to Head Summary", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 8.dp))
                 H2HRow(n1, "Runs", "${s1.runs}", "${s2.runs}", n2, s1.runs > s2.runs)
                 H2HRow(n1, "Average", "%.1f".format(s1.average), "%.1f".format(s2.average), n2, s1.average > s2.average)
                 H2HRow(n1, "SR", "%.1f".format(s1.strikeRate), "%.1f".format(s2.strikeRate), n2, s1.strikeRate > s2.strikeRate)
@@ -572,7 +573,7 @@ fun ComparisonHeader(n1: String, n2: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(n1, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text("vs", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        Text("vs", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
         Text(n2, color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f), textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -588,19 +589,19 @@ fun CompareStatBar(label: String, v1: Int, v2: Int, lowerIsBetter: Boolean = fal
     Column(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 "$v1", fontSize = 14.sp,
-                color = if (better1) NeonGreen else TextPrimary,
+                color = if (better1) NeonGreen else CH.textPrimary,
                 fontWeight = if (better1) FontWeight.Bold else FontWeight.Normal
             )
-            Text(label, color = TextSecondary, fontSize = 12.sp)
+            Text(label, color = CH.textSecondary, fontSize = 12.sp)
             Text(
                 "$v2", fontSize = 14.sp,
-                color = if (better2) NeonBlue else TextPrimary,
+                color = if (better2) NeonBlue else CH.textPrimary,
                 fontWeight = if (better2) FontWeight.Bold else FontWeight.Normal
             )
         }
@@ -640,19 +641,19 @@ fun CompareStatBarDouble(label: String, v1: Double, v2: Double, lowerIsBetter: B
     Column(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 "%.2f".format(v1), fontSize = 14.sp,
-                color = if (better1) NeonGreen else TextPrimary,
+                color = if (better1) NeonGreen else CH.textPrimary,
                 fontWeight = if (better1) FontWeight.Bold else FontWeight.Normal
             )
-            Text(label, color = TextSecondary, fontSize = 12.sp)
+            Text(label, color = CH.textSecondary, fontSize = 12.sp)
             Text(
                 "%.2f".format(v2), fontSize = 14.sp,
-                color = if (better2) NeonBlue else TextPrimary,
+                color = if (better2) NeonBlue else CH.textPrimary,
                 fontWeight = if (better2) FontWeight.Bold else FontWeight.Normal
             )
         }
@@ -686,12 +687,12 @@ fun CompareStatText(label: String, v1: String, v2: String) {
     Column(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(v1, fontSize = 14.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
-            Text(label, color = TextSecondary, fontSize = 12.sp)
+            Text(label, color = CH.textSecondary, fontSize = 12.sp)
             Text(v2, fontSize = 14.sp, color = NeonBlue, fontWeight = FontWeight.Bold)
         }
     }
@@ -706,14 +707,14 @@ fun H2HRow(n1: String, label: String, v1: String, v2: String, n2: String, p1Bett
     ) {
         Text(
             v1, fontSize = 13.sp,
-            color = if (p1Better) NeonGreen else TextPrimary,
+            color = if (p1Better) NeonGreen else CH.textPrimary,
             fontWeight = if (p1Better) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
-        Text(label, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+        Text(label, color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
         Text(
             v2, fontSize = 13.sp,
-            color = if (!p1Better) NeonBlue else TextPrimary,
+            color = if (!p1Better) NeonBlue else CH.textPrimary,
             fontWeight = if (!p1Better) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.weight(1f), textAlign = TextAlign.End
         )

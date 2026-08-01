@@ -103,11 +103,11 @@ fun LoginScreen(
     )
 
     val isDark = isSystemInDarkTheme()
-    val bgColor    = if (isDark) Color(0xFF030F08) else Color(0xFFF0FDF8)
-    val cardBg     = if (isDark) Color(0xFF0D2018).copy(alpha = 0.88f) else Color.White.copy(alpha = 0.90f)
+    val bgColor    = if (isDark) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)
+    val cardBg     = if (isDark) Color(0xFF161616).copy(alpha = 0.88f) else Color.White.copy(alpha = 0.90f)
     val borderC    = if (isDark) Color(0xFF34D399).copy(alpha = 0.3f) else Color(0xFF34D399).copy(alpha = 0.4f)
-    val textP      = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS      = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val textP      = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS      = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
     val glowColor  = Color(0xFF34D399)
     val wordColor  = if (isDark) Color(0xFF34D399).copy(alpha = 0.22f) else Color(0xFF059669).copy(alpha = 0.16f)
 
@@ -273,7 +273,7 @@ fun LoginScreen(
                         .background(
                             Brush.horizontalGradient(
                                 listOf(
-                                    if (isDark) Color(0xFFECFDF5) else Color.White,
+                                    if (isDark) Color(0xFFF2F2F0) else Color.White,
                                     glowColor.copy(alpha = 0.45f)
                                 )
                             )
@@ -315,7 +315,7 @@ fun LoginScreen(
                                 .background(
                                     Brush.verticalGradient(
                                         listOf(
-                                            if (isDark) Color(0xFFECFDF5).copy(alpha = 0.8f) else Color(0xFF064E3B).copy(alpha = 0.6f),
+                                            if (isDark) Color(0xFFF2F2F0).copy(alpha = 0.8f) else Color(0xFF2B2620).copy(alpha = 0.6f),
                                             if (isDark) Color(0xFFA7F3D0).copy(alpha = 0.5f) else Color(0xFF059669).copy(alpha = 0.3f)
                                         )
                                     ),
@@ -328,7 +328,7 @@ fun LoginScreen(
                 Box(
                     modifier = Modifier.width(25.dp).height(3.dp)
                         .background(
-                            if (isDark) Color(0xFFECFDF5).copy(alpha = 0.7f) else Color(0xFF064E3B).copy(alpha = 0.5f),
+                            if (isDark) Color(0xFFF2F2F0).copy(alpha = 0.7f) else Color(0xFF2B2620).copy(alpha = 0.5f),
                             RoundedCornerShape(2.dp)
                         )
                 )
@@ -343,7 +343,7 @@ fun LoginScreen(
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize()
-                        .background(Brush.radialGradient(listOf(Color(0xFFD1FAE5), Color(0xFF6EE7B7))), CircleShape)
+                        .background(Brush.radialGradient(listOf(Color(0xFFE6DDC8), Color(0xFFC4C9D4))), CircleShape)
                         .border(1.dp, glowColor.copy(alpha = 0.5f), CircleShape)
                 )
                 Box(modifier = Modifier.size(7.dp).offset(x = 4.dp, y = 4.dp).background(Color.White.copy(alpha = 0.4f), CircleShape))
@@ -527,9 +527,9 @@ fun AuthTextField(
     supportingText: String? = null
 ) {
     val isDark = isSystemInDarkTheme()
-    val textP  = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS  = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
-    val borderC = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
+    val textP  = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS  = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
+    val borderC = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
     OutlinedTextField(
         value = value, onValueChange = onValueChange,
         label = { Text(label) }, leadingIcon = leadingIcon, trailingIcon = trailingIcon,

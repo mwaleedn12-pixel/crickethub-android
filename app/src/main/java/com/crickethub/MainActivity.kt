@@ -82,10 +82,10 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 
-private val BackgroundDark = Color(0xFF030712)
-private val SurfaceCard = Color(0xFF111827)
-private val NeonGreen = Color(0xFF10B981)
-private val TextSecondary = Color(0xFF9CA3AF)
+private val BackgroundDark = Color(0xFF0A0A0A)
+private val SurfaceCard = Color(0xFF161616)
+private val NeonGreen = Color(0xFF34D399)
+private val TextSecondary = Color(0xFFC4C9D4)
 
 // ── Bottom-nav tab definitions ───────────────────────────────
 private data class BottomTab(

@@ -749,10 +749,16 @@ class ScoringViewModel : ViewModel() {
     fun setNonStriker(player: Player) { _uiState.update { it.copy(nonStriker = player) } }
     fun setBowler(player: Player) { _uiState.update { it.copy(currentBowler = player) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
-    fun getMaxOversPerBowler(totalOvers: Int): Int = when (totalOvers) { 5 -> 1; 10 -> 2; 20 -> 4; 50 -> 10; else -> totalOvers / 5 }
-    fun canBowlerBowl(bowlerId: String, totalOvers: Int): Boolean {
+    fun getMaxOversPerBowler(totalOvers: Int, matchMaxPerBowler: Int? = null): Int {
+        // If the match explicitly sets max overs per bowler, use that
+        if (matchMaxPerBowler != null && matchMaxPerBowler > 0) return matchMaxPerBowler
+        return when (totalOvers) { 5 -> 1; 10 -> 2; 20 -> 4; 50 -> 10; else -> totalOvers / 5 }
+    }
+    fun canBowlerBowl(bowlerId: String, totalOvers: Int, matchMaxPerBowler: Int? = null): Boolean {
+        val isSuperOver = (_uiState.value.innings?.inningsNo ?: 1) >= 3
+        if (isSuperOver) return true  // No per-bowler limit in super over (only 1 over total)
         val balls = _uiState.value.balls.count { it.bowlerId == bowlerId && it.extrasType != "wide" && it.extrasType != "no_ball" }
-        return (balls / 6) < getMaxOversPerBowler(totalOvers)
+        return (balls / 6) < getMaxOversPerBowler(totalOvers, matchMaxPerBowler)
     }
 
     // ── Penalty & Manual ──────────────────────────────────────────────────────
@@ -869,6 +875,13 @@ class ScoringViewModel : ViewModel() {
         val striker = state.striker ?: run { isProcessingBall = false; return }
         val bowler = state.currentBowler ?: run { isProcessingBall = false; return }
         val match = state.match ?: run { isProcessingBall = false; return }
+        // Guard: bowler must not have exceeded their over limit
+        if (!canBowlerBowl(bowler.id, match.totalOvers, match.maxOversPerBowler)) {
+            android.util.Log.e("CricketHub", "BLOCKED: ${bowler.fullName} exceeded max overs (${getMaxOversPerBowler(match.totalOvers, match.maxOversPerBowler)})")
+            _uiState.update { it.copy(currentBowler = null, error = "${bowler.fullName} has completed their max overs — select a new bowler") }
+            isProcessingBall = false
+            return
+        }
         viewModelScope.launch {
             try {
                 val isWide = extrasType == "wide"; val isNoBall = extrasType == "no_ball"

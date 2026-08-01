@@ -217,8 +217,8 @@ fun PlayerCareerScreen(
         }
         AlertDialog(
             onDismissRequest = { showPlayerPicker = false; searchQuery = "" },
-            containerColor = SurfaceCard,
-            title = { Text("Search Player", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            containerColor = CH.surface,
+            title = { Text("Search Player", color = CH.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -229,13 +229,13 @@ fun PlayerCareerScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
+                            focusedTextColor = CH.textPrimary,
+                            unfocusedTextColor = CH.textPrimary,
                             focusedBorderColor = NeonGreen,
-                            unfocusedBorderColor = BorderColor,
+                            unfocusedBorderColor = CH.border,
                             cursorColor = NeonGreen,
                             focusedLabelColor = NeonGreen,
-                            unfocusedLabelColor = TextSecondary
+                            unfocusedLabelColor = CH.textSecondary
                         )
                     )
                     LazyColumn(
@@ -249,10 +249,10 @@ fun PlayerCareerScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else BackgroundDark)
+                                    .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else CH.bg)
                                     .border(
                                         1.dp,
-                                        if (isSelected) NeonGreen else BorderColor,
+                                        if (isSelected) NeonGreen else CH.border,
                                         RoundedCornerShape(8.dp)
                                     )
                                     .clickable {
@@ -278,10 +278,10 @@ fun PlayerCareerScreen(
                                     )
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                     Text(
                                         "${team?.name ?: "No team"} • ${player.role?.replaceFirstChar { it.uppercase() } ?: "Player"}",
-                                        color = TextSecondary, fontSize = 11.sp
+                                        color = CH.textSecondary, fontSize = 11.sp
                                     )
                                 }
                                 if (isSelected) Text("✓", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -290,7 +290,7 @@ fun PlayerCareerScreen(
                         if (filteredPlayers.isEmpty()) {
                             item {
                                 Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                    Text("No players found", color = TextSecondary)
+                                    Text("No players found", color = CH.textSecondary)
                                 }
                             }
                         }
@@ -300,25 +300,25 @@ fun PlayerCareerScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showPlayerPicker = false; searchQuery = "" }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = CH.textSecondary)
                 }
             }
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))) {
+    Column(modifier = Modifier.fillMaxSize().background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))) {
         // Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
             }
             Text(
                 "Career Profile",
                 fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                color = TextPrimary, modifier = Modifier.weight(1f)
+                color = CH.textPrimary, modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { showPlayerPicker = true }) {
                 Icon(Icons.Default.Search, contentDescription = "Search Player", tint = NeonGreen)
@@ -333,7 +333,7 @@ fun PlayerCareerScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                     .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                     .clickable { showPlayerPicker = true }
                     .padding(10.dp),
@@ -354,10 +354,10 @@ fun PlayerCareerScreen(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(player.fullName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(player.fullName, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(
                         "${team?.name ?: "No team"} • ${player.role?.replaceFirstChar { it.uppercase() } ?: "Player"}",
-                        color = TextSecondary, fontSize = 11.sp
+                        color = CH.textSecondary, fontSize = 11.sp
                     )
                 }
                 Text("Change ›", color = NeonGreen, fontSize = 12.sp)
@@ -372,7 +372,7 @@ fun PlayerCareerScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     CircularProgressIndicator(color = NeonGreen)
-                    Text("Loading career data...", color = TextSecondary, fontSize = 13.sp)
+                    Text("Loading career data...", color = CH.textSecondary, fontSize = 13.sp)
                 }
             }
             return@Column
@@ -384,9 +384,9 @@ fun PlayerCareerScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
-                    Text("No players found", color = TextSecondary, fontSize = 16.sp)
-                    Text("Add players to teams first", color = TextSecondary, fontSize = 13.sp)
+                    Icon(Icons.Default.Person, contentDescription = null, tint = CH.textSecondary, modifier = Modifier.size(64.dp))
+                    Text("No players found", color = CH.textSecondary, fontSize = 16.sp)
+                    Text("Add players to teams first", color = CH.textSecondary, fontSize = 13.sp)
                     OutlinedButton(
                         onClick = { showPlayerPicker = true },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen)
@@ -398,7 +398,7 @@ fun PlayerCareerScreen(
 
         ScrollableTabRow(
             selectedTabIndex = selectedTab,
-            containerColor = SurfaceCard,
+            containerColor = CH.surface,
             contentColor = NeonGreen,
             edgePadding = 0.dp
         ) {
@@ -410,7 +410,7 @@ fun PlayerCareerScreen(
                         Text(
                             tab, fontSize = 13.sp,
                             fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == index) NeonGreen else TextSecondary
+                            color = if (selectedTab == index) NeonGreen else CH.textSecondary
                         )
                     }
                 )
@@ -443,7 +443,7 @@ fun CareerProfileTab(data: CareerData) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -462,14 +462,14 @@ fun CareerProfileTab(data: CareerData) {
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(player.fullName, color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                player.nickname?.let { Text("\"$it\"", color = TextSecondary, fontSize = 14.sp) }
+                Text(player.fullName, color = CH.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                player.nickname?.let { Text("\"$it\"", color = CH.textSecondary, fontSize = 14.sp) }
                 Spacer(modifier = Modifier.height(8.dp))
                 player.role?.let { role ->
                     val roleColor = when (role.lowercase()) {
                         "batsman" -> NeonBlue; "bowler" -> ErrorRed
                         "allrounder", "all-rounder" -> NeonGreen; "wicketkeeper", "wicket keeper" -> AmberColor
-                        else -> TextSecondary
+                        else -> CH.textSecondary
                     }
                     Box(
                         modifier = Modifier
@@ -489,10 +489,10 @@ fun CareerProfileTab(data: CareerData) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                     .padding(16.dp)
             ) {
-                Text("Personal Info", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Personal Info", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(10.dp))
                 data.currentTeam?.let { CareerInfoRow("🏏 Current Team", it.name) }
                 player.jerseyNo?.let { CareerInfoRow("👕 Jersey Number", "#$it") }
@@ -512,10 +512,10 @@ fun CareerProfileTab(data: CareerData) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                     .padding(16.dp)
             ) {
-                Text("Career Overview", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Career Overview", color = CH.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     CareerQuickStat("Matches", data.stats.matches.toString(), NeonGreen)
@@ -535,17 +535,17 @@ fun CareerInfoRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextSecondary, fontSize = 13.sp)
-        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+        Text(label, color = CH.textSecondary, fontSize = 13.sp)
+        Text(value, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
     }
-    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
 }
 
 @Composable
 fun CareerQuickStat(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, color = color, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = TextSecondary, fontSize = 11.sp)
+        Text(label, color = CH.textSecondary, fontSize = 11.sp)
     }
 }
 
@@ -610,11 +610,11 @@ fun CareerStatsCard(title: String, content: @Composable ColumnScope.() -> Unit) 
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
             .padding(16.dp)
     ) {
-        Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 8.dp))
+        Text(title, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 8.dp))
         content()
     }
 }
@@ -625,8 +625,8 @@ fun StatRowItem(label: String, value: String) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = TextSecondary, fontSize = 13.sp)
-        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = CH.textSecondary, fontSize = 13.sp)
+        Text(value, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -651,7 +651,7 @@ fun CareerRecordsTab(data: CareerData) {
                 RecordRow("3️⃣ Three-Wicket Hauls", "${s.threeWicketHauls}", AmberColor)
                 RecordRow("💯 Centuries", "${s.hundreds}", NeonGreen)
                 RecordRow("⭐ Half-Centuries", "${s.fifties}", NeonBlue)
-                RecordRow("🦆 Ducks", "${s.ducks}", TextSecondary)
+                RecordRow("🦆 Ducks", "${s.ducks}", CH.textSecondary)
             }
         }
     }
@@ -664,10 +664,10 @@ fun RecordRow(label: String, value: String, color: Color) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(label, color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
-    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+    HorizontalDivider(color = CH.border, thickness = 0.5.dp)
 }
 
 // ── ACHIEVEMENTS TAB ─────────────────────────────────────────
@@ -697,23 +697,23 @@ fun CareerAchievementsTab(data: CareerData) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            Text("🏆 Achievements & Awards", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("🏆 Achievements & Awards", color = CH.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("${achievements.size} achievements unlocked", color = TextSecondary, fontSize = 12.sp)
+            Text("${achievements.size} achievements unlocked", color = CH.textSecondary, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
         }
 
         if (achievements.isEmpty()) {
             item {
                 Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(32.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF)).padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("🎯", fontSize = 40.sp)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("No achievements yet", color = TextSecondary, fontSize = 14.sp)
-                        Text("Play matches to earn achievements", color = TextSecondary, fontSize = 12.sp)
+                        Text("No achievements yet", color = CH.textSecondary, fontSize = 14.sp)
+                        Text("Play matches to earn achievements", color = CH.textSecondary, fontSize = 12.sp)
                     }
                 }
             }
@@ -723,14 +723,14 @@ fun CareerAchievementsTab(data: CareerData) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                        .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                         .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(emoji, fontSize = 24.sp)
-                    Text(text, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -738,7 +738,7 @@ fun CareerAchievementsTab(data: CareerData) {
         if (data.tournaments.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("🏆 Tournament Trophies", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("🏆 Tournament Trophies", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
             }
             items(data.tournaments) { tournament ->
@@ -746,7 +746,7 @@ fun CareerAchievementsTab(data: CareerData) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+                        .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
                         .border(1.dp, AmberColor.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -754,10 +754,10 @@ fun CareerAchievementsTab(data: CareerData) {
                 ) {
                     Text("🏆", fontSize = 24.sp)
                     Column {
-                        Text(tournament.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tournament.name, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         Text(
                             "${tournament.format ?: "Tournament"} • ${tournament.status.replaceFirstChar { it.uppercase() }}",
-                            color = TextSecondary, fontSize = 12.sp
+                            color = CH.textSecondary, fontSize = 12.sp
                         )
                     }
                 }
@@ -782,13 +782,13 @@ fun CareerHistoryTab(
         // Teams
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(16.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF)).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("🏏 Teams Played For", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 4.dp))
+                Text("🏏 Teams Played For", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 4.dp))
                 if (data.teamsPlayed.isEmpty()) {
-                    Text("No team history", color = TextSecondary, fontSize = 13.sp)
+                    Text("No team history", color = CH.textSecondary, fontSize = 13.sp)
                 } else {
                     data.teamsPlayed.forEach { team ->
                         Row(
@@ -804,8 +804,8 @@ fun CareerHistoryTab(
                                     Text(team.shortName?.take(2) ?: team.name.take(2).uppercase(), color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Column {
-                                    Text(team.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    team.category?.let { Text(it, color = TextSecondary, fontSize = 11.sp) }
+                                    Text(team.name, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    team.category?.let { Text(it, color = CH.textSecondary, fontSize = 11.sp) }
                                 }
                             }
                             Box(
@@ -821,11 +821,11 @@ fun CareerHistoryTab(
         if (data.tournaments.isNotEmpty()) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF)).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("🏆 Tournament History", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 4.dp))
+                    Text("🏆 Tournament History", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 4.dp))
                     data.tournaments.forEach { tournament ->
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -833,16 +833,16 @@ fun CareerHistoryTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(tournament.name, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text("${tournament.format ?: "Tournament"} • ${tournament.status.replaceFirstChar { it.uppercase() }}", color = TextSecondary, fontSize = 11.sp)
-                                tournament.startDate?.let { Text("📅 $it", color = TextSecondary, fontSize = 11.sp) }
+                                Text(tournament.name, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("${tournament.format ?: "Tournament"} • ${tournament.status.replaceFirstChar { it.uppercase() }}", color = CH.textSecondary, fontSize = 11.sp)
+                                tournament.startDate?.let { Text("📅 $it", color = CH.textSecondary, fontSize = 11.sp) }
                             }
                             val sc = when (tournament.status) { "completed" -> NeonGreen; "live" -> ErrorRed; else -> AmberColor }
                             Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(sc.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                                 Text(tournament.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-                        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                        HorizontalDivider(color = CH.border, thickness = 0.5.dp)
                     }
                 }
             }
@@ -851,30 +851,30 @@ fun CareerHistoryTab(
         // Match History — clickable
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)).padding(16.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF)).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("📋 Recent Match History", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 4.dp))
+                Text("📋 Recent Match History", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 4.dp))
 
                 if (data.matchHistory.isEmpty()) {
-                    Text("No match history yet", color = TextSecondary, fontSize = 13.sp)
+                    Text("No match history yet", color = CH.textSecondary, fontSize = 13.sp)
                 } else {
                     data.matchHistory.forEach { match ->
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
-                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
+                                .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                 .padding(12.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("${match.matchType} • ${match.totalOvers} ov", color = TextSecondary, fontSize = 11.sp)
-                                val sc = when (match.status) { "completed" -> TextSecondary; "live" -> NeonGreen; else -> AmberColor }
+                                Text("${match.matchType} • ${match.totalOvers} ov", color = CH.textSecondary, fontSize = 11.sp)
+                                val sc = when (match.status) { "completed" -> CH.textSecondary; "live" -> NeonGreen; else -> AmberColor }
                                 Text(match.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp)
                             }
                             Spacer(modifier = Modifier.height(4.dp))

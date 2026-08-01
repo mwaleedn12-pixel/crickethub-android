@@ -13,16 +13,16 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// ── Dark Color Scheme ─────────────────────────────────────────────────────────
+// ── Dark Color Scheme — Charcoal + Platinum ──────────────────────────────────
 private val CricketHubDarkColorScheme = darkColorScheme(
     primary          = EmeraldPrimary,
-    onPrimary        = Color(0xFF031A0E),
+    onPrimary        = Color(0xFF0A0A0A),
     primaryContainer = DarkSurface2,
-    onPrimaryContainer = EmeraldLight,
-    secondary        = EmeraldLight,
-    onSecondary      = Color(0xFF031A0E),
+    onPrimaryContainer = Platinum,
+    secondary        = Platinum,
+    onSecondary      = Color(0xFF0A0A0A),
     secondaryContainer = DarkSurface,
-    onSecondaryContainer = EmeraldMint,
+    onSecondaryContainer = Platinum,
     tertiary         = WarningAmber,
     onTertiary       = Color(0xFF1A0A00),
     background       = DarkBackground,
@@ -32,7 +32,7 @@ private val CricketHubDarkColorScheme = darkColorScheme(
     surfaceVariant   = DarkSurface2,
     onSurfaceVariant = TextOnDarkSub,
     outline          = DarkBorder,
-    outlineVariant   = Color(0xFF1A3828),
+    outlineVariant   = Color(0xFF2A2A2A),
     error            = ErrorRed,
     onError          = Color.White,
     inverseSurface   = TextOnDark,
@@ -41,16 +41,16 @@ private val CricketHubDarkColorScheme = darkColorScheme(
     scrim            = Color(0xFF000000),
 )
 
-// ── Light Color Scheme ────────────────────────────────────────────────────────
+// ── Light Color Scheme — Ivory + Slate ───────────────────────────────────────
 private val CricketHubLightColorScheme = lightColorScheme(
     primary          = EmeraldDark,
     onPrimary        = Color.White,
     primaryContainer = LightSurface2,
-    onPrimaryContainer = EmeraldDark,
-    secondary        = EmeraldDark,
+    onPrimaryContainer = Slate,
+    secondary        = Slate,
     onSecondary      = Color.White,
     secondaryContainer = LightSurface2,
-    onSecondaryContainer = EmeraldDark,
+    onSecondaryContainer = Slate,
     tertiary         = WarningAmber,
     onTertiary       = Color.White,
     background       = LightBackground,
@@ -60,7 +60,7 @@ private val CricketHubLightColorScheme = lightColorScheme(
     surfaceVariant   = LightSurface2,
     onSurfaceVariant = TextOnLightSub,
     outline          = LightBorder,
-    outlineVariant   = EmeraldMint,
+    outlineVariant   = Color(0xFFECE3CF),
     error            = ErrorRed,
     onError          = Color.White,
     inverseSurface   = TextOnLight,

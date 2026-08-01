@@ -65,12 +65,12 @@ fun TeamsScreen(
     var searchQuery by remember { mutableStateOf("") }
     val isDark = isSystemInDarkTheme()
 
-    val bg     = if (isDark) Color(0xFF030F08) else Color(0xFFF0FDF8)
-    val hdrBg  = if (isDark) Color(0xFF071610) else Color(0xFFECFDF5)
-    val surface = if (isDark) Color(0xFF0D2018) else Color(0xFFFFFFFF)
-    val border = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
-    val textP  = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS  = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val bg     = if (isDark) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)
+    val hdrBg  = if (isDark) Color(0xFF111111) else Color(0xFFF0ECE2)
+    val surface = if (isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
+    val border = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val textP  = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS  = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
     val green  = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
 
@@ -187,9 +187,9 @@ fun TeamsScreen(
         teamToDelete?.let { team ->
             AlertDialog(
                 onDismissRequest = { teamToDelete = null },
-                containerColor = if (isDark) Color(0xFF0D2018) else Color.White,
-                title = { Text("Delete Team", color = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B), fontWeight = FontWeight.Bold) },
-                text = { Text("Delete \"${team.name}\"? This cannot be undone.", color = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280), fontSize = 14.sp) },
+                containerColor = if (isDark) Color(0xFF161616) else Color.White,
+                title = { Text("Delete Team", color = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620), fontWeight = FontWeight.Bold) },
+                text = { Text("Delete \"${team.name}\"? This cannot be undone.", color = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073), fontSize = 14.sp) },
                 confirmButton = {
                     Button(onClick = { viewModel.deleteTeam(team.id); teamToDelete = null },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))) {
@@ -218,10 +218,10 @@ fun TeamCard(
 ) {
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
-    val surface = if (isDark) Color(0xFF0D2018) else Color(0xFFFFFFFF)
-    val border  = if (isDark) Color(0xFF1A3828) else Color(0xFFD1FAE5)
-    val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val surface = if (isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
+    val border  = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val textP   = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS   = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
 
     var showShareDialog by remember { mutableStateOf(false) }
     if (showShareDialog) {
@@ -282,7 +282,7 @@ fun TeamCard(
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(
                 modifier = Modifier.size(34.dp).clip(CircleShape)
-                    .background(if (isDark) Color(0xFF122A1E) else Color(0xFFE8FDF4))
+                    .background(if (isDark) Color(0xFF1E1E1E) else Color(0xFFF0ECE2))
                     .clickable { onEdit() },
                 contentAlignment = Alignment.Center
             ) {
@@ -344,10 +344,10 @@ fun AddEditTeamDialog(
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
     val green  = Color(0xFF34D399)
-    val textP  = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS  = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
-    val border = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
-    val surfBg = if (isDark) Color(0xFF0D2018) else Color.White
+    val textP  = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS  = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
+    val border = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val surfBg = if (isDark) Color(0xFF161616) else Color.White
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = textP, unfocusedTextColor = textP,
@@ -510,10 +510,10 @@ fun LogoPickerField(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val green   = Color(0xFF34D399)
-    val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
-    val border  = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
-    val surfBg  = if (isDark) Color(0xFF122A1E) else Color(0xFFE8FDF4)
+    val textP   = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS   = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
+    val border  = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val surfBg  = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF0ECE2)
 
     var showUrlInput by remember { mutableStateOf(false) }
 

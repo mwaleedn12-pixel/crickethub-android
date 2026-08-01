@@ -65,15 +65,15 @@ fun ExportDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isExporting) onDismiss() },
-        containerColor = SurfaceCard,
+        containerColor = CH.surface,
         title = {
-            Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(title, color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "Choose export format",
-                    color = TextSecondary, fontSize = 12.sp
+                    color = CH.textSecondary, fontSize = 12.sp
                 )
 
                 formats.forEach { format ->
@@ -84,12 +84,12 @@ fun ExportDialog(
                             .clip(RoundedCornerShape(10.dp))
                             .background(
                                 if (isActive) NeonGreen.copy(alpha = 0.1f)
-                                else if (isSystemInDarkTheme()) Color(0xFF030F08)
-                                else Color(0xFFF0FDF8)
+                                else if (isSystemInDarkTheme()) Color(0xFF0A0A0A)
+                                else Color(0xFFF7F3EA)
                             )
                             .border(
                                 1.dp,
-                                if (isActive) NeonGreen else BorderColor,
+                                if (isActive) NeonGreen else CH.border,
                                 RoundedCornerShape(10.dp)
                             )
                             .clickable(enabled = !isExporting) {
@@ -118,7 +118,7 @@ fun ExportDialog(
                         Text(format.emoji, fontSize = 24.sp)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                format.label, color = TextPrimary,
+                                format.label, color = CH.textPrimary,
                                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold
                             )
                             Text(
@@ -126,7 +126,7 @@ fun ExportDialog(
                                     ExportFormat.PDF -> "Professional report with tables & branding"
                                     ExportFormat.CSV -> "Raw data, opens in Excel/Sheets"
                                 },
-                                color = TextSecondary, fontSize = 11.sp
+                                color = CH.textSecondary, fontSize = 11.sp
                             )
                         }
                         if (isActive) {
@@ -144,7 +144,7 @@ fun ExportDialog(
         dismissButton = {
             if (!isExporting) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = CH.textSecondary)
                 }
             }
         }

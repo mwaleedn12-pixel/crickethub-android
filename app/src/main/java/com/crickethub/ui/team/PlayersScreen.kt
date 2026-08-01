@@ -52,19 +52,19 @@ fun PlayersScreen(
 
     LaunchedEffect(teamId) { viewModel.loadPlayers(teamId) }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = Modifier.fillMaxSize().background(CH.bg)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
                 }
                 Text(
                     "Players (${uiState.players.size})",
                     fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                    color = TextPrimary, modifier = Modifier.weight(1f)
+                    color = CH.textPrimary, modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = {
                     viewModel.loadAllTeams()
@@ -104,9 +104,9 @@ fun PlayersScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
-                        Text("No players yet", color = TextSecondary, fontSize = 16.sp)
-                        Text("Tap + to add players", color = TextSecondary, fontSize = 13.sp)
+                        Icon(Icons.Default.Person, contentDescription = null, tint = CH.textSecondary, modifier = Modifier.size(64.dp))
+                        Text("No players yet", color = CH.textSecondary, fontSize = 16.sp)
+                        Text("Tap + to add players", color = CH.textSecondary, fontSize = 13.sp)
                     }
                 }
             } else {
@@ -154,9 +154,9 @@ fun PlayersScreen(
         playerToDelete?.let { player ->
             AlertDialog(
                 onDismissRequest = { playerToDelete = null },
-                containerColor = SurfaceCard,
+                containerColor = CH.surface,
                 title = { Text("Remove Player", color = ErrorRed, fontWeight = FontWeight.Bold) },
-                text = { Text("Remove '${player.fullName}' from team?", color = TextSecondary) },
+                text = { Text("Remove '${player.fullName}' from team?", color = CH.textSecondary) },
                 confirmButton = {
                     Button(
                         onClick = { viewModel.deletePlayer(player.id, teamId); playerToDelete = null },
@@ -165,7 +165,7 @@ fun PlayersScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { playerToDelete = null }) {
-                        Text("Cancel", color = TextSecondary)
+                        Text("Cancel", color = CH.textSecondary)
                     }
                 }
             )
@@ -179,7 +179,7 @@ fun PlayersScreen(
                     importSelectedTeamId = null
                     viewModel.clearImportPlayers()
                 },
-                containerColor = SurfaceCard,
+                containerColor = CH.surface,
                 title = {
                     Text(
                         if (importSelectedTeamId == null) "Select Team" else "Select Player",
@@ -195,22 +195,22 @@ fun PlayersScreen(
                             // Step 1: Team list (exclude current team)
                             val otherTeams = uiState.allTeams.filter { it.id != teamId }
                             if (otherTeams.isEmpty()) {
-                                Text("No other teams found", color = TextSecondary, fontSize = 13.sp)
+                                Text("No other teams found", color = CH.textSecondary, fontSize = 13.sp)
                             } else {
                                 otherTeams.forEach { team ->
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(SurfaceCard)
-                                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                            .background(CH.surface)
+                                            .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                             .clickable {
                                                 importSelectedTeamId = team.id
                                                 viewModel.loadImportTeamPlayers(team.id)
                                             }
                                             .padding(12.dp)
                                     ) {
-                                        Text(team.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(team.name, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                 }
@@ -219,7 +219,7 @@ fun PlayersScreen(
                             // Step 2: Player list from selected team
                             val players = uiState.importTeamPlayers
                             if (players.isEmpty()) {
-                                Text("Loading players...", color = TextSecondary, fontSize = 13.sp)
+                                Text("Loading players...", color = CH.textSecondary, fontSize = 13.sp)
                             } else {
                                 // Exclude players already in the current team (by name match)
                                 val existingNames = uiState.players.map { it.fullName.lowercase() }.toSet()
@@ -228,14 +228,14 @@ fun PlayersScreen(
                                     val roleColor = when (player.role?.lowercase()) {
                                         "batsman" -> NeonBlue; "bowler" -> ErrorRed
                                         "allrounder" -> NeonGreen; "wicketkeeper" -> AmberColor
-                                        else -> TextSecondary
+                                        else -> CH.textSecondary
                                     }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (alreadyExists) BackgroundDark.copy(alpha = 0.5f) else SurfaceCard)
-                                            .border(1.dp, if (alreadyExists) BorderColor.copy(alpha = 0.3f) else BorderColor, RoundedCornerShape(8.dp))
+                                            .background(if (alreadyExists) CH.bg.copy(alpha = 0.5f) else CH.surface)
+                                            .border(1.dp, if (alreadyExists) CH.border.copy(alpha = 0.3f) else CH.border, RoundedCornerShape(8.dp))
                                             .then(if (!alreadyExists) Modifier.clickable {
                                                 viewModel.importPlayer(player, teamId)
                                                 showImportDialog = false
@@ -248,7 +248,7 @@ fun PlayersScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 player.fullName,
-                                                color = if (alreadyExists) TextSecondary else TextPrimary,
+                                                color = if (alreadyExists) CH.textSecondary else CH.textPrimary,
                                                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold
                                             )
                                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -257,12 +257,12 @@ fun PlayersScreen(
                                                 }
                                                 Text(
                                                     "${player.battingHand?.take(1)?.uppercase() ?: "R"}HB",
-                                                    color = TextSecondary, fontSize = 10.sp
+                                                    color = CH.textSecondary, fontSize = 10.sp
                                                 )
                                             }
                                         }
                                         if (alreadyExists) {
-                                            Text("Already added", color = TextSecondary, fontSize = 10.sp)
+                                            Text("Already added", color = CH.textSecondary, fontSize = 10.sp)
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
@@ -287,7 +287,7 @@ fun PlayersScreen(
                         importSelectedTeamId = null
                         viewModel.clearImportPlayers()
                     }) {
-                        Text("Cancel", color = TextSecondary)
+                        Text("Cancel", color = CH.textSecondary)
                     }
                 }
             )
@@ -307,13 +307,13 @@ fun PlayerStatPill(value: String, label: String) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+            .background(CH.surface)
+            .border(1.dp, CH.border, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(value, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = TextSecondary, fontSize = 10.sp)
+        Text(value, color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = CH.textSecondary, fontSize = 10.sp)
     }
 }
 
@@ -328,7 +328,7 @@ fun PlayerCard(
         "bowler" -> ErrorRed
         "allrounder" -> NeonGreen
         "wicketkeeper" -> AmberColor
-        else -> TextSecondary
+        else -> CH.textSecondary
     }
     val availabilityColor = when (player.availability) {
         "available" -> NeonGreen
@@ -340,8 +340,8 @@ fun PlayerCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+            .background(CH.surface)
+            .border(1.dp, CH.border, RoundedCornerShape(10.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -361,8 +361,8 @@ fun PlayerCard(
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(player.fullName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                player.nickname?.let { Text("($it)", color = TextSecondary, fontSize = 11.sp) }
+                Text(player.fullName, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                player.nickname?.let { Text("($it)", color = CH.textSecondary, fontSize = 11.sp) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -378,15 +378,15 @@ fun PlayerCard(
                 }
                 Text(
                     "${player.battingHand?.take(1)?.uppercase() ?: "R"}HB",
-                    color = TextSecondary, fontSize = 10.sp
+                    color = CH.textSecondary, fontSize = 10.sp
                 )
                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(availabilityColor))
             }
-            player.bowlingStyle?.let { Text(it, color = TextSecondary, fontSize = 10.sp) }
+            player.bowlingStyle?.let { Text(it, color = CH.textSecondary, fontSize = 10.sp) }
         }
         Row {
             IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = CH.textSecondary, modifier = Modifier.size(16.dp))
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed, modifier = Modifier.size(16.dp))
@@ -421,18 +421,18 @@ fun PlayerDialog(
     val bowlingStyles = if (bowlingHand == "right") RIGHT_HAND_BOWLING_STYLES else LEFT_HAND_BOWLING_STYLES
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
+        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+        focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
         cursorColor = NeonGreen, focusedLabelColor = NeonGreen,
-        unfocusedLabelColor = TextSecondary,
+        unfocusedLabelColor = CH.textSecondary,
         focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SurfaceCard,
-        title = { Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        containerColor = CH.surface,
+        title = { Text(title, color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -469,7 +469,7 @@ fun PlayerDialog(
                     )
                 }
                 item {
-                    Text("Gender", color = TextSecondary, fontSize = 12.sp)
+                    Text("Gender", color = CH.textSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("male", "female", "other").forEach { g ->
@@ -480,8 +480,8 @@ fun PlayerDialog(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = NeonGreen.copy(alpha = 0.2f),
                                     selectedLabelColor = NeonGreen,
-                                    containerColor = SurfaceCard,
-                                    labelColor = TextSecondary
+                                    containerColor = CH.surface,
+                                    labelColor = CH.textSecondary
                                 )
                             )
                         }
@@ -502,7 +502,7 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    Text("Batting Hand", color = TextSecondary, fontSize = 12.sp)
+                    Text("Batting Hand", color = CH.textSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("right", "left").forEach { hand ->
@@ -513,15 +513,15 @@ fun PlayerDialog(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = NeonBlue.copy(alpha = 0.2f),
                                     selectedLabelColor = NeonBlue,
-                                    containerColor = SurfaceCard,
-                                    labelColor = TextSecondary
+                                    containerColor = CH.surface,
+                                    labelColor = CH.textSecondary
                                 )
                             )
                         }
                     }
                 }
                 item {
-                    Text("Bowling Hand", color = TextSecondary, fontSize = 12.sp)
+                    Text("Bowling Hand", color = CH.textSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("right", "left").forEach { hand ->
@@ -535,15 +535,15 @@ fun PlayerDialog(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = ErrorRed.copy(alpha = 0.2f),
                                     selectedLabelColor = ErrorRed,
-                                    containerColor = SurfaceCard,
-                                    labelColor = TextSecondary
+                                    containerColor = CH.surface,
+                                    labelColor = CH.textSecondary
                                 )
                             )
                         }
                     }
                 }
                 item {
-                    Text("Bowling Style", color = TextSecondary, fontSize = 12.sp)
+                    Text("Bowling Style", color = CH.textSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         bowlingStyles.chunked(2).forEach { row ->
@@ -557,15 +557,15 @@ fun PlayerDialog(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) ErrorRed.copy(alpha = 0.2f) else BackgroundDark)
-                                            .border(1.dp, if (isSelected) ErrorRed else BorderColor, RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) ErrorRed.copy(alpha = 0.2f) else CH.bg)
+                                            .border(1.dp, if (isSelected) ErrorRed else CH.border, RoundedCornerShape(8.dp))
                                             .clickable { bowlingStyle = style }
                                             .padding(vertical = 10.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             style,
-                                            color = if (isSelected) ErrorRed else TextSecondary,
+                                            color = if (isSelected) ErrorRed else CH.textSecondary,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             textAlign = TextAlign.Center
@@ -578,7 +578,7 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    Text("Primary Role", color = TextSecondary, fontSize = 12.sp)
+                    Text("Primary Role", color = CH.textSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         PLAYER_ROLES.chunked(2).forEach { row ->
@@ -593,21 +593,21 @@ fun PlayerDialog(
                                         "bowler" -> ErrorRed
                                         "allrounder" -> NeonGreen
                                         "wicketkeeper" -> AmberColor
-                                        else -> TextSecondary
+                                        else -> CH.textSecondary
                                     }
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) roleColor.copy(alpha = 0.2f) else BackgroundDark)
-                                            .border(1.dp, if (isSelected) roleColor else BorderColor, RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) roleColor.copy(alpha = 0.2f) else CH.bg)
+                                            .border(1.dp, if (isSelected) roleColor else CH.border, RoundedCornerShape(8.dp))
                                             .clickable { selectedRole = role }
                                             .padding(vertical = 10.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             roleLabel(role),
-                                            color = if (isSelected) roleColor else TextSecondary,
+                                            color = if (isSelected) roleColor else CH.textSecondary,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             textAlign = TextAlign.Center
@@ -620,7 +620,7 @@ fun PlayerDialog(
                     }
                 }
                 item {
-                    Text("Availability", color = TextSecondary, fontSize = 12.sp)
+                    Text("Availability", color = CH.textSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("available", "unavailable", "injured").forEach { status ->
@@ -636,8 +636,8 @@ fun PlayerDialog(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = color.copy(alpha = 0.2f),
                                     selectedLabelColor = color,
-                                    containerColor = SurfaceCard,
-                                    labelColor = TextSecondary
+                                    containerColor = CH.surface,
+                                    labelColor = CH.textSecondary
                                 )
                             )
                         }
@@ -671,7 +671,7 @@ fun PlayerDialog(
             ) { Text("Save", color = Color.Black, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) }
         }
     )
 }

@@ -88,9 +88,9 @@ fun CreateMatchScreen(
     val defaultMaxOversPerBowler = totalOvers / 5
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-        cursorColor = NeonGreen, focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary,
+        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+        focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
+        cursorColor = NeonGreen, focusedLabelColor = NeonGreen, unfocusedLabelColor = CH.textSecondary,
         focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
     )
 
@@ -102,9 +102,9 @@ fun CreateMatchScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
                 }
-                Text("New Match", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.weight(1f))
+                Text("New Match", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary, modifier = Modifier.weight(1f))
             }
 
             // Step indicators
@@ -128,14 +128,14 @@ fun CreateMatchScreen(
                                     when {
                                         isDone -> NeonGreen
                                         isActive -> NeonGreen.copy(alpha = 0.5f)
-                                        else -> BorderColor
+                                        else -> CH.border
                                     }
                                 )
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             step,
-                            color = if (isActive) NeonGreen else TextSecondary,
+                            color = if (isActive) NeonGreen else CH.textSecondary,
                             fontSize = 9.sp,
                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                         )
@@ -166,7 +166,7 @@ fun CreateMatchScreen(
                             )
                         }
                         item {
-                            Text("Match Type", color = TextSecondary, fontSize = 13.sp)
+                            Text("Match Type", color = CH.textSecondary, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 MATCH_TYPES.take(3).forEach { type ->
@@ -228,7 +228,7 @@ fun CreateMatchScreen(
                             Text("Select Teams", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                         item {
-                            Text("Team A", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Team A", color = CH.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(6.dp))
                         }
                         items(uiState.teams) { team ->
@@ -241,7 +241,7 @@ fun CreateMatchScreen(
                         }
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Team B", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Team B", color = CH.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(6.dp))
                         }
                         items(uiState.teams) { team ->
@@ -315,7 +315,7 @@ fun CreateMatchScreen(
                         item {
                             Text("Match Officials", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("All fields are optional", color = TextSecondary, fontSize = 12.sp)
+                            Text("All fields are optional", color = CH.textSecondary, fontSize = 12.sp)
                         }
                         item {
                             OutlinedTextField(
@@ -415,7 +415,7 @@ fun CreateMatchScreen(
                     OutlinedButton(
                         onClick = { currentStep-- },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CH.textSecondary)
                     ) { Text("Back") }
                 }
 
@@ -482,13 +482,13 @@ fun MatchTypeChip(type: String, selected: String, onClick: (String) -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (selected == type) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
-            .border(1.dp, if (selected == type) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+            .background(if (selected == type) NeonGreen.copy(alpha = 0.2f) else CH.surface)
+            .border(1.dp, if (selected == type) NeonGreen else CH.border, RoundedCornerShape(8.dp))
             .clickable { onClick(type) }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(type, color = if (selected == type) NeonGreen else TextSecondary, fontSize = 13.sp, fontWeight = if (selected == type) FontWeight.Bold else FontWeight.Normal)
+        Text(type, color = if (selected == type) NeonGreen else CH.textSecondary, fontSize = 13.sp, fontWeight = if (selected == type) FontWeight.Bold else FontWeight.Normal)
     }
 }
 
@@ -502,8 +502,8 @@ fun TeamSelectCard(team: Team, isSelected: Boolean, isDisabled: Boolean, onClick
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isSelected) NeonGreen.copy(alpha = 0.1f) else SurfaceCard)
-            .border(1.dp, if (isSelected) NeonGreen else if (isDisabled) BorderColor.copy(alpha = 0.3f) else BorderColor, RoundedCornerShape(10.dp))
+            .background(if (isSelected) NeonGreen.copy(alpha = 0.1f) else CH.surface)
+            .border(1.dp, if (isSelected) NeonGreen else if (isDisabled) CH.border.copy(alpha = 0.3f) else CH.border, RoundedCornerShape(10.dp))
             .then(if (!isDisabled) Modifier.clickable { onClick() } else Modifier)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -512,18 +512,18 @@ fun TeamSelectCard(team: Team, isSelected: Boolean, isDisabled: Boolean, onClick
             modifier = Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(jerseyColor.copy(alpha = if (isDisabled) 0.05f else 0.2f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(team.shortName?.take(3) ?: team.name.take(2).uppercase(), color = if (isDisabled) TextSecondary else jerseyColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(team.shortName?.take(3) ?: team.name.take(2).uppercase(), color = if (isDisabled) CH.textSecondary else jerseyColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(team.name, color = if (isDisabled) TextSecondary else TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            team.category?.let { Text(it, color = TextSecondary, fontSize = 11.sp) }
+            Text(team.name, color = if (isDisabled) CH.textSecondary else CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            team.category?.let { Text(it, color = CH.textSecondary, fontSize = 11.sp) }
         }
         if (isSelected) {
             Text("✓", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
         if (isDisabled) {
-            Text("Used", color = TextSecondary, fontSize = 11.sp)
+            Text("Used", color = CH.textSecondary, fontSize = 11.sp)
         }
     }
     Spacer(modifier = Modifier.height(6.dp))
@@ -532,14 +532,14 @@ fun TeamSelectCard(team: Team, isSelected: Boolean, isDisabled: Boolean, onClick
 @Composable
 fun ToggleRow(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.surface).padding(horizontal = 14.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextPrimary, fontSize = 14.sp)
+        Text(label, color = CH.textPrimary, fontSize = 14.sp)
         Switch(
             checked = value, onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = NeonGreen, uncheckedTrackColor = BorderColor)
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = NeonGreen, uncheckedTrackColor = CH.border)
         )
     }
 }
@@ -556,7 +556,7 @@ fun InfoCard(text: String) {
 @Composable
 fun ReviewCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SurfaceCard).border(1.dp, BorderColor, RoundedCornerShape(10.dp)).padding(14.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CH.surface).border(1.dp, CH.border, RoundedCornerShape(10.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         content = content
     )
@@ -565,7 +565,7 @@ fun ReviewCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 fun ReviewRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = TextSecondary, fontSize = 13.sp)
-        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = CH.textSecondary, fontSize = 13.sp)
+        Text(value, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }

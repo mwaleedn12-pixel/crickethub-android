@@ -93,11 +93,11 @@ fun SignupScreen(
     )
 
     val isDark   = isSystemInDarkTheme()
-    val bgColor  = if (isDark) Color(0xFF030F08) else Color(0xFFF0FDF8)
-    val cardBg   = if (isDark) Color(0xFF0D2018).copy(alpha = 0.88f) else Color.White.copy(alpha = 0.90f)
+    val bgColor  = if (isDark) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)
+    val cardBg   = if (isDark) Color(0xFF161616).copy(alpha = 0.88f) else Color.White.copy(alpha = 0.90f)
     val borderC  = if (isDark) Color(0xFF34D399).copy(alpha = 0.3f) else Color(0xFF34D399).copy(alpha = 0.4f)
-    val textP    = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS    = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val textP    = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS    = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
     val glowColor = Color(0xFF34D399)
     val wordColor = if (isDark) Color(0xFF34D399).copy(alpha = 0.22f) else Color(0xFF059669).copy(alpha = 0.16f)
 
@@ -189,14 +189,14 @@ fun SignupScreen(
                         Box(modifier = Modifier.width(5.dp).height(48.dp)
                             .background(
                                 Brush.verticalGradient(listOf(
-                                    if (isDark) Color(0xFFECFDF5).copy(alpha = 0.7f) else Color(0xFF064E3B).copy(alpha = 0.5f),
+                                    if (isDark) Color(0xFFF2F2F0).copy(alpha = 0.7f) else Color(0xFF2B2620).copy(alpha = 0.5f),
                                     if (isDark) Color(0xFFA7F3D0).copy(alpha = 0.4f) else Color(0xFF059669).copy(alpha = 0.25f)
                                 )), RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
                             ))
                     }
                 }
                 Box(modifier = Modifier.width(25.dp).height(3.dp)
-                    .background(if (isDark) Color(0xFFECFDF5).copy(alpha = 0.65f) else Color(0xFF064E3B).copy(alpha = 0.45f), RoundedCornerShape(2.dp)))
+                    .background(if (isDark) Color(0xFFF2F2F0).copy(alpha = 0.65f) else Color(0xFF2B2620).copy(alpha = 0.45f), RoundedCornerShape(2.dp)))
             }
         }
 
@@ -284,14 +284,14 @@ fun SignupScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = textP, unfocusedTextColor = textP,
-                                focusedBorderColor = glowColor, unfocusedBorderColor = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0),
+                                focusedBorderColor = glowColor, unfocusedBorderColor = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8),
                                 focusedLabelColor = glowColor, unfocusedLabelColor = textS, cursorColor = glowColor
                             )
                         )
                         ExposedDropdownMenu(
                             expanded = showGenderDropdown,
                             onDismissRequest = { showGenderDropdown = false },
-                            modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
+                            modifier = Modifier.background(if (isDark) Color(0xFF161616) else Color.White)
                         ) {
                             listOf("Male", "Female", "Other", "Prefer not to say").forEach { g ->
                                 DropdownMenuItem(
@@ -394,12 +394,12 @@ fun SignupScreen(
     if (uiState.otpSent) {
         AlertDialog(
             onDismissRequest = {},
-            containerColor = Color(0xFF0D2018),
+            containerColor = CH.surface,
             title = { Text("Verify Your Email", color = NeonGreen, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Enter the OTP code sent to ${uiState.otpEmail}",
-                        color = TextSecondary, fontSize = 13.sp)
+                        color = CH.textSecondary, fontSize = 13.sp)
                     OutlinedTextField(
                         value = otpCode,
                         onValueChange = { if (it.length <= 8) otpCode = it },
@@ -408,9 +408,9 @@ fun SignupScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-                            focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary
+                            focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                            focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
+                            focusedLabelColor = NeonGreen, unfocusedLabelColor = CH.textSecondary
                         )
                     )
                     uiState.error?.let { Text(it, color = ErrorRed, fontSize = 12.sp) }
@@ -428,7 +428,7 @@ fun SignupScreen(
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.resetOTP() }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = CH.textSecondary)
                 }
             }
         )

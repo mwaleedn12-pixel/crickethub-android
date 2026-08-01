@@ -281,24 +281,24 @@ fun TournamentDetailScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Column(modifier = Modifier.fillMaxSize().background(CH.bg)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     uiState.currentTournament?.name ?: "Tournament",
-                    fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary
                 )
                 val fmt = uiState.currentTournament?.format ?: ""
                 Text(
                     "${uiState.tournamentTeams.size} teams • ${uiState.fixtures.size} matches" +
                             if (fmt.isNotBlank()) " • $fmt" else "",
-                    fontSize = 12.sp, color = TextSecondary
+                    fontSize = 12.sp, color = CH.textSecondary
                 )
             }
             ExportButton(onClick = { showExport = true })
@@ -306,7 +306,7 @@ fun TournamentDetailScreen(
 
         ScrollableTabRow(
             selectedTabIndex = selectedTab,
-            containerColor = SurfaceCard,
+            containerColor = CH.surface,
             contentColor = NeonGreen,
             edgePadding = 0.dp
         ) {
@@ -318,7 +318,7 @@ fun TournamentDetailScreen(
                         Text(
                             tab, fontSize = 13.sp,
                             fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == index) NeonGreen else TextSecondary
+                            color = if (selectedTab == index) NeonGreen else CH.textSecondary
                         )
                     }
                 )
@@ -399,23 +399,23 @@ fun TFixturesTab(
     if (showFormatInfo) {
         AlertDialog(
             onDismissRequest = { showFormatInfo = false },
-            containerColor = SurfaceCard,
+            containerColor = CH.surface,
             title = { Text("Format: $selectedFormat", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
             text = {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.heightIn(max = 500.dp)) {
-                    item { Text(formatDescription(selectedFormat), color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp) }
-                    item { HorizontalDivider(color = BorderColor) }
+                    item { Text(formatDescription(selectedFormat), color = CH.textSecondary, fontSize = 13.sp, lineHeight = 20.sp) }
+                    item { HorizontalDivider(color = CH.border) }
                     item {
-                        Text("How it works:", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("How it works:", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         formatStages(selectedFormat, teamCount.coerceAtLeast(2), seriesCount).forEach { stage ->
                             Row(modifier = Modifier.padding(vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("•", color = NeonGreen, fontSize = 13.sp)
-                                Text(stage, color = TextPrimary, fontSize = 13.sp)
+                                Text(stage, color = CH.textPrimary, fontSize = 13.sp)
                             }
                         }
                     }
-                    item { HorizontalDivider(color = BorderColor) }
+                    item { HorizontalDivider(color = CH.border) }
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
@@ -423,16 +423,16 @@ fun TFixturesTab(
                             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("With $teamCount teams", color = TextSecondary, fontSize = 12.sp)
+                                Text("With $teamCount teams", color = CH.textSecondary, fontSize = 12.sp)
                                 Text("Total Matches: ${totalMatches(selectedFormat, teamCount, seriesCount)}", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                             Text("🏏", fontSize = 24.sp)
                         }
                     }
                     item {
-                        HorizontalDivider(color = BorderColor)
+                        HorizontalDivider(color = CH.border)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("All Formats ($teamCount teams):", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("All Formats ($teamCount teams):", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         TOURNAMENT_FORMATS.forEach { format ->
                             val isCurrent = format == selectedFormat
@@ -442,8 +442,8 @@ fun TFixturesTab(
                                     .clickable { selectedFormat = format }.padding(8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(format, color = if (isCurrent) NeonGreen else TextSecondary, fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
-                                Text("${totalMatches(format, teamCount, seriesCount)} matches", color = if (isCurrent) NeonGreen else TextSecondary, fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
+                                Text(format, color = if (isCurrent) NeonGreen else CH.textSecondary, fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
+                                Text("${totalMatches(format, teamCount, seriesCount)} matches", color = if (isCurrent) NeonGreen else CH.textSecondary, fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     }
@@ -467,11 +467,11 @@ fun TFixturesTab(
             // Teams
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SurfaceCard).padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CH.surface).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Teams (${uiState.tournamentTeams.size})", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Teams (${uiState.tournamentTeams.size})", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         OutlinedButton(
                             onClick = { showTeamPicker = true },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
@@ -480,15 +480,15 @@ fun TFixturesTab(
                         ) { Text("+ Add Team", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     }
                     if (uiState.tournamentTeams.isEmpty()) {
-                        Text("No teams added yet — tap + Add Team", color = TextSecondary, fontSize = 12.sp)
+                        Text("No teams added yet — tap + Add Team", color = CH.textSecondary, fontSize = 12.sp)
                     } else {
                         uiState.tournamentTeams.forEach { tt ->
                             val teamName = uiState.teamDetails.find { it.id == tt.teamId }?.name ?: "Team"
                             Row(
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BackgroundDark).padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.bg).padding(horizontal = 12.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(teamName, color = TextPrimary, fontSize = 13.sp)
+                                Text(teamName, color = CH.textPrimary, fontSize = 13.sp)
                                 TextButton(
                                     onClick = { viewModel.removeTeamFromTournament(tournamentId, tt.teamId) },
                                     colors = ButtonDefaults.textButtonColors(contentColor = ErrorRed),
@@ -503,11 +503,11 @@ fun TFixturesTab(
             // Format selector
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SurfaceCard).padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CH.surface).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Select Format", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Select Format", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         TextButton(
                             onClick = { showFormatInfo = true },
                             colors = ButtonDefaults.textButtonColors(contentColor = NeonBlue),
@@ -523,16 +523,16 @@ fun TFixturesTab(
                                     val matches = totalMatches(format, teamCount, seriesCount)
                                     Column(
                                         modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
-                                            .border(1.dp, if (isSelected) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) NeonGreen.copy(alpha = 0.2f) else CH.bg)
+                                            .border(1.dp, if (isSelected) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                                             .clickable { selectedFormat = format }.padding(10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Text(format, color = if (isSelected) NeonGreen else TextSecondary, fontSize = 11.sp,
+                                        Text(format, color = if (isSelected) NeonGreen else CH.textSecondary, fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center)
                                         if (teamCount >= 2) {
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            Text("$matches matches", color = if (isSelected) NeonGreen.copy(alpha = 0.8f) else TextSecondary.copy(alpha = 0.6f),
+                                            Text("$matches matches", color = if (isSelected) NeonGreen.copy(alpha = 0.8f) else CH.textSecondary.copy(alpha = 0.6f),
                                                 fontSize = 10.sp, textAlign = TextAlign.Center)
                                         }
                                     }
@@ -544,17 +544,17 @@ fun TFixturesTab(
 
                     // Bilateral series count selector
                     if (selectedFormat == "Bilateral Series") {
-                        Text("Series Length", color = TextSecondary, fontSize = 12.sp)
+                        Text("Series Length", color = CH.textSecondary, fontSize = 12.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(3, 5, 7).forEach { count ->
                                 val isSel = seriesCount == count
                                 Box(
                                     modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSel) NeonGreen.copy(alpha = 0.2f) else BackgroundDark)
-                                        .border(1.dp, if (isSel) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                        .background(if (isSel) NeonGreen.copy(alpha = 0.2f) else CH.bg)
+                                        .border(1.dp, if (isSel) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                                         .clickable { seriesCount = count }.padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
-                                    Text("$count Matches", color = if (isSel) NeonGreen else TextSecondary, fontSize = 12.sp,
+                                    Text("$count Matches", color = if (isSel) NeonGreen else CH.textSecondary, fontSize = 12.sp,
                                         fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
                                 }
                             }
@@ -585,7 +585,7 @@ fun TFixturesTab(
                                 Text("$selectedFormat • $teamCount teams • ${totalMatches(selectedFormat, teamCount, seriesCount)} matches",
                                     color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(2.dp))
-                                Text(formatDescription(selectedFormat).lines().first(), color = TextSecondary, fontSize = 11.sp)
+                                Text(formatDescription(selectedFormat).lines().first(), color = CH.textSecondary, fontSize = 11.sp)
                             }
                         }
                     }
@@ -632,7 +632,7 @@ fun TFixturesTab(
                         Text("✅ Schedule Generated", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         val fmt = uiState.currentTournament?.format ?: selectedFormat
                         val total = uiState.fixtures.size + knockoutPlaceholders.size
-                        Text("$fmt • ${uiState.tournamentTeams.size} teams • $total matches", color = TextSecondary, fontSize = 12.sp)
+                        Text("$fmt • ${uiState.tournamentTeams.size} teams • $total matches", color = CH.textSecondary, fontSize = 12.sp)
                     }
                     Text("🏏", fontSize = 24.sp)
                 }
@@ -647,8 +647,8 @@ fun TFixturesTab(
                             val isSel = stageTab == index
                             Box(
                                 modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSel) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
-                                    .border(1.dp, if (isSel) NeonGreen else BorderColor, RoundedCornerShape(8.dp))
+                                    .background(if (isSel) NeonGreen.copy(alpha = 0.2f) else CH.surface)
+                                    .border(1.dp, if (isSel) NeonGreen else CH.border, RoundedCornerShape(8.dp))
                                     .clickable { stageTab = index }.padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 val count = when (index) {
@@ -656,7 +656,7 @@ fun TFixturesTab(
                                     2 -> knockoutFixtures.size + knockoutPlaceholders.size
                                     else -> uiState.fixtures.size + knockoutPlaceholders.size
                                 }
-                                Text("$label ($count)", color = if (isSel) NeonGreen else TextSecondary, fontSize = 12.sp,
+                                Text("$label ($count)", color = if (isSel) NeonGreen else CH.textSecondary, fontSize = 12.sp,
                                     fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
@@ -694,7 +694,7 @@ fun TFixturesTab(
             item {
                 Text("🏆 Knockout Stage", color = AmberColor, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 8.dp))
-                Text("Teams will be filled from standings", color = TextSecondary, fontSize = 11.sp)
+                Text("Teams will be filled from standings", color = CH.textSecondary, fontSize = 11.sp)
             }
             items(knockoutPlaceholders) { placeholder ->
                 KnockoutPlaceholderCard(placeholder)
@@ -707,23 +707,23 @@ fun TFixturesTab(
         val availableTeams = uiState.allTeams.filter { team -> uiState.tournamentTeams.none { it.teamId == team.id } }
         AlertDialog(
             onDismissRequest = { showTeamPicker = false },
-            containerColor = SurfaceCard,
-            title = { Text("Add Team", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            containerColor = CH.surface,
+            title = { Text("Add Team", color = CH.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 if (availableTeams.isEmpty()) {
-                    Text("No teams available. Create teams first.", color = TextSecondary)
+                    Text("No teams available. Create teams first.", color = CH.textSecondary)
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 400.dp)) {
                         items(availableTeams) { team ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                                    .background(BackgroundDark).border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                    .background(CH.bg).border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                     .clickable { viewModel.addTeamToTournament(tournamentId, team.id); showTeamPicker = false }.padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text(team.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    team.category?.let { Text(it, color = TextSecondary, fontSize = 11.sp) }
+                                    Text(team.name, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    team.category?.let { Text(it, color = CH.textSecondary, fontSize = 11.sp) }
                                 }
                                 Text("+", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
@@ -732,7 +732,7 @@ fun TFixturesTab(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showTeamPicker = false }) { Text("Cancel", color = TextSecondary) } }
+            dismissButton = { TextButton(onClick = { showTeamPicker = false }) { Text("Cancel", color = CH.textSecondary) } }
         )
     }
 }
@@ -750,30 +750,30 @@ fun TFixtureCard(
     val team1Name = teamDetails.find { it.id == match.team1Id }?.name ?: "Team 1"
     val team2Name = teamDetails.find { it.id == match.team2Id }?.name ?: "Team 2"
     val statusColor = when (match.status) {
-        "live" -> NeonGreen; "completed" -> TextSecondary
+        "live" -> NeonGreen; "completed" -> CH.textSecondary
         "abandoned" -> AmberColor; "cancelled" -> ErrorRed
         else -> AmberColor
     }
 
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard).border(1.dp, BorderColor, RoundedCornerShape(12.dp)).padding(14.dp)
+            .background(CH.surface).border(1.dp, CH.border, RoundedCornerShape(12.dp)).padding(14.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Match ${match.matchNumber ?: ""}", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Match ${match.matchNumber ?: ""}", color = CH.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Text(match.status.uppercase(), color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
-            Text("${match.matchType} • ${match.totalOvers} ov", color = TextSecondary, fontSize = 11.sp)
+            Text("${match.matchType} • ${match.totalOvers} ov", color = CH.textSecondary, fontSize = 11.sp)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(team1Name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Text("vs", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
-            Text(team2Name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            Text(team1Name, color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text("vs", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+            Text(team2Name, color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
         }
         match.resultText?.let {
             Spacer(modifier = Modifier.height(6.dp))
@@ -803,7 +803,7 @@ fun TFixtureCard(
 fun KnockoutPlaceholderCard(placeholder: KnockoutPlaceholder) {
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard.copy(alpha = 0.6f))
+            .background(CH.surface.copy(alpha = 0.6f))
             .border(1.dp, AmberColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             .padding(14.dp)
     ) {
@@ -816,12 +816,12 @@ fun KnockoutPlaceholderCard(placeholder: KnockoutPlaceholder) {
             modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(placeholder.team1Desc, color = TextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            Text("vs", color = TextSecondary.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
-            Text(placeholder.team2Desc, color = TextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            Text(placeholder.team1Desc, color = CH.textSecondary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text("vs", color = CH.textSecondary.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+            Text(placeholder.team2Desc, color = CH.textSecondary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
         }
         Spacer(modifier = Modifier.height(6.dp))
-        Text("🔒 Teams decided from standings", color = TextSecondary.copy(alpha = 0.5f), fontSize = 10.sp)
+        Text("🔒 Teams decided from standings", color = CH.textSecondary.copy(alpha = 0.5f), fontSize = 10.sp)
     }
 }
 
@@ -832,15 +832,15 @@ fun TPointsTab(uiState: TournamentUiState) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 12.dp, vertical = 8.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.surface).padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text("#", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp))
-                Text("Team", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text("P", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
-                Text("W", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
-                Text("L", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
-                Text("Pts", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
-                Text("NRR", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
+                Text("#", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp))
+                Text("Team", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("P", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+                Text("W", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+                Text("L", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+                Text("Pts", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
+                Text("NRR", color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
             }
             Spacer(modifier = Modifier.height(4.dp))
         }
@@ -853,21 +853,21 @@ fun TPointsTab(uiState: TournamentUiState) {
             val qualifyColor = when {
                 uiState.currentTournament?.format == "League + Playoffs" && index < 4 -> NeonGreen
                 uiState.currentTournament?.format == "Group + Knockout" && index < 4 -> NeonGreen
-                else -> if (index == 0) NeonGreen else TextSecondary
+                else -> if (index == 0) NeonGreen else CH.textSecondary
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("${index + 1}", color = qualifyColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
-                Text(teamName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("${tt.matchesPlayed}", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+                Text(teamName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("${tt.matchesPlayed}", color = CH.textSecondary, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
                 Text("${tt.wins}", color = NeonGreen, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
                 Text("${tt.losses}", color = ErrorRed, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
                 Text("${tt.points}", color = NeonBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
                 Text("${"%.3f".format(tt.nrr)}", color = if (tt.nrr >= 0) NeonGreen else ErrorRed, fontSize = 12.sp, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 }
@@ -889,15 +889,15 @@ fun TStatsTab(
         return
     }
     if (allBalls.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No match data yet", color = TextSecondary) }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No match data yet", color = CH.textSecondary) }
         return
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        ScrollableTabRow(selectedTabIndex = selectedStat, containerColor = BackgroundDark, contentColor = AmberColor, edgePadding = 0.dp) {
+        ScrollableTabRow(selectedTabIndex = selectedStat, containerColor = CH.bg, contentColor = AmberColor, edgePadding = 0.dp) {
             statTabs.forEachIndexed { index, tab ->
                 Tab(selected = selectedStat == index, onClick = { selectedStat = index },
-                    text = { Text(tab, fontSize = 12.sp, fontWeight = if (selectedStat == index) FontWeight.Bold else FontWeight.Normal, color = if (selectedStat == index) AmberColor else TextSecondary) })
+                    text = { Text(tab, fontSize = 12.sp, fontWeight = if (selectedStat == index) FontWeight.Bold else FontWeight.Normal, color = if (selectedStat == index) AmberColor else CH.textSecondary) })
             }
         }
         when (selectedStat) {
@@ -933,32 +933,32 @@ fun OrangeCapTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, 
         item {
             Text("🟠 Orange Cap", color = AmberColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(SurfaceCard).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                Text("#", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(20.dp))
-                Text("Player", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.weight(1f))
-                Text("R", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("B", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("Avg", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
-                Text("SR", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
-                Text("4s", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                Text("6s", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(CH.surface).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Text("#", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(20.dp))
+                Text("Player", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                Text("R", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("B", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("Avg", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                Text("SR", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                Text("4s", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                Text("6s", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
             }
         }
         items(stats.withIndex().toList()) { (index, s) ->
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${index + 1}", color = if (index == 0) AmberColor else TextSecondary, fontSize = 12.sp, fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(20.dp))
+                Text("${index + 1}", color = if (index == 0) AmberColor else CH.textSecondary, fontSize = 12.sp, fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(20.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(s.player.fullName, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Text(s.team, color = TextSecondary, fontSize = 10.sp)
+                    Text(s.player.fullName, color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(s.team, color = CH.textSecondary, fontSize = 10.sp)
                 }
-                Text("${s.runs}", color = if (index == 0) AmberColor else TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${s.balls}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${"%.1f".format(s.avg)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
-                Text("${"%.1f".format(s.sr)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                Text("${s.runs}", color = if (index == 0) AmberColor else CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${s.balls}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(s.avg)}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(s.sr)}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
                 Text("${s.fours}", color = NeonBlue, fontSize = 12.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
                 Text("${s.sixes}", color = NeonGreen, fontSize = 12.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 }
@@ -990,32 +990,32 @@ fun PurpleCapTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, 
         item {
             Text("🟣 Purple Cap", color = PurpleColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(SurfaceCard).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                Text("#", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(20.dp))
-                Text("Player", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.weight(1f))
-                Text("W", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                Text("R", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("Avg", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
-                Text("Eco", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
-                Text("SR", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("Dot", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(CH.surface).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Text("#", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(20.dp))
+                Text("Player", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                Text("W", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                Text("R", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("Avg", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
+                Text("Eco", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
+                Text("SR", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("Dot", color = CH.textSecondary, fontSize = 10.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
             }
         }
         items(stats.withIndex().toList()) { (index, s) ->
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${index + 1}", color = if (index == 0) PurpleColor else TextSecondary, fontSize = 12.sp, modifier = Modifier.width(20.dp))
+                Text("${index + 1}", color = if (index == 0) PurpleColor else CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(20.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(s.player.fullName, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Text(s.team, color = TextSecondary, fontSize = 10.sp)
+                    Text(s.player.fullName, color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(s.team, color = CH.textSecondary, fontSize = 10.sp)
                 }
-                Text("${s.wickets}", color = if (index == 0) PurpleColor else TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                Text("${s.runs}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${"%.1f".format(s.avg)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
+                Text("${s.wickets}", color = if (index == 0) PurpleColor else CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                Text("${s.runs}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(s.avg)}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
                 Text("${"%.2f".format(s.economy)}", color = when { s.economy < 6 -> NeonGreen; s.economy < 9 -> AmberColor; else -> ErrorRed }, fontSize = 12.sp, modifier = Modifier.width(32.dp), textAlign = TextAlign.End)
-                Text("${"%.1f".format(s.sr)}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                Text("${s.dots}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                Text("${"%.1f".format(s.sr)}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
+                Text("${s.dots}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
             }
-            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            HorizontalDivider(color = CH.border, thickness = 0.5.dp)
         }
     }
 }
@@ -1040,13 +1040,13 @@ fun BestSRTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, Str
             Spacer(modifier = Modifier.height(8.dp))
         }
         items(stats.withIndex().toList()) { (index, s) ->
-            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${index + 1}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(24.dp))
+            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.surface).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("${index + 1}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(24.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(s.player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text(s.team, color = TextSecondary, fontSize = 11.sp)
+                    Text(s.player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(s.team, color = CH.textSecondary, fontSize = 11.sp)
                 }
-                Text("${s.runs}(${s.balls})", color = TextPrimary, fontSize = 12.sp, modifier = Modifier.width(64.dp), textAlign = TextAlign.End)
+                Text("${s.runs}(${s.balls})", color = CH.textPrimary, fontSize = 12.sp, modifier = Modifier.width(64.dp), textAlign = TextAlign.End)
                 Text("${"%.1f".format(s.sr)}", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
             }
         }
@@ -1067,10 +1067,10 @@ fun MostBoundariesTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<Str
         }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedBdry, containerColor = BackgroundDark, contentColor = NeonGreen) {
+        TabRow(selectedTabIndex = selectedBdry, containerColor = CH.bg, contentColor = NeonGreen) {
             bdryTabs.forEachIndexed { index, tab ->
                 Tab(selected = selectedBdry == index, onClick = { selectedBdry = index },
-                    text = { Text(tab, fontSize = 12.sp, color = if (selectedBdry == index) NeonGreen else TextSecondary) })
+                    text = { Text(tab, fontSize = 12.sp, color = if (selectedBdry == index) NeonGreen else CH.textSecondary) })
             }
         }
         val sortedStats = when (selectedBdry) {
@@ -1081,11 +1081,11 @@ fun MostBoundariesTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<Str
 
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(sortedStats.withIndex().toList()) { (index, s) ->
-                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${index + 1}", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(24.dp))
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.surface).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${index + 1}", color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.width(24.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(s.player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(s.team, color = TextSecondary, fontSize = 11.sp)
+                        Text(s.player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(s.team, color = CH.textSecondary, fontSize = 11.sp)
                     }
                     Text("4s: ${s.fours}", color = NeonBlue, fontSize = 12.sp, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
                     Text("6s: ${s.sixes}", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
@@ -1100,7 +1100,7 @@ fun MostBoundariesTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<Str
 @Composable
 fun TAwardsTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, String>, playerMap: Map<String, Player>, isLoading: Boolean) {
     if (isLoading) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NeonGreen) }; return }
-    if (allBalls.isEmpty()) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No match data yet", color = TextSecondary) }; return }
+    if (allBalls.isEmpty()) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No match data yet", color = CH.textSecondary) }; return }
 
     data class MVPStat(val player: Player, val team: String, val score: Double, val runs: Int, val wickets: Int)
     val playerBatBalls = allBalls.groupBy { it.first.batsmanId ?: "" }
@@ -1153,22 +1153,22 @@ fun TAwardsTab(allBalls: List<Pair<Ball, String>>, playerTeamMap: Map<String, St
             item { AwardCard("🎳", "Best Bowler", p.fullName, playerTeamMap[p.id] ?: "", "${bestBowlingInnings?.value?.first ?: 0}/${bestBowlingInnings?.value?.second ?: 0}", ErrorRed) }
         }
         item {
-            Text("MVP Leaderboard", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text("MVP Leaderboard", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             Spacer(modifier = Modifier.height(6.dp))
         }
         items(mvpList.take(10).withIndex().toList()) { (index, s) ->
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(SurfaceCard).padding(horizontal = 12.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CH.surface).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("${index + 1}", color = when (index) { 0 -> AmberColor; 2 -> Color(0xFFCD7F32); else -> TextSecondary }, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
+                Text("${index + 1}", color = when (index) { 0 -> AmberColor; 2 -> Color(0xFFCD7F32); else -> CH.textSecondary }, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(s.player.fullName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text(s.team, color = TextSecondary, fontSize = 11.sp)
+                    Text(s.player.fullName, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(s.team, color = CH.textSecondary, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("${"%.1f".format(s.score)} pts", color = AmberColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("${s.runs}R ${s.wickets}W", color = TextSecondary, fontSize = 11.sp)
+                    Text("${s.runs}R ${s.wickets}W", color = CH.textSecondary, fontSize = 11.sp)
                 }
             }
         }
@@ -1185,9 +1185,9 @@ fun AwardCard(emoji: String, title: String, playerName: String, team: String, de
         Text(emoji, fontSize = 28.sp)
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Text(playerName, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(team, color = TextSecondary, fontSize = 11.sp)
+            Text(playerName, color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(team, color = CH.textSecondary, fontSize = 11.sp)
         }
-        Text(detail, color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.End)
+        Text(detail, color = CH.textSecondary, fontSize = 11.sp, textAlign = TextAlign.End)
     }
 }

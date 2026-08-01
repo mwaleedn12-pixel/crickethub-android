@@ -84,11 +84,11 @@ fun TeamStatsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, null, tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, null, tint = CH.textPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(teamName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("Team Statistics", color = TextSecondary, fontSize = 12.sp)
+                    Text(teamName, color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Team Statistics", color = CH.textSecondary, fontSize = 12.sp)
                 }
                 if (stats != null) {
                     ExportButton(onClick = { showExport = true })
@@ -101,7 +101,7 @@ fun TeamStatsScreen(
                 }
             } else if (stats == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Could not load stats", color = TextSecondary)
+                    Text("Could not load stats", color = CH.textSecondary)
                 }
             } else {
                 val s = stats!!
@@ -120,7 +120,7 @@ fun TeamStatsScreen(
                                 ResultCircle("Won", s.won.toString(), Color(0xFF22C55E))
                                 ResultCircle("Lost", s.lost.toString(), ErrorRed)
                                 ResultCircle("Tied", s.tied.toString(), AmberColor)
-                                ResultCircle("NR", s.noResult.toString(), TextSecondary)
+                                ResultCircle("NR", s.noResult.toString(), CH.textSecondary)
                             }
                         }
                     }
@@ -142,7 +142,7 @@ fun TeamStatsScreen(
                                     progress = { (s.winPercentage / 100).toFloat().coerceIn(0f, 1f) },
                                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                                     color = NeonGreen,
-                                    trackColor = BorderColor
+                                    trackColor = CH.border
                                 )
                             }
                         }
@@ -182,12 +182,12 @@ fun StatsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
+            .background(CH.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(title, color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        HorizontalDivider(color = BorderColor)
+        HorizontalDivider(color = CH.border)
         content()
     }
 }
@@ -205,7 +205,7 @@ fun ResultCircle(label: String, value: String, color: Color) {
             Text(value, color = color, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, color = TextSecondary, fontSize = 11.sp)
+        Text(label, color = CH.textSecondary, fontSize = 11.sp)
     }
 }
 
@@ -216,7 +216,7 @@ fun StatRow(label: String, value: String, valueColor: Color) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextSecondary, fontSize = 13.sp)
+        Text(label, color = CH.textSecondary, fontSize = 13.sp)
         Text(value, color = valueColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -231,6 +231,6 @@ fun StreakBox(label: String, value: Int, color: Color) {
             .padding(horizontal = 32.dp, vertical = 16.dp)
     ) {
         Text(value.toString(), color = color, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = TextSecondary, fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(label, color = CH.textSecondary, fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }

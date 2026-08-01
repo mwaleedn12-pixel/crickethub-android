@@ -43,11 +43,11 @@ fun MatchesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isDark = isSystemInDarkTheme()
 
-    val bg      = if (isDark) Color(0xFF030F08) else Color(0xFFF0FDF8)
-    val surface = if (isDark) Color(0xFF0D2018) else Color(0xFFFFFFFF)
-    val border  = if (isDark) Color(0xFF1A3828) else Color(0xFFBBF7D0)
-    val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val bg      = if (isDark) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)
+    val surface = if (isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
+    val border  = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val textP   = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS   = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
 
@@ -70,7 +70,7 @@ fun MatchesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        if (isDark) Color(0xFF071610) else Color(0xFFECFDF5)
+                        if (isDark) Color(0xFF111111) else Color(0xFFF2F2F0)
                     )
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -113,7 +113,7 @@ fun MatchesScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) green else if (isDark) Color(0xFF0D2018) else Color.White)
+                            .background(if (selected) green else if (isDark) Color(0xFF161616) else Color.White)
                             .border(1.dp, if (selected) green else border, RoundedCornerShape(20.dp))
                             .clickable { selectedFilter = filter }
                             .padding(horizontal = 14.dp, vertical = 7.dp)
@@ -207,10 +207,10 @@ fun MatchCard(
 
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
-    val surface = if (isDark) Color(0xFF0D2018) else Color(0xFFFFFFFF)
-    val border  = if (isDark) Color(0xFF1A3828) else Color(0xFFD1FAE5)
-    val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val surface = if (isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
+    val border  = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val textP   = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS   = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
 
     val isLive      = match.status == "live"
     val isCompleted = match.status == "completed"
@@ -295,7 +295,7 @@ fun MatchCard(
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF122A1E) else Color(0xFFE8FDF4))
+                                .background(if (isDark) Color(0xFF1E1E1E) else Color(0xFFF0ECE2))
                                 .clickable { showMoreMenu = true },
                             contentAlignment = Alignment.Center
                         ) {
@@ -304,7 +304,7 @@ fun MatchCard(
                         DropdownMenu(
                             expanded = showMoreMenu,
                             onDismissRequest = { showMoreMenu = false },
-                            modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
+                            modifier = Modifier.background(if (isDark) Color(0xFF161616) else Color.White)
                         ) {
                             DropdownMenuItem(
                                 text = { Text("📤 Share", color = Color(0xFF34D399), fontSize = 13.sp) },
@@ -452,13 +452,13 @@ fun MatchCard(
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(if (isDark) Color(0xFF122A1E) else Color(0xFFD1FAE5))
+                        .background(if (isDark) Color(0xFF1E1E1E) else Color(0xFFE6DDC8))
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.6f)
                             .fillMaxHeight()
-                            .background(Brush.horizontalGradient(listOf(green, Color(0xFF6EE7B7))))
+                            .background(Brush.horizontalGradient(listOf(green, Color(0xFFC4C9D4))))
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))

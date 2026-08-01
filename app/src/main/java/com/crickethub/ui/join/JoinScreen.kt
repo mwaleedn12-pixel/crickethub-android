@@ -41,9 +41,9 @@ fun JoinWithCodeScreen(
             // Top bar
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, null, tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, null, tint = CH.textPrimary)
                 }
-                Text("Join with Code", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Join with Code", color = CH.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -55,8 +55,8 @@ fun JoinWithCodeScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("🏏", fontSize = 64.sp)
-                Text("Enter Share Code", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Ask the owner for their share code", color = TextSecondary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                Text("Enter Share Code", color = CH.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Ask the owner for their share code", color = CH.textSecondary, fontSize = 14.sp, textAlign = TextAlign.Center)
 
                 OutlinedTextField(
                     value = code,
@@ -66,9 +66,9 @@ fun JoinWithCodeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = NeonGreen, unfocusedBorderColor = BorderColor,
-                        focusedLabelColor = NeonGreen, unfocusedLabelColor = TextSecondary,
+                        focusedTextColor = CH.textPrimary, unfocusedTextColor = CH.textPrimary,
+                        focusedBorderColor = NeonGreen, unfocusedBorderColor = CH.border,
+                        focusedLabelColor = NeonGreen, unfocusedLabelColor = CH.textSecondary,
                         cursorColor = NeonGreen
                     )
                 )

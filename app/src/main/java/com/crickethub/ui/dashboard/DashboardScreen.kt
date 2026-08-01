@@ -164,7 +164,7 @@ fun DashboardScreen(
         }
     }
 
-    val cardBg = if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF)
+    val cardBg = if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF)
 
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -175,7 +175,7 @@ fun DashboardScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize()
-            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8)),
+            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -201,8 +201,8 @@ fun DashboardScreen(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Welcome back!", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text(userEmail, color = TextSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Welcome back!", color = CH.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(userEmail, color = CH.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 IconButton(onClick = {
                     scope.launch {
@@ -239,7 +239,7 @@ fun DashboardScreen(
 
         // Feature cards
         item {
-            Text("Features", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            Text("Features", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 8.dp))
         }
         item {
@@ -259,13 +259,13 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(SurfaceCard)
-                                    .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                    .background(CH.surface)
+                                    .border(1.dp, CH.border, RoundedCornerShape(10.dp))
                                     .padding(12.dp)
                             ) {
                                 Column {
                                     Text("$emoji $title", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    Text(desc, color = TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                                    Text(desc, color = CH.textSecondary, fontSize = 11.sp, lineHeight = 14.sp)
                                 }
                             }
                         }
@@ -278,26 +278,26 @@ fun DashboardScreen(
         // Active tournaments
         if (activeTournaments.isNotEmpty()) {
             item {
-                Text("Active Tournaments", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text("Active Tournaments", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
             items(activeTournaments) { tournament ->
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(cardBg)
-                        .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                        .border(1.dp, CH.border, RoundedCornerShape(10.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(tournament.name, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tournament.name, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         Text(
                             "${tournament.format ?: "Tournament"} • ${tournament.status.replaceFirstChar { it.uppercase() }}",
-                            color = TextSecondary, fontSize = 11.sp
+                            color = CH.textSecondary, fontSize = 11.sp
                         )
                     }
-                    val sc = when (tournament.status) { "live" -> NeonGreen; "upcoming" -> AmberColor; else -> TextSecondary }
+                    val sc = when (tournament.status) { "live" -> NeonGreen; "upcoming" -> AmberColor; else -> CH.textSecondary }
                     Box(
                         modifier = Modifier.clip(RoundedCornerShape(4.dp))
                             .background(sc.copy(alpha = 0.15f))
@@ -311,7 +311,7 @@ fun DashboardScreen(
 
         // Recent matches
         item {
-            Text("Recent Matches", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("Recent Matches", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
 
         if (recentMatches.isEmpty()) {
@@ -321,7 +321,7 @@ fun DashboardScreen(
                         .background(cardBg).padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No matches yet. Create your first match!", color = TextSecondary, fontSize = 13.sp)
+                    Text("No matches yet. Create your first match!", color = CH.textSecondary, fontSize = 13.sp)
                 }
             }
         } else {
@@ -330,17 +330,17 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(cardBg)
-                        .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                        .border(1.dp, CH.border, RoundedCornerShape(10.dp))
                         .padding(12.dp)
                 ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${match.matchType} • ${match.totalOvers} ov", color = TextSecondary, fontSize = 11.sp)
-                        val sc = when (match.status) { "completed" -> NeonGreen; "live" -> AmberColor; else -> TextSecondary }
+                        Text("${match.matchType} • ${match.totalOvers} ov", color = CH.textSecondary, fontSize = 11.sp)
+                        val sc = when (match.status) { "completed" -> NeonGreen; "live" -> AmberColor; else -> CH.textSecondary }
                         Text(match.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     match.resultText?.let {
                         Spacer(Modifier.height(4.dp))
-                        Text(it, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        Text(it, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     if (match.status == "completed") {
@@ -374,7 +374,7 @@ fun QuickStatCard(label: String, value: String, icon: ImageVector, color: Color,
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
+            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
             .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -382,6 +382,6 @@ fun QuickStatCard(label: String, value: String, icon: ImageVector, color: Color,
         Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
         Spacer(Modifier.height(4.dp))
         Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = TextSecondary, fontSize = 10.sp)
+        Text(label, color = CH.textSecondary, fontSize = 10.sp)
     }
 }

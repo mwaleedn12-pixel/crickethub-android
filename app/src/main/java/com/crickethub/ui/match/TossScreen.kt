@@ -63,7 +63,7 @@ fun TossScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(CH.bg)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -74,7 +74,7 @@ fun TossScreen(
             "Toss",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary,
+            color = CH.textPrimary,
             modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
         )
 
@@ -86,7 +86,7 @@ fun TossScreen(
 
             Text(
                 "Who won the toss?",
-                color = TextSecondary,
+                color = CH.textSecondary,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -102,10 +102,10 @@ fun TossScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (selected) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
+                                .background(if (selected) NeonGreen.copy(alpha = 0.2f) else CH.surface)
                                 .border(
                                     2.dp,
-                                    if (selected) NeonGreen else BorderColor,
+                                    if (selected) NeonGreen else CH.border,
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable { tossWinnerId = team.id }
@@ -114,7 +114,7 @@ fun TossScreen(
                         ) {
                             Text(
                                 team.name,
-                                color = if (selected) NeonGreen else TextPrimary,
+                                color = if (selected) NeonGreen else CH.textPrimary,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 textAlign = TextAlign.Center
                             )
@@ -129,7 +129,7 @@ fun TossScreen(
                 val winnerName = teams.find { it.id == tossWinnerId }?.name ?: ""
                 Text(
                     "$winnerName chose to...",
-                    color = TextSecondary,
+                    color = CH.textSecondary,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
@@ -144,10 +144,10 @@ fun TossScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (selected) NeonGreen.copy(alpha = 0.2f) else SurfaceCard)
+                                .background(if (selected) NeonGreen.copy(alpha = 0.2f) else CH.surface)
                                 .border(
                                     2.dp,
-                                    if (selected) NeonGreen else BorderColor,
+                                    if (selected) NeonGreen else CH.border,
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable { tossDecision = value }
@@ -156,7 +156,7 @@ fun TossScreen(
                         ) {
                             Text(
                                 label,
-                                color = if (selected) NeonGreen else TextPrimary,
+                                color = if (selected) NeonGreen else CH.textPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
                             )

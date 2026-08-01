@@ -1,5 +1,6 @@
 package com.crickethub.data.repository
 
+import com.crickethub.data.local.OfflineCache
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.MatchInsert
 import com.crickethub.data.model.Tournament
@@ -20,26 +21,38 @@ class TournamentRepository {
     private var tournamentsCacheTime: Long = 0L
     private val TTL_MS = 2 * 60 * 1000L
 
+    private fun context() = com.crickethub.CricketHubApp.instance
+
     suspend fun getAllTournaments(): List<Tournament> {
         val cached = tournamentsCache
         if (cached != null && System.currentTimeMillis() - tournamentsCacheTime < TTL_MS) {
             return cached
         }
-        return SupabaseClient.withRetry {
-            val list = client.postgrest["tournaments"]
-                .select()
-                .decodeList<Tournament>()
-            tournamentsCache = list
-            tournamentsCacheTime = System.currentTimeMillis()
-            list
+        return try {
+            SupabaseClient.withRetry {
+                val list = client.postgrest["tournaments"]
+                    .select()
+                    .decodeList<Tournament>()
+                tournamentsCache = list
+                tournamentsCacheTime = System.currentTimeMillis()
+                OfflineCache.saveTournaments(context(), list)
+                list
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CricketHub", "getAllTournaments offline fallback: ${e.message}")
+            OfflineCache.getTournaments(context())
         }
     }
 
     suspend fun getTournamentById(tournamentId: String): Tournament? {
-        return SupabaseClient.withRetry {
-            client.postgrest["tournaments"]
-                .select { filter { eq("id", tournamentId) } }
-                .decodeSingleOrNull()
+        return try {
+            SupabaseClient.withRetry {
+                client.postgrest["tournaments"]
+                    .select { filter { eq("id", tournamentId) } }
+                    .decodeSingleOrNull()
+            }
+        } catch (e: Exception) {
+            OfflineCache.getTournaments(context()).find { it.id == tournamentId }
         }
     }
 
@@ -64,10 +77,14 @@ class TournamentRepository {
     }
 
     suspend fun getTournamentFixtures(tournamentId: String): List<Match> {
-        return SupabaseClient.withRetry {
-            client.postgrest["matches"]
-                .select { filter { eq("tournament_id", tournamentId) } }
-                .decodeList()
+        return try {
+            SupabaseClient.withRetry {
+                client.postgrest["matches"]
+                    .select { filter { eq("tournament_id", tournamentId) } }
+                    .decodeList()
+            }
+        } catch (e: Exception) {
+            OfflineCache.getMatches(context()).filter { it.tournamentId == tournamentId }
         }
     }
 
@@ -164,7 +181,6 @@ class TournamentRepository {
 
             "Group + Knockout" -> {
                 if (n < 4) {
-                    // Fall back to round robin if <4 teams
                     for (i in teamIds.indices)
                         for (j in i + 1 until n)
                             specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
@@ -178,7 +194,6 @@ class TournamentRepository {
                     for (i in groupB.indices)
                         for (j in i + 1 until groupB.size)
                             specs.add(FixtureSpec(groupB[i], groupB[j], "Group B"))
-                    // Knockout matches created later when teams qualify
                 }
             }
 
@@ -186,54 +201,55 @@ class TournamentRepository {
                 for (i in teamIds.indices)
                     for (j in i + 1 until n)
                         specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
-                // Playoff matches created later when standings are final
             }
 
             "Bilateral Series" -> {
                 if (n >= 2) {
                     val count = seriesMatches.coerceIn(1, 7)
                     for (i in 1..count) {
-                        val home = if (i % 2 == 1) teamIds[0] else teamIds[1]
-                        val away = if (i % 2 == 1) teamIds[1] else teamIds[0]
-                        specs.add(FixtureSpec(home, away, "Series"))
+                        val t1 = if (i % 2 == 1) teamIds[0] else teamIds[1]
+                        val t2 = if (i % 2 == 1) teamIds[1] else teamIds[0]
+                        specs.add(FixtureSpec(t1, t2, "Match $i"))
                     }
                 }
             }
 
             "Tri-Series" -> {
-                val triTeams = teamIds.take(3)
-                if (triTeams.size == 3) {
+                if (n >= 3) {
                     for (i in 0 until 3)
                         for (j in i + 1 until 3)
-                            specs.add(FixtureSpec(triTeams[i], triTeams[j], "League"))
+                            specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
                     for (i in 0 until 3)
                         for (j in i + 1 until 3)
-                            specs.add(FixtureSpec(triTeams[j], triTeams[i], "League"))
-                    // Final created when standings are final
+                            specs.add(FixtureSpec(teamIds[j], teamIds[i], "League"))
                 }
             }
 
-            "Custom Tournament" -> {
+            "Quad Series" -> {
+                if (n >= 4) {
+                    for (i in 0 until 4)
+                        for (j in i + 1 until 4)
+                            specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
+                }
+            }
+
+            "Double Knockout" -> {
+                specs.addAll(knockoutFirstRound(teamIds))
+            }
+
+            else -> {
                 for (i in teamIds.indices)
                     for (j in i + 1 until n)
                         specs.add(FixtureSpec(teamIds[i], teamIds[j], "League"))
             }
         }
 
-        // Interleave fixtures so one team's matches don't cluster together
-        val interleaved = interleaveFixtures(specs)
-
+        val ordered = interleaveFixtures(specs)
         val matchType = tournament.matchType ?: "T20"
         val totalOvers = tournament.oversPerMatch ?: 20
-        val playersPerSide = tournament.playersPerSide ?: 11
         val userId = client.auth.currentUserOrNull()?.id
-        val ppOvers = when {
-            totalOvers <= 10 -> 2
-            totalOvers <= 20 -> 6
-            else -> 10
-        }
 
-        interleaved.forEachIndexed { index, spec ->
+        for ((index, spec) in ordered.withIndex()) {
             try {
                 client.postgrest["matches"].insert(
                     MatchInsert(
@@ -243,10 +259,10 @@ class TournamentRepository {
                         team2Id = spec.team2Id,
                         matchType = matchType,
                         totalOvers = totalOvers,
-                        playersPerSide = playersPerSide,
+                        playersPerSide = tournament.playersPerSide ?: 11,
                         tournamentId = tournamentId,
                         matchNumber = index + 1,
-                        powerplayOvers = ppOvers,
+                        powerplayOvers = if (totalOvers <= 10) 2 else if (totalOvers <= 20) 6 else 10,
                         freeHitOnNoball = true,
                         superOverEnabled = false,
                         maxOversPerBowler = if (totalOvers >= 5) totalOvers / 5 else null,
@@ -255,18 +271,13 @@ class TournamentRepository {
                     )
                 )
             } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Fixture #${index + 1} error: ${e.message}", e)
+                android.util.Log.e("CricketHub", "Fixture ${index + 1} error: ${e.message}", e)
             }
         }
 
         return getTournamentFixtures(tournamentId)
     }
 
-    /**
-     * Interleave fixtures so no team plays consecutive matches.
-     * Uses a greedy approach: pick the next fixture where neither
-     * team played in the previous fixture.
-     */
     private fun interleaveFixtures(specs: List<FixtureSpec>): List<FixtureSpec> {
         if (specs.size <= 2) return specs
         val remaining = specs.toMutableList()
@@ -274,14 +285,12 @@ class TournamentRepository {
         val lastTeams = mutableSetOf<String>()
 
         while (remaining.isNotEmpty()) {
-            // Find a fixture where neither team played last
             val idx = remaining.indexOfFirst { spec ->
                 spec.team1Id !in lastTeams && spec.team2Id !in lastTeams
             }
             val pick = if (idx >= 0) {
                 remaining.removeAt(idx)
             } else {
-                // No ideal match — just take the first remaining
                 remaining.removeAt(0)
             }
             result.add(pick)
@@ -292,7 +301,6 @@ class TournamentRepository {
         return result
     }
 
-    /** Single Knockout: only first round (teams without byes) */
     private fun knockoutFirstRound(teamIds: List<String>): List<FixtureSpec> {
         val n = teamIds.size
         if (n == 2) return listOf(FixtureSpec(teamIds[0], teamIds[1], "Final"))
@@ -315,7 +323,6 @@ class TournamentRepository {
         return specs
     }
 
-    /** Create a knockout match when teams qualify */
     suspend fun createKnockoutMatch(
         tournamentId: String,
         team1Id: String,
@@ -353,7 +360,6 @@ class TournamentRepository {
         }
     }
 
-    /** Reschedule a fixture */
     suspend fun rescheduleMatch(matchId: String, newDate: String?, newTime: String?) {
         try {
             client.postgrest["matches"].update({

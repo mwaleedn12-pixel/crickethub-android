@@ -149,14 +149,14 @@ fun AnalyticsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = CH.textPrimary)
                 }
-                Text("Analytics", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("Analytics", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary)
             }
 
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = SurfaceCard,
+                containerColor = CH.surface,
                 contentColor = NeonGreen,
                 edgePadding = 0.dp
             ) {
@@ -168,7 +168,7 @@ fun AnalyticsScreen(
                             Text(
                                 tab, fontSize = 13.sp,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index) NeonGreen else TextSecondary
+                                color = if (selectedTab == index) NeonGreen else CH.textSecondary
                             )
                         }
                     )
@@ -213,7 +213,7 @@ fun BattingAnalyticsTab(
                     it.wicketType?.replace("_", " ")?.replaceFirstChar { c -> c.uppercase() } ?: "Unknown"
                 }
                 if (dismissalGroups.isEmpty()) {
-                    Text("No wickets yet", color = TextSecondary, fontSize = 12.sp)
+                    Text("No wickets yet", color = CH.textSecondary, fontSize = 12.sp)
                 } else {
                     dismissalGroups.forEach { (type, balls) ->
                         Row(
@@ -221,7 +221,7 @@ fun BattingAnalyticsTab(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(type, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Text(type, color = CH.textPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
                             Box(
                                 modifier = Modifier
                                     .height(20.dp)
@@ -243,7 +243,7 @@ fun BattingAnalyticsTab(
                 val allBalls = inn1Balls + inn2Balls
                 val boundaries = allBalls.filter { it.isBoundary || it.isSix }
                 if (boundaries.isEmpty()) {
-                    Text("No boundaries yet", color = TextSecondary, fontSize = 12.sp)
+                    Text("No boundaries yet", color = CH.textSecondary, fontSize = 12.sp)
                 } else {
                     val overGroups = allBalls.groupBy { it.overNo }
                     val maxOver = (overGroups.keys.maxOrNull() ?: 0) + 1
@@ -278,11 +278,11 @@ fun BattingAnalyticsTab(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(modifier = Modifier.size(10.dp).background(NeonBlue, RoundedCornerShape(2.dp)))
-                            Text("4s", color = TextSecondary, fontSize = 11.sp)
+                            Text("4s", color = CH.textSecondary, fontSize = 11.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(modifier = Modifier.size(10.dp).background(NeonGreen, RoundedCornerShape(2.dp)))
-                            Text("6s", color = TextSecondary, fontSize = 11.sp)
+                            Text("6s", color = CH.textSecondary, fontSize = 11.sp)
                         }
                     }
                 }
@@ -325,9 +325,9 @@ fun BattingAnalyticsTab(
                     Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatBox("Dot Balls", "$dotBalls", TextSecondary, Modifier.weight(1f))
+                        StatBox("Dot Balls", "$dotBalls", CH.textSecondary, Modifier.weight(1f))
                         StatBox("Dot %", "${"%.1f".format(dotPct)}%", ErrorRed, Modifier.weight(1f))
-                        StatBox("Legal Balls", "${legalBalls.size}", TextPrimary, Modifier.weight(1f))
+                        StatBox("Legal Balls", "${legalBalls.size}", CH.textPrimary, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -354,13 +354,13 @@ fun BattingAnalyticsTab(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
-                                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                    .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
+                                    .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                     .padding(8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(phaseLabels[i], color = TextSecondary, fontSize = 10.sp, textAlign = TextAlign.Center)
-                                Text("$runs/$wkts", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                Text(phaseLabels[i], color = CH.textSecondary, fontSize = 10.sp, textAlign = TextAlign.Center)
+                                Text("$runs/$wkts", color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                                 Text("RR: ${"%.1f".format(rr)}", color = NeonGreen, fontSize = 11.sp, textAlign = TextAlign.Center)
                             }
                         }
@@ -404,6 +404,8 @@ fun BowlingAnalyticsTab(
                     val maxEco = (ecoData.maxOfOrNull { it.second } ?: 12.0).coerceAtLeast(6.0)
 
                     // Axis-labeled bar chart via Canvas
+                    val canvasBorder = CH.border
+                    val canvasTextSec = CH.textSecondary
                     Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
                         val padLeft = 28.dp.toPx()
                         val padBottom = 20.dp.toPx()
@@ -419,7 +421,7 @@ fun BowlingAnalyticsTab(
                         for (i in 0..ySteps) {
                             val v = maxEco * i / ySteps
                             val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
-                            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+                            drawLine(canvasBorder, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
                             drawAxisText("%.0f".format(v), padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
                         }
 
@@ -453,7 +455,7 @@ fun BowlingAnalyticsTab(
                     Text(name, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     if (wickets.isEmpty()) {
-                        Text("No wickets", color = TextSecondary, fontSize = 12.sp)
+                        Text("No wickets", color = CH.textSecondary, fontSize = 12.sp)
                     } else {
                         wickets.forEachIndexed { index, ball ->
                             val runsSoFar = balls
@@ -471,17 +473,17 @@ fun BowlingAnalyticsTab(
                                 )
                                 Text(
                                     "${ball.overNo}.${ball.ballNo} ov",
-                                    color = TextSecondary, fontSize = 12.sp,
+                                    color = CH.textSecondary, fontSize = 12.sp,
                                     modifier = Modifier.width(56.dp)
                                 )
                                 Text(
                                     "$runsSoFar runs",
-                                    color = TextPrimary, fontSize = 12.sp,
+                                    color = CH.textPrimary, fontSize = 12.sp,
                                     modifier = Modifier.width(64.dp)
                                 )
                                 Text(
                                     ball.wicketType?.replace("_", " ") ?: "out",
-                                    color = TextSecondary, fontSize = 11.sp,
+                                    color = CH.textSecondary, fontSize = 11.sp,
                                     modifier = Modifier.weight(1f), textAlign = TextAlign.End
                                 )
                             }
@@ -510,7 +512,7 @@ fun BowlingAnalyticsTab(
                         StatBox("NB", "$noBalls", ErrorRed, Modifier.weight(1f))
                         StatBox("Byes", "$byes", NeonBlue, Modifier.weight(1f))
                         StatBox("LB", "$legByes", PurpleColor, Modifier.weight(1f))
-                        StatBox("Total", "$totalExtras", TextPrimary, Modifier.weight(1f))
+                        StatBox("Total", "$totalExtras", CH.textPrimary, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -622,14 +624,14 @@ fun SummaryAnalyticsTab(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+                            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
                             .padding(12.dp)
                     ) {
                         Text(name, color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Score", color = TextSecondary, fontSize = 12.sp)
-                            Text("$runs/$wickets ($overs ov)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Score", color = CH.textSecondary, fontSize = 12.sp)
+                            Text("$runs/$wickets ($overs ov)", color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                         SummaryRow("Run Rate", "${"%.2f".format(rr)}")
                         SummaryRow("Fours", "$fours")
@@ -664,7 +666,7 @@ fun SummaryAnalyticsTab(
                         Text("", modifier = Modifier.width(60.dp))
                         Text(inn2Name, color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
                     }
-                    HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 6.dp))
+                    HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 6.dp))
 
                     CompareRow("$inn1Runs", "Runs", "$inn2Runs", inn1Runs > inn2Runs)
                     CompareRow("$inn1Wkts", "Wickets", "$inn2Wkts", inn1Wkts < inn2Wkts)
@@ -684,7 +686,7 @@ fun WormGraph(
     inn1Name: String, inn2Name: String, totalOvers: Int
 ) {
     if (inn1Balls.isEmpty()) {
-        Text("No data yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No data yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -695,6 +697,8 @@ fun WormGraph(
         .coerceAtLeast(1)
     val maxOver = totalOvers
 
+    val canvasBorder = CH.border
+    val canvasTextSec = CH.textSecondary
     Canvas(modifier = Modifier.fillMaxWidth().height(180.dp)) {
         val padLeft = 32.dp.toPx()
         val padBottom = 22.dp.toPx()
@@ -707,7 +711,7 @@ fun WormGraph(
         for (i in 0..ySteps) {
             val v = maxRuns * i / ySteps
             val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
-            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawLine(canvasBorder, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
             drawAxisText("$v", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
         }
 
@@ -716,7 +720,7 @@ fun WormGraph(
         for (ov in 0..maxOver step xStep) {
             val x = padLeft + (ov.toFloat() / maxOver) * graphW
             drawAxisText("$ov", x, size.height - 2.dp.toPx(), 20f)
-            if (ov > 0) drawLine(BorderColor, Offset(x, padTop), Offset(x, padTop + graphH), strokeWidth = 0.3f)
+            if (ov > 0) drawLine(canvasBorder, Offset(x, padTop), Offset(x, padTop + graphH), strokeWidth = 0.3f)
         }
 
         // Inn1 line
@@ -748,12 +752,12 @@ fun WormGraph(
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
-            Text(inn1Name, color = TextSecondary, fontSize = 11.sp)
+            Text(inn1Name, color = CH.textSecondary, fontSize = 11.sp)
         }
         if (inn2Balls.isNotEmpty()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonBlue))
-                Text(inn2Name, color = TextSecondary, fontSize = 11.sp)
+                Text(inn2Name, color = CH.textSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -765,7 +769,7 @@ fun ManhattanChart(
     inn1Name: String, inn2Name: String, totalOvers: Int
 ) {
     if (inn1Balls.isEmpty()) {
-        Text("No data yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No data yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -777,6 +781,8 @@ fun ManhattanChart(
         .coerceAtLeast(inn2OverRuns.values.maxOrNull() ?: 0) + 2).coerceAtLeast(1)
     val overCount = (maxOverIdx + 1).coerceAtLeast(1)
 
+    val canvasBorder = CH.border
+    val canvasTextSec = CH.textSecondary
     Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
         val padLeft = 28.dp.toPx()
         val padBottom = 22.dp.toPx()
@@ -789,7 +795,7 @@ fun ManhattanChart(
         for (i in 0..ySteps) {
             val v = maxRuns * i / ySteps
             val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
-            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawLine(canvasBorder, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
             drawAxisText("$v", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
         }
 
@@ -832,12 +838,12 @@ fun ManhattanChart(
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.size(10.dp).background(NeonGreen, RoundedCornerShape(2.dp)))
-            Text(inn1Name, color = TextSecondary, fontSize = 11.sp)
+            Text(inn1Name, color = CH.textSecondary, fontSize = 11.sp)
         }
         if (inn2Balls.isNotEmpty()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(modifier = Modifier.size(10.dp).background(NeonBlue, RoundedCornerShape(2.dp)))
-                Text(inn2Name, color = TextSecondary, fontSize = 11.sp)
+                Text(inn2Name, color = CH.textSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -851,7 +857,7 @@ fun RunRateGraph(
     inn1Name: String, inn2Name: String, totalOvers: Int
 ) {
     if (inn1Balls.isEmpty()) {
-        Text("No data yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No data yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -866,6 +872,8 @@ fun RunRateGraph(
     val maxRR = ((inn1RR.maxOfOrNull { it.second } ?: 6f)
         .coerceAtLeast(inn2RR.maxOfOrNull { it.second } ?: 0f) + 2f).coerceAtLeast(2f)
 
+    val canvasBorder = CH.border
+    val canvasTextSec = CH.textSecondary
     Canvas(modifier = Modifier.fillMaxWidth().height(170.dp)) {
         val padLeft = 32.dp.toPx()
         val padBottom = 22.dp.toPx()
@@ -878,7 +886,7 @@ fun RunRateGraph(
         for (i in 0..ySteps) {
             val v = maxRR * i / ySteps
             val y = padTop + graphH - (i.toFloat() / ySteps) * graphH
-            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawLine(canvasBorder, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
             drawAxisText("%.0f".format(v), padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
         }
 
@@ -916,12 +924,12 @@ fun RunRateGraph(
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
-            Text(inn1Name, color = TextSecondary, fontSize = 11.sp)
+            Text(inn1Name, color = CH.textSecondary, fontSize = 11.sp)
         }
         if (inn2Balls.isNotEmpty()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonBlue))
-                Text(inn2Name, color = TextSecondary, fontSize = 11.sp)
+                Text(inn2Name, color = CH.textSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -938,7 +946,7 @@ fun WicketProgressionGraph(
     val inn2Wkts = inn2Balls.filter { it.isRealWicket() }
 
     if (inn1Wkts.isEmpty() && inn2Wkts.isEmpty()) {
-        Text("No wickets yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No wickets yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -962,6 +970,8 @@ fun WicketProgressionGraph(
         .coerceAtLeast(inn2Pts.maxOfOrNull { it.second } ?: 0)
         .coerceAtLeast(1)
 
+    val canvasBorder = CH.border
+    val canvasTextSec = CH.textSecondary
     Canvas(modifier = Modifier.fillMaxWidth().height(160.dp)) {
         val padLeft = 24.dp.toPx()
         val padBottom = 22.dp.toPx()
@@ -972,7 +982,7 @@ fun WicketProgressionGraph(
         // Y grid (wicket count)
         for (i in 0..maxWkts) {
             val y = padTop + graphH - (i.toFloat() / maxWkts) * graphH
-            drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
+            drawLine(canvasBorder, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.5f)
             drawAxisText("$i", padLeft - 4.dp.toPx(), y + 4.dp.toPx(), 20f, align = android.graphics.Paint.Align.RIGHT)
         }
 
@@ -1030,12 +1040,12 @@ fun WicketProgressionGraph(
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
-            Text(inn1Name, color = TextSecondary, fontSize = 11.sp)
+            Text(inn1Name, color = CH.textSecondary, fontSize = 11.sp)
         }
         if (inn2Wkts.isNotEmpty()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonBlue))
-                Text(inn2Name, color = TextSecondary, fontSize = 11.sp)
+                Text(inn2Name, color = CH.textSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -1053,7 +1063,7 @@ fun PhaseAnalysisChart(
     val p2 = inn2Balls.filter { it.inningsPhase == phase }
 
     if (p1.isEmpty() && p2.isEmpty()) {
-        Text("No $phaseLabel data yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No $phaseLabel data yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -1087,7 +1097,7 @@ fun PhaseAnalysisChart(
             StatBox("Runs", "$runs", NeonGreen, Modifier.weight(1f))
             StatBox("Wkts", "$wkts", ErrorRed, Modifier.weight(1f))
             StatBox("RR", "${"%.1f".format(rr)}", NeonBlue, Modifier.weight(1f))
-            StatBox("Dots", "$dots", TextSecondary, Modifier.weight(1f))
+            StatBox("Dots", "$dots", CH.textSecondary, Modifier.weight(1f))
             StatBox("Bdry", "$bdry", AmberColor, Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(6.dp))
@@ -1096,6 +1106,8 @@ fun PhaseAnalysisChart(
         val overStats = phaseOverStats(balls)
         if (overStats.isNotEmpty()) {
             val maxR = (overStats.maxOfOrNull { it.runs } ?: 1).coerceAtLeast(1)
+            val canvasBorder = CH.border
+            val canvasTextSec = CH.textSecondary
             Canvas(modifier = Modifier.fillMaxWidth().height(90.dp)) {
                 val padLeft = 22.dp.toPx()
                 val padBottom = 18.dp.toPx()
@@ -1109,7 +1121,7 @@ fun PhaseAnalysisChart(
                 // Y labels
                 for (i in listOf(0, maxR / 2, maxR)) {
                     val y = padTop + graphH - (i.toFloat() / maxR) * graphH
-                    drawLine(BorderColor, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.3f)
+                    drawLine(canvasBorder, Offset(padLeft, y), Offset(size.width, y), strokeWidth = 0.3f)
                     drawAxisText("$i", padLeft - 3.dp.toPx(), y + 4.dp.toPx(), 18f, align = android.graphics.Paint.Align.RIGHT)
                 }
 
@@ -1157,7 +1169,7 @@ fun PartnershipGraph(
     val inn2P = computePartnerships(inn2Balls)
 
     if (inn1P.isEmpty() && inn2P.isEmpty()) {
-        Text("No partnership data yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No partnership data yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -1176,7 +1188,7 @@ fun PartnershipGraph(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(label, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.width(32.dp))
+                Text(label, color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.width(32.dp))
                 Box(
                     modifier = Modifier
                         .height(18.dp)
@@ -1197,7 +1209,7 @@ fun WinProbabilityGraph(
     inn1Name: String, inn2Name: String, totalOvers: Int
 ) {
     if (inn2Balls.isEmpty() || inn1Balls.isEmpty()) {
-        Text("Win probability available after both innings start", color = TextSecondary, fontSize = 12.sp)
+        Text("Win probability available after both innings start", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -1234,7 +1246,7 @@ fun WinProbabilityGraph(
     }
 
     if (probPoints.isEmpty()) {
-        Text("No data yet", color = TextSecondary, fontSize = 12.sp)
+        Text("No data yet", color = CH.textSecondary, fontSize = 12.sp)
         return
     }
 
@@ -1242,10 +1254,12 @@ fun WinProbabilityGraph(
 
     Text(
         "Current: $inn2Name ${"%.0f".format(currentProb * 100)}% | $inn1Name ${"%.0f".format((1 - currentProb) * 100)}%",
-        color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold
+        color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold
     )
     Spacer(modifier = Modifier.height(8.dp))
 
+    val canvasBorder = CH.border
+    val canvasTextSec = CH.textSecondary
     Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
         val padLeft = 30.dp.toPx()
         val padBottom = 22.dp.toPx()
@@ -1258,7 +1272,7 @@ fun WinProbabilityGraph(
             val frac = pct / 100f
             val y = padTop + graphH - frac * graphH
             drawLine(
-                if (pct == 50) TextSecondary.copy(alpha = 0.5f) else BorderColor,
+                if (pct == 50) canvasTextSec.copy(alpha = 0.5f) else canvasBorder,
                 Offset(padLeft, y), Offset(size.width, y),
                 strokeWidth = if (pct == 50) 1f else 0.5f
             )
@@ -1293,7 +1307,7 @@ fun WinProbabilityGraph(
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.size(12.dp, 3.dp).background(NeonGreen))
-            Text("$inn2Name win %", color = TextSecondary, fontSize = 11.sp)
+            Text("$inn2Name win %", color = CH.textSecondary, fontSize = 11.sp)
         }
     }
 }
@@ -1306,12 +1320,12 @@ fun AnalyticsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceCard)
-            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+            .background(CH.surface)
+            .border(1.dp, CH.border, RoundedCornerShape(12.dp))
             .padding(14.dp)
     ) {
-        Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 8.dp))
+        Text(title, color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        HorizontalDivider(color = CH.border, modifier = Modifier.padding(vertical = 8.dp))
         content()
     }
 }
@@ -1321,13 +1335,13 @@ fun StatBox(label: String, value: String, color: Color, modifier: Modifier = Mod
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
-            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
+            .border(1.dp, CH.border, RoundedCornerShape(8.dp))
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(value, color = color, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        Text(label, color = TextSecondary, fontSize = 10.sp, textAlign = TextAlign.Center)
+        Text(label, color = CH.textSecondary, fontSize = 10.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -1337,8 +1351,8 @@ fun SummaryRow(label: String, value: String) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = TextSecondary, fontSize = 12.sp)
-        Text(value, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = CH.textSecondary, fontSize = 12.sp)
+        Text(value, color = CH.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -1350,13 +1364,13 @@ fun CompareRow(val1: String, label: String, val2: String, val1Better: Boolean) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            val1, color = if (val1Better) NeonGreen else TextPrimary,
+            val1, color = if (val1Better) NeonGreen else CH.textPrimary,
             fontSize = 13.sp, fontWeight = if (val1Better) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
-        Text(label, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+        Text(label, color = CH.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
         Text(
-            val2, color = if (!val1Better) NeonGreen else TextPrimary,
+            val2, color = if (!val1Better) NeonGreen else CH.textPrimary,
             fontSize = 13.sp, fontWeight = if (!val1Better) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.weight(1f), textAlign = TextAlign.End
         )

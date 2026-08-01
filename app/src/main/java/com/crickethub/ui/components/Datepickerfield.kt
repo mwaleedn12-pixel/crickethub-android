@@ -40,12 +40,12 @@ fun DatePickerField(
             .fillMaxWidth()
             .clickable { showPicker = true },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = TextPrimary,
-            unfocusedTextColor = TextPrimary,
+            focusedTextColor = CH.textPrimary,
+            unfocusedTextColor = CH.textPrimary,
             focusedBorderColor = NeonGreen,
-            unfocusedBorderColor = BorderColor,
+            unfocusedBorderColor = CH.border,
             focusedLabelColor = NeonGreen,
-            unfocusedLabelColor = TextSecondary,
+            unfocusedLabelColor = CH.textSecondary,
             cursorColor = NeonGreen
         )
     )
@@ -82,21 +82,21 @@ fun DatePickerField(
             },
             dismissButton = {
                 TextButton(onClick = { showPicker = false }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = CH.textSecondary)
                 }
             },
             colors = DatePickerDefaults.colors(
-                containerColor = Color(0xFF0D2018),
-                titleContentColor = TextPrimary,
+                containerColor = CH.surface,
+                titleContentColor = CH.textPrimary,
                 headlineContentColor = NeonGreen,
-                weekdayContentColor = TextSecondary,
-                subheadContentColor = TextSecondary,
-                navigationContentColor = TextPrimary,
-                yearContentColor = TextPrimary,
+                weekdayContentColor = CH.textSecondary,
+                subheadContentColor = CH.textSecondary,
+                navigationContentColor = CH.textPrimary,
+                yearContentColor = CH.textPrimary,
                 currentYearContentColor = NeonGreen,
                 selectedYearContainerColor = NeonGreen,
                 selectedYearContentColor = Color.Black,
-                dayContentColor = TextPrimary,
+                dayContentColor = CH.textPrimary,
                 selectedDayContainerColor = NeonGreen,
                 selectedDayContentColor = Color.Black,
                 todayContentColor = NeonGreen,

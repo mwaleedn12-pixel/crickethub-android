@@ -62,15 +62,15 @@ fun AllPlayersScreen(
 
     Column(
         modifier = Modifier.fillMaxSize()
-            .background(if (isSystemInDarkTheme()) Color(0xFF030F08) else Color(0xFFF0FDF8))
+            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
     ) {
         // Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Players", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.weight(1f))
-            Text("${allPlayers.size} total", color = TextSecondary, fontSize = 12.sp)
+            Text("Players", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary, modifier = Modifier.weight(1f))
+            Text("${allPlayers.size} total", color = CH.textSecondary, fontSize = 12.sp)
         }
 
         // Search
@@ -83,13 +83,13 @@ fun AllPlayersScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary,
+                focusedTextColor = CH.textPrimary,
+                unfocusedTextColor = CH.textPrimary,
                 focusedBorderColor = NeonGreen,
-                unfocusedBorderColor = BorderColor,
+                unfocusedBorderColor = CH.border,
                 cursorColor = NeonGreen,
                 focusedLeadingIconColor = NeonGreen,
-                unfocusedLeadingIconColor = TextSecondary
+                unfocusedLeadingIconColor = CH.textSecondary
             )
         )
 
@@ -105,9 +105,9 @@ fun AllPlayersScreen(
         if (allPlayers.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Person, null, tint = TextSecondary, modifier = Modifier.size(48.dp))
-                    Text("No players yet", color = TextSecondary, fontSize = 14.sp)
-                    Text("Add players to your teams first", color = TextSecondary, fontSize = 12.sp)
+                    Icon(Icons.Default.Person, null, tint = CH.textSecondary, modifier = Modifier.size(48.dp))
+                    Text("No players yet", color = CH.textSecondary, fontSize = 14.sp)
+                    Text("Add players to your teams first", color = CH.textSecondary, fontSize = 12.sp)
                 }
             }
             return@Column
@@ -139,7 +139,7 @@ fun AllPlayersScreen(
                             team?.name ?: "No Team",
                             color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold
                         )
-                        Text("(${players.size})", color = TextSecondary, fontSize = 11.sp)
+                        Text("(${players.size})", color = CH.textSecondary, fontSize = 11.sp)
                     }
                 }
 
@@ -148,8 +148,8 @@ fun AllPlayersScreen(
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSystemInDarkTheme()) Color(0xFF0D2018) else Color(0xFFFFFFFF))
-                            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
+                            .border(1.dp, CH.border, RoundedCornerShape(10.dp))
                             .clickable { onPlayerClick(player.id) }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -168,7 +168,7 @@ fun AllPlayersScreen(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                player.fullName, color = TextPrimary,
+                                player.fullName, color = CH.textPrimary,
                                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis
                             )
@@ -178,7 +178,7 @@ fun AllPlayersScreen(
                                         "batsman" -> NeonBlue; "bowler" -> ErrorRed
                                         "allrounder", "all-rounder" -> NeonGreen
                                         "wicketkeeper", "wicket keeper" -> AmberColor
-                                        else -> TextSecondary
+                                        else -> CH.textSecondary
                                     }
                                     Text(
                                         role.replaceFirstChar { it.uppercase() },
@@ -186,7 +186,7 @@ fun AllPlayersScreen(
                                     )
                                 }
                                 player.battingHand?.let {
-                                    Text("• ${it.take(1).uppercase()}HB", color = TextSecondary, fontSize = 11.sp)
+                                    Text("• ${it.take(1).uppercase()}HB", color = CH.textSecondary, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -198,7 +198,7 @@ fun AllPlayersScreen(
             if (filtered.isEmpty() && searchQuery.isNotBlank()) {
                 item {
                     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("No players match \"$searchQuery\"", color = TextSecondary, fontSize = 13.sp)
+                        Text("No players match \"$searchQuery\"", color = CH.textSecondary, fontSize = 13.sp)
                     }
                 }
             }

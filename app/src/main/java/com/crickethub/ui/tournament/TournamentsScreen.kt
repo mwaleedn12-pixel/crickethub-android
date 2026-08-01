@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,12 +39,10 @@ fun TournamentsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isDark = isSystemInDarkTheme()
 
-    val bg     = if (isDark) Color(0xFF030F08) else Color(0xFFF0FDF8)
-    val hdrBg  = if (isDark) Color(0xFF071610) else Color(0xFFECFDF5)
-    val textP  = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS  = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val hdrBg  = if (isDark) Color(0xFF111111) else Color(0xFFF0ECE2)
+    val textP  = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS  = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
     val green  = Color(0xFF34D399)
-    val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
 
     LaunchedEffect(Unit) { viewModel.loadTournaments() }
 
@@ -95,7 +94,7 @@ fun TournamentsScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(uiState.tournaments) { tournament ->
                         TournamentCard(
@@ -112,6 +111,9 @@ fun TournamentsScreen(
     }
 }
 
+// ── 1-line professional tournament card ──────────────────────────────────────
+// Single row: [🏆 Name · Format] ······ [Status] [⋮]
+// Clean, compact, no multi-section bloat.
 @Composable
 fun TournamentCard(
     tournament: Tournament,
@@ -123,6 +125,7 @@ fun TournamentCard(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
+
     if (showShareDialog) {
         ShareDialog(
             resourceType = "tournament",
@@ -146,136 +149,106 @@ fun TournamentCard(
             }
         )
     }
+
     val green   = Color(0xFF34D399)
     val greenDk = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
-    val surface = if (isDark) Color(0xFF0D2018) else Color(0xFFFFFFFF)
-    val border  = if (isDark) Color(0xFF1A3828) else Color(0xFFD1FAE5)
-    val textP   = if (isDark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-    val textS   = if (isDark) Color(0xFF6EE7B7) else Color(0xFF6B7280)
+    val surface = if (isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
+    val border  = if (isDark) Color(0xFF262626) else Color(0xFFE6DDC8)
+    val textP   = if (isDark) Color(0xFFF2F2F0) else Color(0xFF2B2620)
+    val textS   = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
     val gold    = Color(0xFFF59E0B)
     val isLive  = tournament.status == "active" || tournament.status == "live"
 
-    Box(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+    val statusColor = when (tournament.status) {
+        "active", "live" -> green
+        "completed" -> greenDk
+        "cancelled" -> Color(0xFFEF4444)
+        else -> gold
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .background(surface)
-            .border(if (isLive) 1.5.dp else 1.dp, if (isLive) green.copy(alpha = 0.5f) else border, RoundedCornerShape(16.dp))
+            .border(
+                if (isLive) 1.5.dp else 1.dp,
+                if (isLive) green.copy(alpha = 0.4f) else border,
+                RoundedCornerShape(12.dp)
+            )
             .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (isLive) {
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp)
-                .background(Brush.horizontalGradient(listOf(Color.Transparent, green, Color.Transparent))))
+        // Trophy icon — small circle
+        Box(
+            modifier = Modifier.size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(gold.copy(alpha = if (isDark) 0.12f else 0.08f)),
+            contentAlignment = Alignment.Center
+        ) { Text("🏆", fontSize = 16.sp) }
+
+        // Name + format on one line
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                tournament.name,
+                color = textP, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val details = buildList {
+                    tournament.format?.let { add(it) }
+                    tournament.matchType?.let { add(it) }
+                    tournament.venue?.let { add(it) }
+                }
+                if (details.isNotEmpty()) {
+                    Text(
+                        details.joinToString("  ·  "),
+                        color = textS, fontSize = 11.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Trophy icon
-                    Box(
-                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp))
-                            .background(gold.copy(alpha = if (isDark) 0.15f else 0.1f))
-                            .border(1.dp, gold.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) { Text("🏆", fontSize = 22.sp) }
 
-                    Column {
-                        Text(tournament.name, color = textP, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text(tournament.format ?: "T20", color = textS, fontSize = 11.sp)
-                    }
-                }
-                // Status badge
-                val statusColor = when (tournament.status) {
-                    "active", "live" -> green
-                    "completed" -> greenDk
-                    else -> gold
-                }
-                Box(
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                        .background(statusColor.copy(alpha = if (isDark) 0.15f else 0.1f))
-                        .border(0.5.dp, statusColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        (tournament.status ?: "upcoming").replaceFirstChar { it.uppercase() },
-                        color = statusColor, fontSize = 10.sp, fontWeight = FontWeight.Bold
-                    )
-                }
-                // ⋮ overflow menu
-                Box {
-                    Box(
-                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
-                            .clickable { showMenu = true },
-                        contentAlignment = Alignment.Center
-                    ) { Text("\u22EE", color = textS, fontSize = 18.sp) }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF0D2018) else Color.White)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("📤 Share", color = green, fontSize = 13.sp) },
-                            onClick = { showMenu = false; showShareDialog = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("\uD83C\uDFF3\uFE0F Cancel Tournament", color = gold, fontSize = 13.sp) },
-                            onClick = { showMenu = false; onCancel() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("\uD83D\uDDD1\uFE0F Delete Tournament", color = Color(0xFFEF4444), fontSize = 13.sp) },
-                            onClick = { showMenu = false; showDeleteConfirm = true }
-                        )
-                    }
-                }
-            }
+        // Status badge — compact
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(statusColor.copy(alpha = if (isDark) 0.12f else 0.08f))
+                .border(0.5.dp, statusColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+            Text(
+                (tournament.status ?: "upcoming").replaceFirstChar { it.uppercase() },
+                color = statusColor, fontSize = 10.sp, fontWeight = FontWeight.Bold
+            )
+        }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Stats row
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                listOf(
-                    "Teams" to (tournament.maxTeams?.toString() ?: "-"),
-                    "Overs" to (tournament.oversPerMatch?.toString() ?: "20"),
-                    "Format" to (tournament.matchType ?: "T20")
-                ).forEach { (label, value) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(value, color = textP, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Text(label, color = textS, fontSize = 10.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Progress bar
-            val progress = 0f  // updated when match data available
-
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Status", color = textS, fontSize = 11.sp)
-                    Text(
-                        buildString {
-                            tournament.startDate?.let { append("From $it") } ?: append("No date set")
-                        },
-                        color = textS, fontSize = 11.sp
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp))
-                    .background(if (isDark) Color(0xFF122A1E) else Color(0xFFD1FAE5))) {
-                    Box(modifier = Modifier.fillMaxWidth(progress).fillMaxHeight()
-                        .background(Brush.horizontalGradient(listOf(green, Color(0xFF6EE7B7)))))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // View button
+        // ⋮ overflow menu
+        Box {
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                    .background(greenDk.copy(alpha = if (isDark) 0.12f else 0.1f))
-                    .border(1.dp, greenDk.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                    .clickable { onClick() }.padding(vertical = 9.dp),
+                modifier = Modifier.size(26.dp).clip(RoundedCornerShape(6.dp))
+                    .clickable { showMenu = true },
                 contentAlignment = Alignment.Center
+            ) { Text("\u22EE", color = textS, fontSize = 16.sp) }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                modifier = Modifier.background(if (isDark) Color(0xFF161616) else Color.White)
             ) {
-                Text("View Tournament →", color = greenDk, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                DropdownMenuItem(
+                    text = { Text("📤 Share", color = green, fontSize = 13.sp) },
+                    onClick = { showMenu = false; showShareDialog = true }
+                )
+                DropdownMenuItem(
+                    text = { Text("\uD83C\uDFF3\uFE0F Cancel", color = gold, fontSize = 13.sp) },
+                    onClick = { showMenu = false; onCancel() }
+                )
+                DropdownMenuItem(
+                    text = { Text("\uD83D\uDDD1\uFE0F Delete", color = Color(0xFFEF4444), fontSize = 13.sp) },
+                    onClick = { showMenu = false; showDeleteConfirm = true }
+                )
             }
         }
     }
