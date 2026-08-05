@@ -167,13 +167,51 @@ class MatchViewModel : ViewModel() {
     fun abandonMatch(matchId: String) {
         viewModelScope.launch {
             try {
+                // Find the match to check if it's a tournament match
+                val match = _uiState.value.matches.find { it.id == matchId }
+
                 SupabaseClient.client.postgrest["matches"]
                     .update({
                         set("status", "abandoned")
-                        set("result_text", "Match Abandoned")
+                        set("result_type", "no_result")
+                        set("result_text", "Match Abandoned — No Result")
                     }) {
                         filter { eq("id", matchId) }
                     }
+
+                // If tournament match → award 1 point each, +1 noResults, +1 matchesPlayed
+                val tournamentId = match?.tournamentId
+                if (!tournamentId.isNullOrBlank() && match.team1Id.isNotBlank() && match.team2Id.isNotBlank()) {
+                    listOf(match.team1Id, match.team2Id).forEach { teamId ->
+                        try {
+                            val entry = SupabaseClient.client.postgrest["tournament_teams"]
+                                .select {
+                                    filter {
+                                        eq("tournament_id", tournamentId)
+                                        eq("team_id", teamId)
+                                    }
+                                }
+                                .decodeSingleOrNull<com.crickethub.data.model.TournamentTeam>()
+
+                            if (entry != null) {
+                                SupabaseClient.client.postgrest["tournament_teams"]
+                                    .update({
+                                        set("points", entry.points + 1)
+                                        set("matches_played", entry.matchesPlayed + 1)
+                                        set("no_results", entry.noResults + 1)
+                                    }) {
+                                        filter {
+                                            eq("tournament_id", tournamentId)
+                                            eq("team_id", teamId)
+                                        }
+                                    }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("CricketHub", "No Result points error for $teamId: ${e.message}")
+                        }
+                    }
+                }
+
                 loadMatches()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }

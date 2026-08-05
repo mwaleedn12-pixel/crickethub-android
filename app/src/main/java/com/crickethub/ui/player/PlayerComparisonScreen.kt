@@ -2,6 +2,7 @@ package com.crickethub.ui.player
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -142,7 +143,7 @@ fun PlayerComparisonScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(CH.bg)
+
                                     .border(1.dp, CH.border, RoundedCornerShape(8.dp))
                                     .clickable {
                                         if (pickingSlot == 1) player1 = player else player2 = player
@@ -192,97 +193,98 @@ fun PlayerComparisonScreen(
     }
 
     // ── UI ──
-    Column(
-        modifier = Modifier.fillMaxSize()
-            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, "Back", tint = CH.textPrimary)
-            }
-            Text("Player Comparison", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary)
-        }
-
-        // Player slots
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            PlayerSlot(
-                player = player1,
-                team = allTeams.find { it.id == player1?.teamId },
-                color = NeonGreen,
-                label = "Player 1",
-                modifier = Modifier.weight(1f),
-                onClick = { pickingSlot = 1 }
-            )
-            PlayerSlot(
-                player = player2,
-                team = allTeams.find { it.id == player2?.teamId },
-                color = NeonBlue,
-                label = "Player 2",
-                modifier = Modifier.weight(1f),
-                onClick = { pickingSlot = 2 }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (isLoading || statsLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
-            }
-            return@Column
-        }
-
-        if (stats1 == null || stats2 == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Person, null, tint = CH.textSecondary, modifier = Modifier.size(48.dp))
-                    Text("Select two players to compare", color = CH.textSecondary, fontSize = 14.sp)
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, "Back", tint = CH.textPrimary)
                 }
+                Text("Player Comparison", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary)
             }
-            return@Column
-        }
 
-        // Tabs
-        ScrollableTabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = CH.surface,
-            contentColor = NeonGreen,
-            edgePadding = 0.dp
-        ) {
-            tabs.forEachIndexed { idx, tab ->
-                Tab(
-                    selected = selectedTab == idx,
-                    onClick = { selectedTab = idx },
-                    text = {
-                        Text(
-                            tab, fontSize = 13.sp,
-                            fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == idx) NeonGreen else CH.textSecondary
-                        )
-                    }
+            // Player slots
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                PlayerSlot(
+                    player = player1,
+                    team = allTeams.find { it.id == player1?.teamId },
+                    color = NeonGreen,
+                    label = "Player 1",
+                    modifier = Modifier.weight(1f),
+                    onClick = { pickingSlot = 1 }
+                )
+                PlayerSlot(
+                    player = player2,
+                    team = allTeams.find { it.id == player2?.teamId },
+                    color = NeonBlue,
+                    label = "Player 2",
+                    modifier = Modifier.weight(1f),
+                    onClick = { pickingSlot = 2 }
                 )
             }
-        }
 
-        val s1 = stats1!!
-        val s2 = stats2!!
-        val n1 = player1!!.fullName
-        val n2 = player2!!.fullName
+            Spacer(modifier = Modifier.height(8.dp))
 
-        when (selectedTab) {
-            0 -> BattingComparisonTab(s1, s2, n1, n2)
-            1 -> BowlingComparisonTab(s1, s2, n1, n2)
-            2 -> FieldingComparisonTab(s1, s2, n1, n2)
-            3 -> RadarComparisonTab(s1, s2, n1, n2)
+            if (isLoading || statsLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+                return@Column
+            }
+
+            if (stats1 == null || stats2 == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Person, null, tint = CH.textSecondary, modifier = Modifier.size(48.dp))
+                        Text("Select two players to compare", color = CH.textSecondary, fontSize = 14.sp)
+                    }
+                }
+                return@Column
+            }
+
+            // Tabs
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = CH.surface,
+                contentColor = NeonGreen,
+                edgePadding = 0.dp
+            ) {
+                tabs.forEachIndexed { idx, tab ->
+                    Tab(
+                        selected = selectedTab == idx,
+                        onClick = { selectedTab = idx },
+                        text = {
+                            Text(
+                                tab, fontSize = 13.sp,
+                                fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == idx) NeonGreen else CH.textSecondary
+                            )
+                        }
+                    )
+                }
+            }
+
+            val s1 = stats1!!
+            val s2 = stats2!!
+            val n1 = player1!!.fullName
+            val n2 = player2!!.fullName
+
+            when (selectedTab) {
+                0 -> BattingComparisonTab(s1, s2, n1, n2)
+                1 -> BowlingComparisonTab(s1, s2, n1, n2)
+                2 -> FieldingComparisonTab(s1, s2, n1, n2)
+                3 -> RadarComparisonTab(s1, s2, n1, n2)
+            }
         }
-    }
+    } // CricketAnimatedBackground
 }
 
 // ── PLAYER SLOT ──────────────────────────────────────────────

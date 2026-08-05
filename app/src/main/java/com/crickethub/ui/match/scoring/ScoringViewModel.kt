@@ -407,8 +407,31 @@ class ScoringViewModel : ViewModel() {
                 balls.forEach { ball -> ballStack.addLast(ball) }
 
                 val firstInnings = allInnings.find { it.inningsNo == 1 }
-                if (liveInnings.inningsNo == 2 && firstInnings != null) {
+                val isTest = match.matchType == "Test"
+                if (!isTest && liveInnings.inningsNo == 2 && firstInnings != null) {
                     target = firstInnings.totalRuns + 1
+                } else if (isTest && liveInnings.inningsNo == 4) {
+                    // Test 4th innings: chase target = team1 combined - team2 first innings + 1
+                    val inn1 = allInnings.find { it.inningsNo == 1 }
+                    val inn2 = allInnings.find { it.inningsNo == 2 }
+                    val inn3 = allInnings.find { it.inningsNo == 3 }
+                    if (inn1 != null && inn2 != null && inn3 != null) {
+                        target = (inn1.totalRuns + inn3.totalRuns) - inn2.totalRuns + 1
+                    }
+                } else if (isTest) {
+                    target = null // Test innings 1/2/3: no target
+                }
+
+                // Compute Test lead/trail
+                var testLT = 0
+                if (isTest && liveInnings.inningsNo >= 2) {
+                    val inn1 = allInnings.find { it.inningsNo == 1 }
+                    val inn2 = allInnings.find { it.inningsNo == 2 }
+                    val inn3 = allInnings.find { it.inningsNo == 3 }
+                    val team1Runs = (inn1?.totalRuns ?: 0) + (if (liveInnings.inningsNo == 3) liveInnings.totalRuns else (inn3?.totalRuns ?: 0))
+                    val team2Runs = (inn2?.totalRuns ?: 0) + (if (liveInnings.inningsNo == 2 || liveInnings.inningsNo == 4) liveInnings.totalRuns else 0)
+                    // Positive = batting team leads
+                    testLT = if (liveInnings.inningsNo % 2 == 1) team1Runs - team2Runs else team2Runs - team1Runs
                 }
 
                 isMatchLoaded = true; currentMatchId = matchId
@@ -422,6 +445,7 @@ class ScoringViewModel : ViewModel() {
                     batsmanStats = batsmanStats, bowlerStats = bowlerStats,
                     battingTeamName = batName, bowlingTeamName = bowlName, tournamentName = tourName,
                     target = target,
+                    testLeadTrail = testLT,
                     inningsComplete = false, matchComplete = false, error = null) }
 
                 android.util.Log.d("CricketHub", "resumeMatch: ${liveInnings.totalRuns}/${liveInnings.totalWickets} " +
@@ -464,8 +488,22 @@ class ScoringViewModel : ViewModel() {
                     // set chase target for 2nd innings / super-over chase before delegating
                     val firstInn = allInnings.find { it.inningsNo == 1 }
                     val prevOdd = allInnings.find { it.inningsNo == currentInnings.inningsNo - 1 }
+                    val isTest = match.matchType == "Test"
                     target = when {
+                        // Test: no target for innings 1/2/3
+                        isTest && currentInnings.inningsNo <= 3 -> null
+                        // Test 4th innings: chase = team1 combined - team2 first + 1
+                        isTest && currentInnings.inningsNo == 4 -> {
+                            val inn1 = allInnings.find { it.inningsNo == 1 }
+                            val inn2 = allInnings.find { it.inningsNo == 2 }
+                            val inn3 = allInnings.find { it.inningsNo == 3 }
+                            if (inn1 != null && inn2 != null && inn3 != null)
+                                (inn1.totalRuns + inn3.totalRuns) - inn2.totalRuns + 1
+                            else null
+                        }
+                        // Limited-overs 2nd innings
                         currentInnings.inningsNo == 2 && firstInn != null -> firstInn.totalRuns + 1
+                        // Super over chase
                         currentInnings.inningsNo >= 4 && currentInnings.inningsNo % 2 == 0 && prevOdd != null -> prevOdd.totalRuns + 1
                         else -> null
                     }
@@ -480,6 +518,15 @@ class ScoringViewModel : ViewModel() {
                 // Only decide match-complete when NOTHING is live. Super-over creation and
                 // repeat/tie decisions are owned by checkAndStartNextInnings, not here.
                 if (completedInnings.size >= 2 && currentInnings == null) {
+                    val isTestHere = match.matchType == "Test"
+                    // Test with 2+ completed and no live → might need 3rd/4th innings
+                    if (isTestHere) {
+                        inningsCompleteHandled = false
+                        checkAndStartNextInnings(matchId) {
+                            _uiState.update { it.copy(isLoading = false, matchComplete = true) }
+                        }
+                        return@launch
+                    }
                     val superOverInnings = allInnings.filter { it.inningsNo >= 3 }
                     // A super over is live? set its chase target and fall through to load it.
                     val superOverLive = superOverInnings.find { it.status == "live" }
@@ -523,11 +570,14 @@ class ScoringViewModel : ViewModel() {
                 }
                 val firstInnings = allInnings.find { it.inningsNo == 1 }
                 val thirdInnings = allInnings.find { it.inningsNo == 3 }
-                target = when {
-                    currentInnings?.inningsNo == 4 && thirdInnings != null -> thirdInnings.totalRuns + 1
-                    firstInnings != null && firstInnings.status == "completed" &&
-                            (currentInnings?.inningsNo == 2 || allInnings.count { it.status == "completed" } == 1) -> firstInnings.totalRuns + 1
-                    else -> null
+                val isTest2 = match.matchType == "Test"
+                if (!isTest2) {
+                    target = when {
+                        currentInnings?.inningsNo == 4 && thirdInnings != null -> thirdInnings.totalRuns + 1
+                        firstInnings != null && firstInnings.status == "completed" &&
+                                (currentInnings?.inningsNo == 2 || allInnings.count { it.status == "completed" } == 1) -> firstInnings.totalRuns + 1
+                        else -> null
+                    }
                 }
                 val battingTeamId: String; val bowlingTeamId: String
                 when {
@@ -595,19 +645,44 @@ class ScoringViewModel : ViewModel() {
 
                 // ---- MAIN MATCH (innings 1 & 2) ----
                 if (completed.size == 1) {
-                    // start 2nd innings, chasing 1st
+                    // start 2nd innings
                     val first = completed.first()
-                    startInnings(2, first.bowlingTeamId, first.battingTeamId, first.totalRuns + 1)
+                    val isTest = match.matchType == "Test"
+                    // Test: no target in 2nd innings (both teams bat freely)
+                    val chaseTarget = if (isTest) null else first.totalRuns + 1
+                    startInnings(2, first.bowlingTeamId, first.battingTeamId, chaseTarget)
                     return@launch
                 }
                 if (completed.size == 2) {
-                    if (mainTied && match.superOverEnabled) {
-                        // Super over 1: team that batted SECOND bats first (innings 3).
+                    val isTest = match.matchType == "Test"
+                    if (isTest) {
+                        // Test: start 3rd innings — team that batted 1st bats again
+                        // No target in 3rd innings
+                        startInnings(3, inn1!!.battingTeamId, inn1.bowlingTeamId, null)
+                    } else if (mainTied && match.superOverEnabled) {
                         startInnings(3, inn2!!.battingTeamId, inn2.bowlingTeamId, null)
                     } else {
                         inningsCompleteHandled = false
-                        onMatchComplete()  // decided on runs
+                        onMatchComplete()
                     }
+                    return@launch
+                }
+                if (completed.size == 3) {
+                    val isTest = match.matchType == "Test"
+                    if (isTest) {
+                        // Test: start 4th innings — team that batted 2nd chases
+                        val inn3 = allInnings.find { it.inningsNo == 3 }
+                        val team1Total = (inn1?.totalRuns ?: 0) + (inn3?.totalRuns ?: 0)
+                        val team2Total = inn2?.totalRuns ?: 0
+                        val targetFor4th = team1Total - team2Total + 1
+                        startInnings(4, inn2!!.battingTeamId, inn2.bowlingTeamId, targetFor4th)
+                        return@launch
+                    }
+                }
+                if (completed.size == 4 && match.matchType == "Test") {
+                    // Test: 4th innings done = match over
+                    inningsCompleteHandled = false
+                    onMatchComplete()
                     return@launch
                 }
 
@@ -749,16 +824,14 @@ class ScoringViewModel : ViewModel() {
     fun setNonStriker(player: Player) { _uiState.update { it.copy(nonStriker = player) } }
     fun setBowler(player: Player) { _uiState.update { it.copy(currentBowler = player) } }
     fun clearError() { _uiState.update { it.copy(error = null) } }
-    fun getMaxOversPerBowler(totalOvers: Int, matchMaxPerBowler: Int? = null): Int {
-        // If the match explicitly sets max overs per bowler, use that
-        if (matchMaxPerBowler != null && matchMaxPerBowler > 0) return matchMaxPerBowler
+    fun getMaxOversPerBowler(totalOvers: Int): Int {
+        val isTest = _uiState.value.match?.matchType == "Test"
+        if (isTest) return 999  // Test: no bowler over limit
         return when (totalOvers) { 5 -> 1; 10 -> 2; 20 -> 4; 50 -> 10; else -> totalOvers / 5 }
     }
-    fun canBowlerBowl(bowlerId: String, totalOvers: Int, matchMaxPerBowler: Int? = null): Boolean {
-        val isSuperOver = (_uiState.value.innings?.inningsNo ?: 1) >= 3
-        if (isSuperOver) return true  // No per-bowler limit in super over (only 1 over total)
+    fun canBowlerBowl(bowlerId: String, totalOvers: Int): Boolean {
         val balls = _uiState.value.balls.count { it.bowlerId == bowlerId && it.extrasType != "wide" && it.extrasType != "no_ball" }
-        return (balls / 6) < getMaxOversPerBowler(totalOvers, matchMaxPerBowler)
+        return (balls / 6) < getMaxOversPerBowler(totalOvers)
     }
 
     // ── Penalty & Manual ──────────────────────────────────────────────────────
@@ -875,13 +948,6 @@ class ScoringViewModel : ViewModel() {
         val striker = state.striker ?: run { isProcessingBall = false; return }
         val bowler = state.currentBowler ?: run { isProcessingBall = false; return }
         val match = state.match ?: run { isProcessingBall = false; return }
-        // Guard: bowler must not have exceeded their over limit
-        if (!canBowlerBowl(bowler.id, match.totalOvers, match.maxOversPerBowler)) {
-            android.util.Log.e("CricketHub", "BLOCKED: ${bowler.fullName} exceeded max overs (${getMaxOversPerBowler(match.totalOvers, match.maxOversPerBowler)})")
-            _uiState.update { it.copy(currentBowler = null, error = "${bowler.fullName} has completed their max overs — select a new bowler") }
-            isProcessingBall = false
-            return
-        }
         viewModelScope.launch {
             try {
                 val isWide = extrasType == "wide"; val isNoBall = extrasType == "no_ball"
@@ -964,21 +1030,30 @@ class ScoringViewModel : ViewModel() {
                 }
                 val isOverEnd = newTotalBalls % 6 == 0 && newTotalBalls > 0 && isLegal
                 if (isOverEnd && newStriker != null) { val t = newStriker; newStriker = newNonStriker; newNonStriker = t }
-                val isSuperOver = innings.inningsNo >= 3
-                val maxOvers = if (isSuperOver) 1 else match.totalOvers
+                val isTestMatch = match.matchType == "Test"
+                val isSuperOver = !isTestMatch && innings.inningsNo >= 3
+                val maxOvers = when {
+                    isSuperOver -> 1
+                    isTestMatch -> 999  // Test: no innings over limit
+                    else -> match.totalOvers
+                }
                 // Super over: 2 wickets ends the innings. Main match: all out = players-1.
                 val maxWickets = if (isSuperOver) 2 else match.playersPerSide - 1
                 val targetChased = target != null && newTotalRuns >= target!!
-                val isInningsComplete = newTotalWickets >= maxWickets || newTotalBalls >= maxOvers * 6 || targetChased
+                val isInningsComplete = newTotalWickets >= maxWickets || (!isTestMatch && newTotalBalls >= maxOvers * 6) || targetChased
                 if (isInningsComplete) {
                     scoringRepository.completeInnings(innings.id)
                     savePartnerships(innings.id, newBalls)
                 }
+                // Update Test lead/trail: batting team scored, so their lead increases
+                val updatedLT = if (isTestMatch) state.testLeadTrail + totalRunsThisBall else state.testLeadTrail
+
                 _uiState.update { it.copy(innings = updatedInnings, balls = newBalls,
                     striker = newStriker, nonStriker = newNonStriker,
                     currentBowler = if (isOverEnd) null else state.currentBowler,
                     batsmanStats = computeBatsmanStats(newBalls, state.battingTeamPlayers, newStriker?.id, newNonStriker?.id),
                     bowlerStats = computeBowlerStats(newBalls, state.bowlingTeamPlayers),
+                    testLeadTrail = updatedLT,
                     inningsComplete = isInningsComplete, error = null) }
             } catch (e: Exception) { _uiState.update { it.copy(error = e.message) } } finally { isProcessingBall = false }
         }
@@ -1146,6 +1221,108 @@ class ScoringViewModel : ViewModel() {
             4 -> "$header, FOUR! $batsmanName finds the boundary, brilliant shot"
             6 -> "$header, SIX! $batsmanName launches it over the ropes, maximum!"
             else -> "$header, $runs runs"
+        }
+    }
+
+    // ── Test Match: Declare Innings ──────────────────────────────────────────
+    fun declareInnings(matchId: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                val inn = _uiState.value.innings ?: return@launch
+
+                SupabaseClient.client.postgrest["innings"]
+                    .update({ set("status", "completed") }) { filter { eq("id", inn.id) } }
+
+                _uiState.update { it.copy(
+                    striker = null, nonStriker = null, currentBowler = null,
+                    inningsComplete = true, isLoading = false
+                ) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Declare failed: ${e.message}", isLoading = false) }
+            }
+        }
+    }
+
+    // ── Test Match: Record Rain Delay ────────────────────────────────────────
+    fun recordRainDelay(matchId: String, delayMinutes: Int, oversLost: Int) {
+        viewModelScope.launch {
+            try {
+                // Store rain delay info in match notes (no schema change needed)
+                val current = _uiState.value.match
+                val existingNotes = current?.abandonReason ?: ""
+                val delayNote = "Rain delay: ${delayMinutes}min, ${oversLost} overs lost"
+                val updated = if (existingNotes.isBlank()) delayNote else "$existingNotes | $delayNote"
+                SupabaseClient.client.postgrest["matches"]
+                    .update({ set("abandon_reason", updated) }) {
+                        filter { eq("id", matchId) }
+                    }
+                android.util.Log.d("CricketHub", "Rain delay recorded: $delayMinutes min, $oversLost overs lost")
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Rain delay record failed: ${e.message}") }
+            }
+        }
+    }
+
+    // ── Test Match: Enforce Follow On ────────────────────────────────────────
+    fun enforceFollowOn(matchId: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                // Mark follow-on enforced on the match
+                SupabaseClient.client.postgrest["matches"]
+                    .update({ set("follow_on_enabled", true) }) {
+                        filter { eq("id", matchId) }
+                    }
+                // The innings complete handler will check follow_on_enabled
+                // and swap the batting order for the next innings
+                _uiState.update { it.copy(inningsComplete = true, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Follow-on failed: ${e.message}", isLoading = false) }
+            }
+        }
+    }
+
+    // ── Test Match: End Day (stumps) ──────────────────────────────────────────
+    fun endDay(matchId: String) {
+        viewModelScope.launch {
+            try {
+                val innId = _uiState.value.innings?.id ?: "?"
+                val innBalls = _uiState.value.innings?.totalBalls ?: 0
+                val current = _uiState.value.match ?: return@launch
+                val existing = current.abandonReason ?: ""
+                val parts = existing.split("|").map { it.trim() }.toMutableList()
+
+                // Remove old TESTDAY/DAYSTART, compute new day
+                val oldDay = _uiState.value.testDay
+                parts.removeAll { it.startsWith("TESTDAY:") || it.startsWith("DAYSTART:") }
+                parts.add("TESTDAY:${oldDay + 1}")
+                parts.add("DAYSTART:$innId:$innBalls")
+
+                val updated = parts.filter { it.isNotBlank() }.joinToString("|")
+                SupabaseClient.client.postgrest["matches"]
+                    .update({ set("abandon_reason", updated) }) { filter { eq("id", matchId) } }
+                _uiState.update { it.copy(match = current.copy(abandonReason = updated)) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Stumps failed: ${e.message}") }
+            }
+        }
+    }
+
+    // Test: end match as draw when all days exhausted
+    fun endMatchAsDraw(matchId: String) {
+        viewModelScope.launch {
+            try {
+                SupabaseClient.client.postgrest["matches"]
+                    .update({
+                        set("status", "completed")
+                        set("result_type", "draw")
+                        set("result_text", "Match Drawn")
+                    }) { filter { eq("id", matchId) } }
+                _uiState.update { it.copy(matchComplete = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Draw failed: ${e.message}") }
+            }
         }
     }
 }

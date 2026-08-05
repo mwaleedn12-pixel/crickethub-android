@@ -4,22 +4,53 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Used by Matches, Teams, Tournaments, Career screens
+// ── Cricket words that flow bottom → top, continuously, never empty ──────────
+// Single animation driver → all positioning via graphicsLayer (GPU, zero recomposition)
+// Dark: grey/ivory words · Light: charcoal words
+
+private val CRICKET_WORDS = listOf(
+    "Yorker", "SIX!", "Powerplay", "LBW", "Hat-Trick",
+    "Bouncer", "Cover Drive", "Googly", "Super Over", "No Ball",
+    "Reverse Swing", "FOUR!", "Maiden", "Spin", "Stumped",
+    "Caught", "Century", "Duck", "Wide", "Run Out"
+)
+
+// Each word slot: fixed x%, staggered start phase, font size
+private data class WordSlot(
+    val text: String,
+    val xFrac: Float,   // 0..1 horizontal position
+    val phase: Float,   // 0..1 stagger offset so words are evenly spread
+    val size: Int        // font size sp
+)
+
+// 14 word slots spread across the screen — enough that it's never empty
+private val WORD_SLOTS = listOf(
+    WordSlot("Yorker",        0.04f, 0.00f, 12),
+    WordSlot("SIX!",          0.75f, 0.07f, 14),
+    WordSlot("Powerplay",     0.35f, 0.14f, 11),
+    WordSlot("LBW",           0.62f, 0.21f, 10),
+    WordSlot("Hat-Trick",     0.18f, 0.28f, 13),
+    WordSlot("Bouncer",       0.50f, 0.35f, 11),
+    WordSlot("Cover Drive",   0.08f, 0.42f, 12),
+    WordSlot("Googly",        0.82f, 0.49f, 10),
+    WordSlot("Super Over",    0.28f, 0.56f, 11),
+    WordSlot("No Ball",       0.68f, 0.63f, 10),
+    WordSlot("Reverse Swing", 0.12f, 0.70f, 11),
+    WordSlot("FOUR!",         0.55f, 0.77f, 13),
+    WordSlot("Maiden",        0.40f, 0.84f, 10),
+    WordSlot("Wide",          0.78f, 0.91f, 11),
+)
+
 @Composable
 fun CricketAnimatedBackground(
     modifier: Modifier = Modifier,
@@ -28,117 +59,66 @@ fun CricketAnimatedBackground(
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)
     Box(modifier = modifier.background(bgColor)) {
-        AnimatedBgLayer(isDark)
+        FloatingWords(isDark)
         content()
     }
 }
 
-// Used by Scoring, LiveScorecard, PostMatch, Analytics, CreateMatch, Toss, PlayingXI
-// Does NOT block touches — just shows background color
+// Backward compat — screens that call this for just the background color
 @Composable
 fun CricketBackgroundDecor(isDark: Boolean = isSystemInDarkTheme()) {
-    // intentionally empty — just background color is set in the screen itself
+    // no-op: bg color is set by the screen itself
 }
 
-// ── Floating cricket words — drift animation matching the HTML mockup ────────
-// Words float gently: translateY oscillation, slight rotation, scale pulse.
-// High opacity for strong presence on both themes.
 @Composable
-private fun AnimatedBgLayer(isDark: Boolean) {
+private fun FloatingWords(isDark: Boolean) {
+    // Word color — visible but not distracting
     val wordColor = if (isDark)
-        Color(0xFFE4E7ED).copy(alpha = 0.08f)   // bright platinum, subtle
+        Color(0xFFD0D4DC).copy(alpha = 0.13f)   // grey/ivory on dark
     else
-        Color(0xFF3D4759).copy(alpha = 0.06f)   // dark slate, subtle
+        Color(0xFF2B2620).copy(alpha = 0.10f)    // charcoal on light
 
-    val inf = rememberInfiniteTransition(label = "bg")
+    // Single animation: 0→1 over 45s, loops forever
+    // Each word uses this + its phase offset to compute its Y position
+    // 45s cycle = gentle drift, not distracting
+    val inf = rememberInfiniteTransition(label = "words")
+    val progress by inf.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 65_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "flow"
+    )
 
-    // Drift offsets — each word gets a unique vertical oscillation
-    val d1 by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "d1")
-    val d2 by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(11000, easing = LinearEasing), RepeatMode.Reverse), label = "d2")
-    val d3 by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(13000, easing = LinearEasing), RepeatMode.Reverse), label = "d3")
-    val d4 by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Reverse), label = "d4")
-    val d5 by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Reverse), label = "d5")
-    val d6 by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Reverse), label = "d6")
-
-    // Cricket ball rotation
-    val ballRot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(8000, easing = LinearEasing)), label = "br")
-
-    data class FloatWord(val text: String, val xFrac: Float, val yFrac: Float, val size: Int, val drift: Float)
-
+    // Render all word slots — pure graphicsLayer, zero recomposition
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val W = maxWidth; val H = maxHeight
+        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+        val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+        // Extra overflow so words smoothly exit top and enter from bottom
+        val overflow = heightPx * 0.15f
 
-        val words = listOf(
-            FloatWord("Yorker",        0.06f, 0.05f, 12, d1),
-            FloatWord("SIX!",          0.72f, 0.08f, 14, d2),
-            FloatWord("Powerplay",     0.44f, 0.15f, 11, d3),
-            FloatWord("LBW",           0.16f, 0.22f, 10, d4),
-            FloatWord("Hat-Trick",     0.60f, 0.28f, 13, d5),
-            FloatWord("Bouncer",       0.28f, 0.35f, 11, d6),
-            FloatWord("Cover Drive",   0.52f, 0.42f, 12, d1),
-            FloatWord("Googly",        0.80f, 0.48f, 10, d2),
-            FloatWord("Super Over",    0.04f, 0.55f, 11, d3),
-            FloatWord("No Ball",       0.38f, 0.62f, 10, d4),
-            FloatWord("Reverse Swing", 0.22f, 0.72f, 11, d5),
-            FloatWord("FOUR!",         0.66f, 0.78f, 13, d6),
-        )
-
-        words.forEach { w ->
-            // Drift: translateY oscillates ±14dp, slight rotation ±4°, scale 1.0–1.05
-            val translateY = -14f + 28f * w.drift
-            val rotation = -4f + 8f * w.drift
-            val scale = 1f + 0.05f * w.drift
+        WORD_SLOTS.forEach { slot ->
+            // Y position: bottom → top, wrapping around
+            // (progress + phase) mod 1.0 gives current normalized position
+            // Map: 0.0 = just below bottom, 1.0 = just above top
+            val normalizedY = (progress + slot.phase) % 1f
+            // Map to pixel: 1.0→ bottom+overflow, 0.0→ -overflow (above top)
+            val yPx = (1f - normalizedY) * (heightPx + overflow * 2) - overflow
+            val xPx = slot.xFrac * widthPx
 
             Text(
-                text = w.text,
+                text = slot.text,
                 color = wordColor,
-                fontSize = w.size.sp,
+                fontSize = slot.size.sp,
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.sp,
-                modifier = Modifier
-                    .offset(x = W * w.xFrac, y = H * w.yFrac)
-                    .graphicsLayer {
-                        this.translationY = translateY
-                        this.rotationZ = rotation
-                        this.scaleX = scale
-                        this.scaleY = scale
-                    }
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.graphicsLayer {
+                    translationX = xPx
+                    translationY = yPx
+                }
             )
-        }
-
-        // Cricket ball — top right
-        Box(modifier = Modifier.size(52.dp).offset(x = W * 0.80f, y = H * 0.04f)) {
-            Box(modifier = Modifier.fillMaxSize().background(
-                Brush.radialGradient(listOf(Color(0xFFCC2200), Color(0xFF8B0000), Color(0xFF5C0000))), CircleShape))
-            Box(modifier = Modifier.size(14.dp).offset(8.dp, 7.dp)
-                .background(Brush.radialGradient(listOf(Color.White.copy(0.4f), Color.Transparent)), CircleShape))
-            androidx.compose.foundation.Canvas(Modifier.fillMaxSize().rotate(ballRot)) {
-                val s = androidx.compose.ui.graphics.drawscope.Stroke(1.5f)
-                drawArc(Color(0xFFEEEEEE), -30f, 60f, false,
-                    androidx.compose.ui.geometry.Offset(4f,4f),
-                    androidx.compose.ui.geometry.Size(size.width-8f,size.height-8f), style = s)
-                drawArc(Color(0xFFEEEEEE), 150f, 60f, false,
-                    androidx.compose.ui.geometry.Offset(4f,4f),
-                    androidx.compose.ui.geometry.Size(size.width-8f,size.height-8f), style = s)
-            }
-        }
-
-        // Small green ball — bottom left
-        val green = Color(0xFF34D399)
-        Box(modifier = Modifier.size(30.dp).offset(x = W * 0.04f, y = H * 0.75f).rotate(-ballRot)) {
-            Box(modifier = Modifier.fillMaxSize()
-                .background(Brush.radialGradient(listOf(Color(0xFFA7F3D0), green)), CircleShape))
-        }
-
-        // Stumps — right side
-        Row(modifier = Modifier.offset(x = W * 0.82f, y = H * 0.55f),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(3) {
-                Box(modifier = Modifier.width(4.dp).height(40.dp).background(
-                    Brush.verticalGradient(listOf(
-                        if (isDark) Color(0xFFF2F2F0).copy(0.15f) else Color(0xFF2B2620).copy(0.10f),
-                        Color.Transparent)), RoundedCornerShape(topStart=2.dp, topEnd=2.dp)))
-            }
         }
     }
 }

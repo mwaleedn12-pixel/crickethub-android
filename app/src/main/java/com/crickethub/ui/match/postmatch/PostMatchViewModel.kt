@@ -113,31 +113,38 @@ data class InningsCard(
     val bowling: List<BowlerScorecard>,
     val balls: List<Ball>,
     val label: String,
-    val shortLabel: String
+    val shortLabel: String,
+    val matchType: String = ""
 ) {
-    val isSuperOver: Boolean get() = innings.inningsNo >= 3
+    val isSuperOver: Boolean get() = matchType != "Test" && innings.inningsNo >= 3
     val oversText: String get() = "${innings.totalBalls / 6}.${innings.totalBalls % 6}"
     val scoreText: String get() = "${innings.totalRuns}/${innings.totalWickets}"
     /** Bowler id -> name, for dismissal lines. */
     val bowlerMap: Map<String, String> get() = bowling.associate { it.player.id to it.player.fullName }
 }
 
-/** inningsNo 1,2 -> "1st/2nd Innings"; 3,4 -> "Super Over"; 5,6 -> "2nd Super Over"; ... */
-fun inningsLabel(inningsNo: Int): String = when (inningsNo) {
-    1 -> "1st Innings"
-    2 -> "2nd Innings"
+/** inningsNo 1,2 -> "1st/2nd Innings"; 3,4 -> "Super Over" (or "3rd/4th Innings" for Test) */
+fun inningsLabel(inningsNo: Int, matchType: String = ""): String = when {
+    matchType == "Test" -> when (inningsNo) {
+        1 -> "1st Innings"; 2 -> "2nd Innings"; 3 -> "3rd Innings"; 4 -> "4th Innings"
+        else -> "${inningsNo}th Innings"
+    }
+    inningsNo == 1 -> "1st Innings"
+    inningsNo == 2 -> "2nd Innings"
     else -> when (val so = (inningsNo - 1) / 2) {
-        1 -> "Super Over"
-        2 -> "2nd Super Over"
-        3 -> "3rd Super Over"
+        1 -> "Super Over"; 2 -> "2nd Super Over"; 3 -> "3rd Super Over"
         else -> "${so}th Super Over"
     }
 }
 
 /** Short form for the tab row. */
-fun inningsShortLabel(inningsNo: Int): String = when (inningsNo) {
-    1 -> "1st Inn"
-    2 -> "2nd Inn"
+fun inningsShortLabel(inningsNo: Int, matchType: String = ""): String = when {
+    matchType == "Test" -> when (inningsNo) {
+        1 -> "1st Inn"; 2 -> "2nd Inn"; 3 -> "3rd Inn"; 4 -> "4th Inn"
+        else -> "${inningsNo}th Inn"
+    }
+    inningsNo == 1 -> "1st Inn"
+    inningsNo == 2 -> "2nd Inn"
     else -> {
         val so = (inningsNo - 1) / 2
         if (so <= 1) "SO" else "SO $so"
@@ -267,6 +274,7 @@ class PostMatchViewModel : ViewModel() {
                         val balls = ballsByInnings[inn.id].orEmpty()
                         val batPlayers = xiByTeam[battingId].orEmpty()
                         val bowlPlayers = xiByTeam[bowlingId].orEmpty()
+                        val mType = match.matchType ?: ""
                         InningsCard(
                             innings = inn,
                             battingTeamName = nameOf(battingId),
@@ -274,8 +282,9 @@ class PostMatchViewModel : ViewModel() {
                             batting = computeBattingScorecard(balls, batPlayers),
                             bowling = computeBowlingScorecard(balls, bowlPlayers),
                             balls = balls,
-                            label = inningsLabel(inn.inningsNo),
-                            shortLabel = inningsShortLabel(inn.inningsNo)
+                            label = inningsLabel(inn.inningsNo, mType),
+                            shortLabel = inningsShortLabel(inn.inningsNo, mType),
+                            matchType = mType
                         )
                     }
 

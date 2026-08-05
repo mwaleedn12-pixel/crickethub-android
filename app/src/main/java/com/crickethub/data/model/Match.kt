@@ -74,7 +74,8 @@ data class MatchInsert(
     @SerialName("scorer_name") val scorerName: String? = null,
     @SerialName("live_sharing_enabled") val liveSharingEnabled: Boolean = false,
     @SerialName("is_public") val isPublic: Boolean = true,
-    @SerialName("created_by") val createdBy: String? = null
+    @SerialName("created_by") val createdBy: String? = null,
+    @SerialName("abandon_reason") val abandonReason: String? = null
 )
 
 val MATCH_TYPES = listOf("T5", "T10", "T20", "ODI", "Test", "Custom")

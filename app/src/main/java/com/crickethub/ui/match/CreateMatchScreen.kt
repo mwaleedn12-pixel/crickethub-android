@@ -59,6 +59,9 @@ fun CreateMatchScreen(
     var inningsBreak by remember { mutableStateOf("20") }
     var freeHitOnNoball by remember { mutableStateOf(true) }
     var superOverEnabled by remember { mutableStateOf(false) }
+    var followOnEnabled by remember { mutableStateOf(true) }
+    var oversPerDay by remember { mutableStateOf("90") }
+    var numberOfDays by remember { mutableStateOf("5") }
     // DLS removed — future update
     var liveSharingEnabled by remember { mutableStateOf(false) }
     var isPublic by remember { mutableStateOf(true) }
@@ -80,7 +83,7 @@ fun CreateMatchScreen(
     }
 
     val totalOvers = when (selectedMatchType) {
-        "T5" -> 5; "T10" -> 10; "T20" -> 20; "ODI" -> 50; "Test" -> 90
+        "T5" -> 5; "T10" -> 10; "T20" -> 20; "ODI" -> 50; "Test" -> oversPerDay.toIntOrNull() ?: 90
         "Custom" -> customOvers.toIntOrNull() ?: 20
         else -> 20
     }
@@ -256,56 +259,100 @@ fun CreateMatchScreen(
 
                     // ── STEP 2: Rules ───────────────────────────
                     2 -> {
-                        item {
-                            Text("Match Rules", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        }
-                        item {
-                            InfoCard("Total Overs: $totalOvers  •  Default Max/Bowler: $defaultMaxOversPerBowler")
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = powerplayOvers,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) powerplayOvers = it },
-                                    label = { Text("Powerplay 1 (PP)") }, singleLine = true,
-                                    modifier = Modifier.weight(1f), colors = fieldColors
-                                )
-                                OutlinedTextField(
-                                    value = powerplay2Overs,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) powerplay2Overs = it },
-                                    label = { Text("Middle (P2)") }, singleLine = true,
-                                    modifier = Modifier.weight(1f), colors = fieldColors
-                                )
-                                OutlinedTextField(
-                                    value = powerplay3Overs,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) powerplay3Overs = it },
-                                    label = { Text("Death (P3)") }, singleLine = true,
-                                    modifier = Modifier.weight(1f), colors = fieldColors
-                                )
+                        if (selectedMatchType == "Test") {
+                            // ═══ TEST MATCH RULES — completely different from limited-overs ═══
+                            item {
+                                Text("Test Match Rules", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = maxOversPerBowler,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) maxOversPerBowler = it },
-                                    label = { Text("Max Overs/Bowler (default: $defaultMaxOversPerBowler)") },
-                                    singleLine = true, modifier = Modifier.weight(1f), colors = fieldColors
-                                )
-                                OutlinedTextField(
-                                    value = inningsBreak,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) inningsBreak = it },
-                                    label = { Text("Innings Break (min)") }, singleLine = true,
-                                    modifier = Modifier.weight(1f), colors = fieldColors
-                                )
+                            item {
+                                InfoCard("No innings over limit  •  No powerplay phases  •  4 innings per match")
                             }
-                        }
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                ToggleRow("Free Hit on No Ball", freeHitOnNoball) { freeHitOnNoball = it }
-                                ToggleRow("Super Over Enabled", superOverEnabled) { superOverEnabled = it }
-                                ToggleRow("Live Score Sharing", liveSharingEnabled) { liveSharingEnabled = it }
-                                ToggleRow("Public Match", isPublic) { isPublic = it }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = oversPerDay,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) oversPerDay = it },
+                                        label = { Text("Overs per Day") }, singleLine = true,
+                                        modifier = Modifier.weight(1f), colors = fieldColors
+                                    )
+                                    OutlinedTextField(
+                                        value = numberOfDays,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) numberOfDays = it },
+                                        label = { Text("Days") }, singleLine = true,
+                                        modifier = Modifier.weight(0.5f), colors = fieldColors
+                                    )
+                                    OutlinedTextField(
+                                        value = inningsBreak,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) inningsBreak = it },
+                                        label = { Text("Inn. Break") }, singleLine = true,
+                                        modifier = Modifier.weight(0.5f), colors = fieldColors
+                                    )
+                                }
+                            }
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    ToggleRow("Follow-on Enabled", followOnEnabled) { followOnEnabled = it }
+                                    Text("Lead of 200+ runs required to enforce follow-on",
+                                        color = CH.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    ToggleRow("Free Hit on No Ball", freeHitOnNoball) { freeHitOnNoball = it }
+                                    ToggleRow("Live Score Sharing", liveSharingEnabled) { liveSharingEnabled = it }
+                                    ToggleRow("Public Match", isPublic) { isPublic = it }
+                                }
+                            }
+                        } else {
+                            // ═══ LIMITED-OVERS RULES (T5/T10/T20/ODI/Custom) ═══
+                            item {
+                                Text("Match Rules", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                            item {
+                                InfoCard("Total Overs: $totalOvers  •  Default Max/Bowler: $defaultMaxOversPerBowler")
+                            }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = powerplayOvers,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) powerplayOvers = it },
+                                        label = { Text("Powerplay 1 (PP)") }, singleLine = true,
+                                        modifier = Modifier.weight(1f), colors = fieldColors
+                                    )
+                                    OutlinedTextField(
+                                        value = powerplay2Overs,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) powerplay2Overs = it },
+                                        label = { Text("Middle (P2)") }, singleLine = true,
+                                        modifier = Modifier.weight(1f), colors = fieldColors
+                                    )
+                                    OutlinedTextField(
+                                        value = powerplay3Overs,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) powerplay3Overs = it },
+                                        label = { Text("Death (P3)") }, singleLine = true,
+                                        modifier = Modifier.weight(1f), colors = fieldColors
+                                    )
+                                }
+                            }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = maxOversPerBowler,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) maxOversPerBowler = it },
+                                        label = { Text("Max Overs/Bowler (default: $defaultMaxOversPerBowler)") },
+                                        singleLine = true, modifier = Modifier.weight(1f), colors = fieldColors
+                                    )
+                                    OutlinedTextField(
+                                        value = inningsBreak,
+                                        onValueChange = { if (it.all { c -> c.isDigit() }) inningsBreak = it },
+                                        label = { Text("Innings Break (min)") }, singleLine = true,
+                                        modifier = Modifier.weight(1f), colors = fieldColors
+                                    )
+                                }
+                            }
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    ToggleRow("Free Hit on No Ball", freeHitOnNoball) { freeHitOnNoball = it }
+                                    ToggleRow("Super Over Enabled", superOverEnabled) { superOverEnabled = it }
+                                    ToggleRow("Live Score Sharing", liveSharingEnabled) { liveSharingEnabled = it }
+                                    ToggleRow("Public Match", isPublic) { isPublic = it }
+                                }
                             }
                         }
                     }
@@ -362,7 +409,12 @@ fun CreateMatchScreen(
                         item {
                             ReviewCard {
                                 ReviewRow("Type", selectedMatchType)
-                                ReviewRow("Overs", totalOvers.toString())
+                                if (selectedMatchType == "Test") {
+                                    ReviewRow("Overs/Day", oversPerDay)
+                                    ReviewRow("Days", numberOfDays)
+                                } else {
+                                    ReviewRow("Overs", totalOvers.toString())
+                                }
                                 if (title.isNotBlank()) ReviewRow("Title", title)
                                 if (venue.isNotBlank()) ReviewRow("Venue", venue)
                                 if (matchDate.isNotBlank()) ReviewRow("Date", matchDate)
@@ -377,14 +429,23 @@ fun CreateMatchScreen(
                                 ReviewRow("Team B", t2?.name ?: "Not selected")
                             }
                         }
-                        item {
-                            ReviewCard {
-                                ReviewRow("Powerplay", "${powerplayOvers} ov (PP)")
-                                if (powerplay2Overs != "0") ReviewRow("Middle", "${powerplay2Overs} ov (P2)")
-                                if (powerplay3Overs != "0") ReviewRow("Death", "${powerplay3Overs} ov (P3)")
-                                ReviewRow("Max Overs/Bowler", maxOversPerBowler.ifBlank { defaultMaxOversPerBowler.toString() })
-                                ReviewRow("Free Hit", if (freeHitOnNoball) "Yes" else "No")
-                                ReviewRow("Super Over", if (superOverEnabled) "Yes" else "No")
+                        if (selectedMatchType == "Test") {
+                            item {
+                                ReviewCard {
+                                    ReviewRow("Follow-on", if (followOnEnabled) "Enabled" else "Disabled")
+                                    ReviewRow("Free Hit", if (freeHitOnNoball) "Yes" else "No")
+                                }
+                            }
+                        } else {
+                            item {
+                                ReviewCard {
+                                    ReviewRow("Powerplay", "${powerplayOvers} ov (PP)")
+                                    if (powerplay2Overs != "0") ReviewRow("Middle", "${powerplay2Overs} ov (P2)")
+                                    if (powerplay3Overs != "0") ReviewRow("Death", "${powerplay3Overs} ov (P3)")
+                                    ReviewRow("Max Overs/Bowler", maxOversPerBowler.ifBlank { defaultMaxOversPerBowler.toString() })
+                                    ReviewRow("Free Hit", if (freeHitOnNoball) "Yes" else "No")
+                                    ReviewRow("Super Over", if (superOverEnabled) "Yes" else "No")
+                                }
                             }
                         }
                         if (umpire1.isNotBlank() || umpire2.isNotBlank()) {
@@ -435,21 +496,22 @@ fun CreateMatchScreen(
                                 team2Id = team2Id,
                                 playersPerSide = playersPerSide.toIntOrNull() ?: 11,
                                 totalOvers = totalOvers,
-                                powerplayOvers = powerplayOvers.toIntOrNull() ?: 6,
-                                powerplay2Overs = powerplay2Overs.toIntOrNull() ?: 0,
-                                powerplay3Overs = powerplay3Overs.toIntOrNull() ?: 0,
+                                powerplayOvers = if (selectedMatchType == "Test") 0 else powerplayOvers.toIntOrNull() ?: 6,
+                                powerplay2Overs = if (selectedMatchType == "Test") 0 else powerplay2Overs.toIntOrNull() ?: 0,
+                                powerplay3Overs = if (selectedMatchType == "Test") 0 else powerplay3Overs.toIntOrNull() ?: 0,
                                 inningsBreakMinutes = inningsBreak.toIntOrNull() ?: 20,
-                                superOverEnabled = superOverEnabled,
+                                superOverEnabled = if (selectedMatchType == "Test") false else superOverEnabled,
                                 freeHitOnNoball = freeHitOnNoball,
                                 dlsEnabled = false,
-                                maxOversPerBowler = maxOversPerBowler.toIntOrNull() ?: defaultMaxOversPerBowler,
+                                maxOversPerBowler = if (selectedMatchType == "Test") 999 else maxOversPerBowler.toIntOrNull() ?: defaultMaxOversPerBowler,
                                 umpire1 = umpire1.trim().ifBlank { null },
                                 umpire2 = umpire2.trim().ifBlank { null },
                                 thirdUmpire = thirdUmpire.trim().ifBlank { null },
                                 matchReferee = matchReferee.trim().ifBlank { null },
                                 scorerName = scorerName.trim().ifBlank { null },
                                 liveSharingEnabled = liveSharingEnabled,
-                                isPublic = isPublic
+                                isPublic = isPublic,
+                                abandonReason = if (selectedMatchType == "Test") "DAYS:${numberOfDays.toIntOrNull() ?: 5}" else null
                             ))
                         }
                     },

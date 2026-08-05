@@ -80,7 +80,9 @@ data class ScoringUiState(
     val dlsTeam1Resource: Double = 100.0,
     val dlsOversRemaining: Double = 0.0,
     val dlsWicketsLost: Int = 0,
-    val showDLSBanner: Boolean = false
+    val showDLSBanner: Boolean = false,
+    // Test: lead/trail of the batting team (positive = lead, negative = trail)
+    val testLeadTrail: Int = 0
 ) {
     val totalRuns: Int get() = innings?.totalRuns ?: 0
     val totalWickets: Int get() = innings?.totalWickets ?: 0
@@ -92,11 +94,59 @@ data class ScoringUiState(
         return if (b > 0) (r.toDouble() / b) * 6 else 0.0
     }
 
-    val isSuperOver: Boolean get() = (innings?.inningsNo ?: 1) >= 3
-    val isSecondInnings: Boolean get() = (innings?.inningsNo ?: 1) == 2
+    val isSuperOver: Boolean get() = !isTestMatch && (innings?.inningsNo ?: 1) >= 3
+    val isSecondInnings: Boolean get() {
+        val no = innings?.inningsNo ?: 1
+        return if (isTestMatch) no == 4 else no == 2
+    }
 
     /** Overs limit for the current innings (a super over is always 1 over). */
-    val oversLimit: Int get() = if (isSuperOver) 1 else (match?.totalOvers ?: 20)
+    val isTestMatch: Boolean get() = match?.matchType == "Test"
+    val oversLimit: Int get() = when {
+        isSuperOver -> 1
+        isTestMatch -> 999  // Test: no innings over limit
+        else -> match?.totalOvers ?: 20
+    }
+
+    // ── Test match: Day / Session / Lead-Trail ──
+    val testOversPerDay: Int get() = match?.totalOvers ?: 90
+    val testMaxDays: Int get() {
+        val notes = match?.abandonReason ?: ""
+        val m = notes.split("|").firstOrNull { it.trim().startsWith("DAYS:") }
+        return m?.substringAfter("DAYS:")?.toIntOrNull() ?: 5
+    }
+    val testDay: Int get() {
+        val notes = match?.abandonReason ?: ""
+        val m = notes.split("|").lastOrNull { it.trim().startsWith("TESTDAY:") }
+        return m?.substringAfter("TESTDAY:")?.toIntOrNull() ?: 1
+    }
+    private val dayStartInfo: Pair<String, Int>? get() {
+        val notes = match?.abandonReason ?: ""
+        val m = notes.split("|").lastOrNull { it.trim().startsWith("DAYSTART:") } ?: return null
+        val parts = m.trim().substringAfter("DAYSTART:").split(":")
+        return if (parts.size >= 2) Pair(parts[0], parts[1].toIntOrNull() ?: 0) else null
+    }
+    val testSession: Int get() {
+        if (!isTestMatch) return 1
+        val sessLen = testOversPerDay / 3
+        return when {
+            testOversToday < sessLen -> 1
+            testOversToday < sessLen * 2 -> 2
+            else -> 3
+        }
+    }
+    val testOversToday: Int get() {
+        if (!isTestMatch) return 0
+        val currentBalls = innings?.totalBalls ?: 0
+        val ds = dayStartInfo
+        return if (ds != null && ds.first == innings?.id) {
+            ((currentBalls - ds.second).coerceAtLeast(0)) / 6
+        } else {
+            currentBalls / 6
+        }
+    }
+    val testOversRemInDay: Int get() = (testOversPerDay - testOversToday).coerceAtLeast(0)
+    val testIsDraw: Boolean get() = isTestMatch && testDay > testMaxDays
 
     val ballsRemaining: Int get() =
         (oversLimit * 6 - (innings?.totalBalls ?: 0)).coerceAtLeast(0)

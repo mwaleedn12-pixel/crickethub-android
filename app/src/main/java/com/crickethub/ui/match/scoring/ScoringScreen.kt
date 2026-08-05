@@ -69,6 +69,24 @@ fun ScoringScreen(
 
     var showWicketDialog by remember { mutableStateOf(false) }
     var showExtrasDialog by remember { mutableStateOf(false) }
+    var showDeclareDialog by remember { mutableStateOf(false) }
+    var showFollowOnDialog by remember { mutableStateOf(false) }
+    var showStumpsPrompt by remember { mutableStateOf(false) }
+    var stumpsDismissedForDay by remember { mutableIntStateOf(-1) }
+    val isTestMatch = uiState.match?.matchType == "Test"
+
+    // Auto-prompt stumps when day's overs exhausted (only once per day)
+    if (isTestMatch && uiState.testOversRemInDay <= 0 && uiState.testOversToday > 0
+        && stumpsDismissedForDay != uiState.testDay && !showStumpsPrompt) {
+        showStumpsPrompt = true
+    }
+
+    // Auto-draw when days exceeded
+    if (isTestMatch && uiState.testIsDraw) {
+        LaunchedEffect(Unit) {
+            viewModel.endMatchAsDraw(matchId)
+        }
+    }
     var showSelectBatsman by remember { mutableStateOf(false) }
     var showSelectBowler by remember { mutableStateOf(false) }
     var showSelectNonStriker by remember { mutableStateOf(false) }
@@ -323,16 +341,21 @@ fun ScoringScreen(
                     if (!needStriker && !needBowler && !needNonStriker &&
                         !uiState.inningsComplete && !uiState.matchComplete
                     ) {
+                        val dayOversUp = isTestMatch && uiState.testOversRemInDay <= 0 && uiState.testOversToday > 0
                         ScoringButtons(
-                            isLoading = uiState.isLoading,
+                            isLoading = uiState.isLoading || dayOversUp,
                             isFreeHit = isFreeHit,
+                            isTestMatch = isTestMatch,
                             onRuns = { runs -> viewModel.recordBall(runsOffBat = runs) },
                             onWicket = { if (!isFreeHit) showWicketDialog = true },
                             onExtras = { showExtrasDialog = true },
                             onUndo = { viewModel.undoLastBall() },
                             onPenalty = { showPenaltyDialog = true },
                             onManualEdit = { showManualEditDialog = true },
-                            onMissedChance = { showMissedChanceDialog = true }
+                            onMissedChance = { showMissedChanceDialog = true },
+                            onDeclare = { showDeclareDialog = true },
+                            onFollowOn = { showFollowOnDialog = true },
+                            onEndDay = { viewModel.endDay(matchId) }
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -376,6 +399,7 @@ fun ScoringScreen(
             if (needBowler || showSelectBowler) {
                 val totalOvers = uiState.match?.totalOvers ?: 20
                 val maxPerBowler = viewModel.getMaxOversPerBowler(totalOvers)
+                val bowlerDialogTitle = if (isTestMatch) "Select Bowler" else "Select Bowler (Max $maxPerBowler overs)"
                 val lastBowlerId = uiState.balls
                     .filter { it.extrasType != "wide" && it.extrasType != "no_ball" }
                     .lastOrNull()?.bowlerId
@@ -390,7 +414,7 @@ fun ScoringScreen(
                     player.id to (maxPerBowler - bowled)
                 }
                 BowlerSelectDialog(
-                    title = "Select Bowler (Max $maxPerBowler overs)",
+                    title = bowlerDialogTitle,
                     players = eligibleBowlers,
                     remainingOvers = bowlerOversMap,
                     onPlayerSelected = { viewModel.setBowler(it); showSelectBowler = false },
@@ -460,6 +484,108 @@ fun ScoringScreen(
                 )
             }
 
+            // ── Test Match: Declare Innings ──
+            if (showDeclareDialog) {
+                val currentRuns = uiState.innings?.totalRuns ?: 0
+                val currentWkts = uiState.innings?.totalWickets ?: 0
+                val totalBalls = uiState.innings?.totalBalls ?: 0
+                val currentOvers = totalBalls / 6
+                val currentBallsInOver = totalBalls % 6
+                AlertDialog(
+                    onDismissRequest = { showDeclareDialog = false },
+                    containerColor = CH.surface,
+                    title = { Text("📣 Declare Innings?", color = Color(0xFFE8A200), fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Current score: $currentRuns/$currentWkts ($currentOvers.$currentBallsInOver ov)",
+                                color = CH.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Declaring will end the current innings. The batting team chooses to stop batting.",
+                                color = CH.textSecondary, fontSize = 13.sp)
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            viewModel.declareInnings(matchId)
+                            showDeclareDialog = false
+                        }) { Text("Declare", color = Color(0xFFE8A200), fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeclareDialog = false }) { Text("Cancel", color = CH.textSecondary) }
+                    }
+                )
+            }
+
+            // ── Test Match: Follow On ──
+            if (showFollowOnDialog) {
+                val inn = uiState.innings
+                val inningsNo = inn?.inningsNo ?: 1
+                val canFollowOn = inningsNo == 3  // Only after both teams batted once (start of 3rd innings)
+                val leadAmount = if (uiState.isSecondInnings && uiState.target != null) {
+                    (uiState.target!! - 1) - uiState.totalRuns  // lead of team that batted first
+                } else 0
+                val hasEnoughLead = leadAmount >= 200
+                AlertDialog(
+                    onDismissRequest = { showFollowOnDialog = false },
+                    containerColor = CH.surface,
+                    title = { Text("🔄 Enforce Follow On?", color = NeonGreen, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (!canFollowOn) {
+                                Text("⚠ Follow-on can only be enforced at the start of the 3rd innings (after both teams have batted once).",
+                                    color = AmberColor, fontSize = 13.sp)
+                                Text("Current innings: $inningsNo", color = CH.textSecondary, fontSize = 12.sp)
+                            } else if (!hasEnoughLead) {
+                                Text("⚠ The fielding team needs a lead of 200+ runs to enforce follow-on.",
+                                    color = AmberColor, fontSize = 13.sp)
+                                Text("Current lead: $leadAmount runs (need 200+)", color = CH.textSecondary, fontSize = 12.sp)
+                            } else {
+                                Text("The fielding team leads by $leadAmount runs and can enforce the follow-on.",
+                                    color = NeonGreen, fontSize = 13.sp)
+                                Text("The opposition will bat again immediately instead of the fielding team batting.",
+                                    color = CH.textSecondary, fontSize = 12.sp)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { viewModel.enforceFollowOn(matchId); showFollowOnDialog = false },
+                            enabled = canFollowOn && hasEnoughLead
+                        ) { Text("Enforce Follow On", color = if (canFollowOn && hasEnoughLead) NeonGreen else CH.textHint, fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showFollowOnDialog = false }) { Text("Cancel", color = CH.textSecondary) }
+                    }
+                )
+            }
+
+            // ── Test: Auto Stumps Prompt ──
+            if (showStumpsPrompt) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showStumpsPrompt = false
+                        stumpsDismissedForDay = uiState.testDay
+                    },
+                    containerColor = CH.surface,
+                    title = { Text("🌙 Stumps — Day ${uiState.testDay} Over", color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text("${uiState.testOversPerDay} overs for the day have been bowled. Call stumps to end Day ${uiState.testDay}.",
+                            color = CH.textSecondary, fontSize = 13.sp)
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showStumpsPrompt = false
+                            viewModel.endDay(matchId)
+                        }) { Text("Call Stumps", color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showStumpsPrompt = false
+                            stumpsDismissedForDay = uiState.testDay
+                        }) { Text("Continue Play", color = CH.textSecondary) }
+                    }
+                )
+            }
+
             if (showPenaltyDialog) {
                 PenaltyRunsDialog(
                     onDismiss = { showPenaltyDialog = false },
@@ -498,21 +624,21 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                 popupLabel: String? = null, popupColor: androidx.compose.ui.graphics.Color = NeonGreen, popupKey: Int = 0, popupBig: Boolean = false) {
     val match = uiState.match
     val currentOver = uiState.currentOver
-    val powerplayOvers = match?.powerplayOvers ?: 6
-    val totalOvers = match?.totalOvers ?: 20
     val isSuperOver = uiState.isSuperOver
+    val isTest = uiState.isTestMatch
 
+    // Powerplay phase — NOT shown for Test matches
     val phaseLabel = when {
-        match == null || isSuperOver -> null
-        currentOver < powerplayOvers -> "PP"
-        currentOver >= (totalOvers - (match.powerplay3Overs.takeIf { it > 0 } ?: 4)) -> "P3"
+        match == null || isSuperOver || isTest -> null
+        currentOver < (match.powerplayOvers) -> "PP"
+        currentOver >= ((match.totalOvers) - (match.powerplay3Overs.takeIf { it > 0 } ?: 4)) -> "P3"
         else -> "P2"
     }
 
     Box(modifier = Modifier.fillMaxWidth().background(CH.surface)) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
 
-            // ── Match info bar: tournament • Match N • format • venue ──
+            // ── Match info bar ──
             uiState.tournamentName?.takeIf { it.isNotBlank() }?.let {
                 Text(it, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
@@ -524,7 +650,26 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
             if (infoBits.isNotEmpty()) {
                 Text(infoBits.joinToString("  •  "), color = CH.textSecondary, fontSize = 11.sp, maxLines = 1)
             }
-            if (uiState.tournamentName?.isNotBlank() == true || infoBits.isNotEmpty()) {
+
+            // ── Test: Day & Session banner ──
+            if (isTest) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+                        .background(AmberColor.copy(alpha = 0.1f))
+                        .border(1.dp, AmberColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Day ${uiState.testDay} • Session ${uiState.testSession}",
+                        color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Overs today: ${uiState.testOversToday}/${uiState.testOversPerDay}  •  Rem: ${uiState.testOversRemInDay}",
+                        color = CH.textSecondary, fontSize = 11.sp)
+                }
+            }
+
+            if (uiState.tournamentName?.isNotBlank() == true || infoBits.isNotEmpty() || isTest) {
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
@@ -564,9 +709,13 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    // Super over (innings 3+) is always 1 over - don't show the match's total.
                     if (isSuperOver) {
                         Text("SUPER OVER", color = AmberColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    } else if (isTest) {
+                        // Test: show innings number instead of total overs
+                        val innNo = uiState.innings?.inningsNo ?: 1
+                        Text("${innNo}${if (innNo == 1) "st" else if (innNo == 2) "nd" else if (innNo == 3) "rd" else "th"} Innings",
+                            color = CH.textSecondary, fontSize = 12.sp)
                     } else {
                         match?.let { Text("${it.totalOvers} ov", color = CH.textSecondary, fontSize = 12.sp) }
                     }
@@ -581,14 +730,34 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
             HorizontalDivider(color = CH.border)
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── Stats row: CRR always; chase shows Target + RRR, 1st innings shows Projected ──
+            // ── Stats row ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HeaderStat("CRR", "%.2f".format(uiState.runRate), NeonBlue)
-                if (uiState.isSecondInnings) {
+                if (isTest) {
+                    // Test: show Lead/Trail for innings 2/3/4 + Target in 4th
+                    val innNo = uiState.innings?.inningsNo ?: 1
+                    if (innNo >= 2) {
+                        // Lead/Trail computed from all innings via ViewModel
+                        val leadTrail = uiState.testLeadTrail
+                        if (leadTrail > 0) {
+                            HeaderStat("Lead", "$leadTrail", NeonGreen)
+                        } else if (leadTrail < 0) {
+                            HeaderStat("Trail", "${-leadTrail}", ErrorRed)
+                        } else {
+                            HeaderStat("Scores Level", "", AmberColor)
+                        }
+                    }
+                    if (innNo == 4 && uiState.target != null) {
+                        HeaderStat("Target", "${uiState.target}", AmberColor)
+                        uiState.requiredRunRate?.let {
+                            HeaderStat("RRR", "%.2f".format(it), if (it > uiState.runRate) ErrorRed else NeonGreen)
+                        }
+                    }
+                } else if (uiState.isSecondInnings) {
                     uiState.target?.let { HeaderStat("Target", "$it", AmberColor) }
                     uiState.requiredRunRate?.let {
                         HeaderStat("RRR", "%.2f".format(it), if (it > uiState.runRate) ErrorRed else NeonGreen)
@@ -598,13 +767,15 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                 }
             }
 
-            // ── Match status line (chase only) ──
-            headerStatusLine(uiState)?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            // ── Match status line (chase only — not for Test) ──
+            if (!isTest) {
+                headerStatusLine(uiState)?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(it, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
-        // Celebratory ball-result overlay across the header band
+        // Celebratory ball-result overlay
         BallPopup(
             label = popupLabel,
             color = popupColor,
@@ -782,13 +953,17 @@ fun CurrentBowlerRow(
 fun ScoringButtons(
     isLoading: Boolean,
     isFreeHit: Boolean = false,
+    isTestMatch: Boolean = false,
     onRuns: (Int) -> Unit,
     onWicket: () -> Unit,
     onExtras: () -> Unit,
     onUndo: () -> Unit,
     onPenalty: () -> Unit,
     onManualEdit: () -> Unit,
-    onMissedChance: () -> Unit
+    onMissedChance: () -> Unit,
+    onDeclare: () -> Unit = {},
+    onFollowOn: () -> Unit = {},
+    onEndDay: () -> Unit = {}
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -839,6 +1014,26 @@ fun ScoringButtons(
                 modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor)
             ) { Text("Missed", fontSize = 11.sp) }
+        }
+        // ── Test match specific buttons ──
+        if (isTestMatch) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onDeclare, enabled = !isLoading,
+                    modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE8A200))
+                ) { Text("📣 Declare", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                OutlinedButton(
+                    onClick = onEndDay, enabled = !isLoading,
+                    modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF59E0B))
+                ) { Text("🌙 Stumps", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                OutlinedButton(
+                    onClick = onFollowOn, enabled = !isLoading,
+                    modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF34D399))
+                ) { Text("🔄 Follow On", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            }
         }
     }
 }
@@ -898,7 +1093,9 @@ fun BowlerSelectDialog(title: String, players: List<Player>, remainingOvers: Map
                             player.role?.let { Text(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, color = CH.textSecondary, fontSize = 11.sp) }
                         }
                         val rem = remainingOvers[player.id] ?: 0
-                        Text("rem: $rem ov", color = if (rem <= 1) AmberColor else NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        if (rem < 900) {  // Hide for Test (999)
+                            Text("rem: $rem ov", color = if (rem <= 1) AmberColor else NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
                 if (players.isEmpty()) {

@@ -1,6 +1,7 @@
 package com.crickethub.ui.dashboard
 
 import androidx.compose.foundation.background
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -173,200 +174,201 @@ fun DashboardScreen(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize()
-            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA)),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // User header
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(cardBg)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier.size(48.dp).clip(CircleShape)
-                        .background(NeonGreen.copy(alpha = 0.2f))
-                        .border(2.dp, NeonGreen, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        userEmail.take(1).uppercase(),
-                        color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Welcome back!", color = CH.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text(userEmail, color = CH.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                IconButton(onClick = {
-                    scope.launch {
-                        try { SupabaseClient.client.auth.signOut() } catch (_: Exception) {}
-                        onLogout()
-                    }
-                }) {
-                    Icon(Icons.Default.ExitToApp, "Logout", tint = ErrorRed)
-                }
-            }
-        }
-
-        // Quick stats
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickStatCard("Teams", "$teamCount", Icons.Default.Person, NeonGreen, Modifier.weight(1f))
-                QuickStatCard("Players", "$playerCount", Icons.Default.Person, NeonBlue, Modifier.weight(1f))
-                QuickStatCard("Matches", "$matchCount", Icons.Default.List, AmberColor, Modifier.weight(1f))
-                QuickStatCard("tourneys", "$tournamentCount", Icons.Default.Star, PurpleColor, Modifier.weight(1f))
-            }
-        }
-
-        // Join with Code button
-        item {
-            Button(
-                onClick = onJoinWithCode,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen.copy(alpha = 0.15f))
-            ) {
-                Text("🔗  Join with Code", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-        }
-
-        // Feature cards
-        item {
-            Text("Features", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp))
-        }
-        item {
-            val features = listOf(
-                Triple("🏏", "Matches", "Create and score live matches"),
-                Triple("👥", "Teams", "Manage your teams and squads"),
-                Triple("🏆", "Tournaments", "Run tournaments with fixtures"),
-                Triple("📊", "Players", "Career batting & bowling records"),
-                Triple("⚔️", "Compare", "Head-to-head player comparison"),
-                Triple("🔗", "Join", "Enter a code to view shared content")
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                features.chunked(2).forEach { row ->
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { (emoji, title, desc) ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(CH.surface)
-                                    .border(1.dp, CH.border, RoundedCornerShape(10.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Column {
-                                    Text("$emoji $title", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    Text(desc, color = CH.textSecondary, fontSize = 11.sp, lineHeight = 14.sp)
-                                }
-                            }
-                        }
-                        if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-
-        // Active tournaments
-        if (activeTournaments.isNotEmpty()) {
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // User header
             item {
-                Text("Active Tournaments", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-            items(activeTournaments) { tournament ->
                 Row(
                     modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(cardBg)
-                        .border(1.dp, CH.border, RoundedCornerShape(10.dp))
-                        .padding(12.dp),
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(tournament.name, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        modifier = Modifier.size(48.dp).clip(CircleShape)
+                            .background(NeonGreen.copy(alpha = 0.2f))
+                            .border(2.dp, NeonGreen, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            "${tournament.format ?: "Tournament"} • ${tournament.status.replaceFirstChar { it.uppercase() }}",
-                            color = CH.textSecondary, fontSize = 11.sp
+                            userEmail.take(1).uppercase(),
+                            color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold
                         )
                     }
-                    val sc = when (tournament.status) { "live" -> NeonGreen; "upcoming" -> AmberColor; else -> CH.textSecondary }
-                    Box(
-                        modifier = Modifier.clip(RoundedCornerShape(4.dp))
-                            .background(sc.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(tournament.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Welcome back!", color = CH.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(userEmail, color = CH.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    IconButton(onClick = {
+                        scope.launch {
+                            try { SupabaseClient.client.auth.signOut() } catch (_: Exception) {}
+                            onLogout()
+                        }
+                    }) {
+                        Icon(Icons.Default.ExitToApp, "Logout", tint = ErrorRed)
                     }
                 }
             }
-        }
 
-        // Recent matches
-        item {
-            Text("Recent Matches", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        }
-
-        if (recentMatches.isEmpty()) {
+            // Quick stats
             item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                        .background(cardBg).padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No matches yet. Create your first match!", color = CH.textSecondary, fontSize = 13.sp)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickStatCard("Teams", "$teamCount", Icons.Default.Person, NeonGreen, Modifier.weight(1f))
+                    QuickStatCard("Players", "$playerCount", Icons.Default.Person, NeonBlue, Modifier.weight(1f))
+                    QuickStatCard("Matches", "$matchCount", Icons.Default.List, AmberColor, Modifier.weight(1f))
+                    QuickStatCard("tourneys", "$tournamentCount", Icons.Default.Star, PurpleColor, Modifier.weight(1f))
                 }
             }
-        } else {
-            items(recentMatches) { match ->
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(cardBg)
-                        .border(1.dp, CH.border, RoundedCornerShape(10.dp))
-                        .padding(12.dp)
+
+            // Join with Code button
+            item {
+                Button(
+                    onClick = onJoinWithCode,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen.copy(alpha = 0.15f))
                 ) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${match.matchType} • ${match.totalOvers} ov", color = CH.textSecondary, fontSize = 11.sp)
-                        val sc = when (match.status) { "completed" -> NeonGreen; "live" -> AmberColor; else -> CH.textSecondary }
-                        Text(match.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                    match.resultText?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text(it, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (match.status == "completed") {
-                        Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = { onViewScorecard(match.id) },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
-                                shape = RoundedCornerShape(6.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) { Text("Scorecard", fontSize = 11.sp) }
-                            OutlinedButton(
-                                onClick = { onViewAnalytics(match.id) },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor),
-                                shape = RoundedCornerShape(6.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) { Text("Analytics", fontSize = 11.sp) }
+                    Text("🔗  Join with Code", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+
+            // Feature cards
+            item {
+                Text("Features", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp))
+            }
+            item {
+                val features = listOf(
+                    Triple("🏏", "Matches", "Create and score live matches"),
+                    Triple("👥", "Teams", "Manage your teams and squads"),
+                    Triple("🏆", "Tournaments", "Run tournaments with fixtures"),
+                    Triple("📊", "Players", "Career batting & bowling records"),
+                    Triple("⚔️", "Compare", "Head-to-head player comparison"),
+                    Triple("🔗", "Join", "Enter a code to view shared content")
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    features.chunked(2).forEach { row ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { (emoji, title, desc) ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(CH.surface)
+                                        .border(1.dp, CH.border, RoundedCornerShape(10.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Column {
+                                        Text("$emoji $title", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Text(desc, color = CH.textSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                                    }
+                                }
+                            }
+                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
             }
-        }
 
-        // Bottom spacer
-        item { Spacer(Modifier.height(8.dp)) }
-    }
+            // Active tournaments
+            if (activeTournaments.isNotEmpty()) {
+                item {
+                    Text("Active Tournaments", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+                items(activeTournaments) { tournament ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(cardBg)
+                            .border(1.dp, CH.border, RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(tournament.name, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${tournament.format ?: "Tournament"} • ${tournament.status.replaceFirstChar { it.uppercase() }}",
+                                color = CH.textSecondary, fontSize = 11.sp
+                            )
+                        }
+                        val sc = when (tournament.status) { "live" -> NeonGreen; "upcoming" -> AmberColor; else -> CH.textSecondary }
+                        Box(
+                            modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                                .background(sc.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(tournament.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // Recent matches
+            item {
+                Text("Recent Matches", color = CH.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+
+            if (recentMatches.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(cardBg).padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No matches yet. Create your first match!", color = CH.textSecondary, fontSize = 13.sp)
+                    }
+                }
+            } else {
+                items(recentMatches) { match ->
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(cardBg)
+                            .border(1.dp, CH.border, RoundedCornerShape(10.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("${match.matchType} • ${match.totalOvers} ov", color = CH.textSecondary, fontSize = 11.sp)
+                            val sc = when (match.status) { "completed" -> NeonGreen; "live" -> AmberColor; else -> CH.textSecondary }
+                            Text(match.status.replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        match.resultText?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(it, color = CH.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        if (match.status == "completed") {
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { onViewScorecard(match.id) },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonGreen),
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) { Text("Scorecard", fontSize = 11.sp) }
+                                OutlinedButton(
+                                    onClick = { onViewAnalytics(match.id) },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor),
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) { Text("Analytics", fontSize = 11.sp) }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bottom spacer
+            item { Spacer(Modifier.height(8.dp)) }
+        }
+    } // CricketAnimatedBackground
 }
 
 @Composable

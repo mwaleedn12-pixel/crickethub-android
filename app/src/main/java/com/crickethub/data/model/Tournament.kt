@@ -7,7 +7,6 @@ import kotlinx.serialization.Serializable
 data class Tournament(
     val id: String = "",
     val name: String = "",
-    val description: String? = null,
     val format: String? = null,
     val status: String = "upcoming",
     @SerialName("start_date") val startDate: String? = null,
@@ -29,7 +28,6 @@ data class Tournament(
 data class TournamentInsert(
     @SerialName("user_id") val userId: String? = null,
     val name: String,
-    val description: String? = null,
     val format: String? = null,
     val status: String = "upcoming",
     @SerialName("start_date") val startDate: String? = null,

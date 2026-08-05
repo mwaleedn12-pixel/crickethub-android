@@ -1,6 +1,7 @@
 package com.crickethub.ui.player
 
 import androidx.compose.foundation.background
+import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -60,150 +61,151 @@ fun AllPlayersScreen(
     // Group by team
     val grouped = filtered.groupBy { p -> allTeams.find { it.id == p.teamId } }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-            .background(if (isSystemInDarkTheme()) Color(0xFF0A0A0A) else Color(0xFFF7F3EA))
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+    CricketAnimatedBackground(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text("Players", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary, modifier = Modifier.weight(1f))
-            Text("${allPlayers.size} total", color = CH.textSecondary, fontSize = 12.sp)
-        }
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Players", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CH.textPrimary, modifier = Modifier.weight(1f))
+                Text("${allPlayers.size} total", color = CH.textSecondary, fontSize = 12.sp)
+            }
 
-        // Search
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search players...") },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = NeonGreen) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(10.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = CH.textPrimary,
-                unfocusedTextColor = CH.textPrimary,
-                focusedBorderColor = NeonGreen,
-                unfocusedBorderColor = CH.border,
-                cursorColor = NeonGreen,
-                focusedLeadingIconColor = NeonGreen,
-                unfocusedLeadingIconColor = CH.textSecondary
+            // Search
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search players...") },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = NeonGreen) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = CH.textPrimary,
+                    unfocusedTextColor = CH.textPrimary,
+                    focusedBorderColor = NeonGreen,
+                    unfocusedBorderColor = CH.border,
+                    cursorColor = NeonGreen,
+                    focusedLeadingIconColor = NeonGreen,
+                    unfocusedLeadingIconColor = CH.textSecondary
+                )
             )
-        )
 
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-        if (isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
-            }
-            return@Column
-        }
-
-        if (allPlayers.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Person, null, tint = CH.textSecondary, modifier = Modifier.size(48.dp))
-                    Text("No players yet", color = CH.textSecondary, fontSize = 14.sp)
-                    Text("Add players to your teams first", color = CH.textSecondary, fontSize = 12.sp)
+            if (isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
                 }
+                return@Column
             }
-            return@Column
-        }
 
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            grouped.forEach { (team, players) ->
-                // Team header
-                item(key = "team_${team?.id ?: "none"}") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(24.dp).clip(CircleShape)
-                                .background(NeonGreen.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                team?.shortName?.take(2) ?: team?.name?.take(2)?.uppercase() ?: "?",
-                                color = NeonGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            team?.name ?: "No Team",
-                            color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold
-                        )
-                        Text("(${players.size})", color = CH.textSecondary, fontSize = 11.sp)
+            if (allPlayers.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Person, null, tint = CH.textSecondary, modifier = Modifier.size(48.dp))
+                        Text("No players yet", color = CH.textSecondary, fontSize = 14.sp)
+                        Text("Add players to your teams first", color = CH.textSecondary, fontSize = 12.sp)
                     }
                 }
+                return@Column
+            }
 
-                // Players
-                items(players, key = { it.id }) { player ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
-                            .border(1.dp, CH.border, RoundedCornerShape(10.dp))
-                            .clickable { onPlayerClick(player.id) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(36.dp).clip(CircleShape)
-                                .background(NeonGreen.copy(alpha = 0.15f))
-                                .border(1.dp, NeonGreen, CircleShape),
-                            contentAlignment = Alignment.Center
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                grouped.forEach { (team, players) ->
+                    // Team header
+                    item(key = "team_${team?.id ?: "none"}") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            Box(
+                                modifier = Modifier.size(24.dp).clip(CircleShape)
+                                    .background(NeonGreen.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    team?.shortName?.take(2) ?: team?.name?.take(2)?.uppercase() ?: "?",
+                                    color = NeonGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold
+                                )
+                            }
                             Text(
-                                player.jerseyNo?.toString() ?: player.fullName.take(1).uppercase(),
-                                color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                                team?.name ?: "No Team",
+                                color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold
                             )
+                            Text("(${players.size})", color = CH.textSecondary, fontSize = 11.sp)
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                player.fullName, color = CH.textPrimary,
-                                fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                player.role?.let { role ->
-                                    val rc = when (role.lowercase()) {
-                                        "batsman" -> NeonBlue; "bowler" -> ErrorRed
-                                        "allrounder", "all-rounder" -> NeonGreen
-                                        "wicketkeeper", "wicket keeper" -> AmberColor
-                                        else -> CH.textSecondary
+                    }
+
+                    // Players
+                    items(players, key = { it.id }) { player ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSystemInDarkTheme()) Color(0xFF161616) else Color(0xFFFFFFFF))
+                                .border(1.dp, CH.border, RoundedCornerShape(10.dp))
+                                .clickable { onPlayerClick(player.id) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(36.dp).clip(CircleShape)
+                                    .background(NeonGreen.copy(alpha = 0.15f))
+                                    .border(1.dp, NeonGreen, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    player.jerseyNo?.toString() ?: player.fullName.take(1).uppercase(),
+                                    color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    player.fullName, color = CH.textPrimary,
+                                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    player.role?.let { role ->
+                                        val rc = when (role.lowercase()) {
+                                            "batsman" -> NeonBlue; "bowler" -> ErrorRed
+                                            "allrounder", "all-rounder" -> NeonGreen
+                                            "wicketkeeper", "wicket keeper" -> AmberColor
+                                            else -> CH.textSecondary
+                                        }
+                                        Text(
+                                            role.replaceFirstChar { it.uppercase() },
+                                            color = rc, fontSize = 11.sp
+                                        )
                                     }
-                                    Text(
-                                        role.replaceFirstChar { it.uppercase() },
-                                        color = rc, fontSize = 11.sp
-                                    )
-                                }
-                                player.battingHand?.let {
-                                    Text("• ${it.take(1).uppercase()}HB", color = CH.textSecondary, fontSize = 11.sp)
+                                    player.battingHand?.let {
+                                        Text("• ${it.take(1).uppercase()}HB", color = CH.textSecondary, fontSize = 11.sp)
+                                    }
                                 }
                             }
+                            Text("›", color = NeonGreen, fontSize = 18.sp)
                         }
-                        Text("›", color = NeonGreen, fontSize = 18.sp)
                     }
                 }
-            }
 
-            if (filtered.isEmpty() && searchQuery.isNotBlank()) {
-                item {
-                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("No players match \"$searchQuery\"", color = CH.textSecondary, fontSize = 13.sp)
+                if (filtered.isEmpty() && searchQuery.isNotBlank()) {
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No players match \"$searchQuery\"", color = CH.textSecondary, fontSize = 13.sp)
+                        }
                     }
                 }
-            }
 
-            item { Spacer(Modifier.height(8.dp)) }
+                item { Spacer(Modifier.height(8.dp)) }
+            }
         }
-    }
+    } // CricketAnimatedBackground
 }

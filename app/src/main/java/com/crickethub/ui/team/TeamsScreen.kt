@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -224,6 +225,8 @@ fun TeamCard(
     val textS   = if (isDark) Color(0xFFC4C9D4) else Color(0xFF566073)
 
     var showShareDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+
     if (showShareDialog) {
         ShareDialog(
             resourceType = "team",
@@ -238,15 +241,15 @@ fun TeamCard(
     } catch (e: Exception) { green }
 
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(surface).border(1.dp, border, RoundedCornerShape(14.dp))
-            .clickable { onClick() }.padding(14.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(surface).border(1.dp, border, RoundedCornerShape(12.dp))
+            .clickable { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Team avatar — logo if available, else initials
+        // Team avatar
         Box(
-            modifier = Modifier.size(48.dp).clip(CircleShape)
+            modifier = Modifier.size(40.dp).clip(CircleShape)
                 .background(Brush.radialGradient(listOf(teamColor.copy(alpha = 0.35f), teamColor.copy(alpha = 0.1f))))
                 .border(1.5.dp, teamColor.copy(alpha = 0.6f), CircleShape),
             contentAlignment = Alignment.Center
@@ -259,67 +262,51 @@ fun TeamCard(
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             } else {
-                Text(
-                    team.name.take(2).uppercase(),
-                    color = teamColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold
+                Text(team.name.take(2).uppercase(), color = teamColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+
+        // Name + details
+        Column(modifier = Modifier.weight(1f)) {
+            Text(team.name, color = textP, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val details = buildList {
+                team.category?.let { add(it) }
+                add("$playerCount players")
+            }
+            Text(details.joinToString("  ·  "), color = textS, fontSize = 11.sp, maxLines = 1)
+        }
+
+        // ⋮ overflow menu
+        Box {
+            Box(
+                modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)).clickable { showMenu = true },
+                contentAlignment = Alignment.Center
+            ) { Text("\u22EE", color = textS, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                modifier = Modifier.background(if (isDark) Color(0xFF161616) else Color.White)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("✏️ Edit", color = greenDk, fontSize = 13.sp) },
+                    onClick = { showMenu = false; onEdit() }
+                )
+                DropdownMenuItem(
+                    text = { Text("📊 Stats", color = Color(0xFF60A5FA), fontSize = 13.sp) },
+                    onClick = { showMenu = false; onStats() }
+                )
+                DropdownMenuItem(
+                    text = { Text("📤 Share", color = greenDk, fontSize = 13.sp) },
+                    onClick = { showMenu = false; showShareDialog = true }
+                )
+                DropdownMenuItem(
+                    text = { Text("🗑️ Delete", color = Color(0xFFEF4444), fontSize = 13.sp) },
+                    onClick = { showMenu = false; onDelete() }
                 )
             }
         }
-
-        // Team info
-        Column(modifier = Modifier.weight(1f)) {
-            Text(team.name, color = textP, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                team.category?.let {
-                    Text(it, color = textS, fontSize = 11.sp)
-                    Text("•", color = textS, fontSize = 11.sp)
-                }
-                Text("$playerCount players", color = textS, fontSize = 11.sp)
-            }
-        }
-
-        // Action buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape)
-                    .background(if (isDark) Color(0xFF1E1E1E) else Color(0xFFF0ECE2))
-                    .clickable { onEdit() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Edit, null, tint = greenDk, modifier = Modifier.size(16.dp))
-            }
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape)
-                    .background(Color(0xFFEF4444).copy(alpha = if (isDark) 0.15f else 0.1f))
-                    .clickable { onDelete() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
-            }
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape)
-                    .background(Color(0xFF60A5FA).copy(alpha = if (isDark) 0.15f else 0.1f))
-                    .clickable { onStats() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.BarChart, null, tint = Color(0xFF60A5FA), modifier = Modifier.size(16.dp))
-            }
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape)
-                    .background(greenDk.copy(alpha = if (isDark) 0.15f else 0.1f))
-                    .clickable { showShareDialog = true },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Share, null, tint = greenDk, modifier = Modifier.size(16.dp))
-            }
-        }
-
-        Icon(
-            imageVector = androidx.compose.material.icons.Icons.Default.Groups,
-            contentDescription = null,
-            tint = textS.copy(alpha = 0.5f),
-            modifier = Modifier.size(18.dp)
-        )
     }
 }
 
