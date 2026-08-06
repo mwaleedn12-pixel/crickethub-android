@@ -96,7 +96,6 @@ fun ScoringScreen(
     var showSelectBowler by remember { mutableStateOf(false) }
     var showSelectNonStriker by remember { mutableStateOf(false) }
     var showPenaltyDialog by remember { mutableStateOf(false) }
-    var showMissedChanceDialog by remember { mutableStateOf(false) }
     var showManualEditDialog by remember { mutableStateOf(false) }
     var isFreeHit by remember { mutableStateOf(false) }
     var lastResumeTime by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -358,7 +357,6 @@ fun ScoringScreen(
                             onUndo = { viewModel.undoLastBall() },
                             onPenalty = { showPenaltyDialog = true },
                             onManualEdit = { showManualEditDialog = true },
-                            onMissedChance = { showMissedChanceDialog = true },
                             onDeclare = { showDeclareDialog = true },
                             onFollowOn = { showFollowOnDialog = true },
                             onEndDay = { viewModel.endDay(matchId) }
@@ -596,17 +594,6 @@ fun ScoringScreen(
                 PenaltyRunsDialog(
                     onDismiss = { showPenaltyDialog = false },
                     onConfirm = { team -> viewModel.addPenaltyRuns(team); showPenaltyDialog = false }
-                )
-            }
-
-            if (showMissedChanceDialog) {
-                MissedChanceDialog(
-                    fielders = uiState.bowlingTeamPlayers,
-                    onConfirm = { player, type ->
-                        viewModel.recordMissedChance(player, type)
-                        showMissedChanceDialog = false
-                    },
-                    onDismiss = { showMissedChanceDialog = false }
                 )
             }
 
@@ -964,7 +951,6 @@ fun ScoringButtons(
     onUndo: () -> Unit,
     onPenalty: () -> Unit,
     onManualEdit: () -> Unit,
-    onMissedChance: () -> Unit,
     onDeclare: () -> Unit = {},
     onFollowOn: () -> Unit = {},
     onEndDay: () -> Unit = {}
@@ -1013,11 +999,6 @@ fun ScoringButtons(
                 modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonBlue)
             ) { Text("Manual Edit", fontSize = 11.sp) }
-            OutlinedButton(
-                onClick = onMissedChance, enabled = !isLoading,
-                modifier = Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleColor)
-            ) { Text("Missed", fontSize = 11.sp) }
         }
         // ── Test match specific buttons ──
         if (isTestMatch) {
@@ -1903,85 +1884,6 @@ private fun BowlerTableRow(
     }
 }
 
-// ── MISSED CHANCE DIALOG ──────────────────────────────────────────────────────
-
-@Composable
-fun MissedChanceDialog(
-    fielders: List<Player>,
-    onConfirm: (Player, String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var type by remember { mutableStateOf<String?>(null) }
-    var selected by remember { mutableStateOf<Player?>(null) }
-    val types = listOf(
-        "catch_dropped" to "Catch Dropped",
-        "run_out_missed" to "Run Out Missed",
-        "stumping_missed" to "Missed Stumping"
-    )
-    val ready = type != null && selected != null
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CH.surface,
-        title = { Text("Missed Chance", color = CH.textPrimary, fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                Text("Type", color = CH.textSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                types.forEach { (key, label) ->
-                    val sel = type == key
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (sel) AmberColor.copy(alpha = 0.2f) else CH.bg)
-                            .border(1.dp, if (sel) AmberColor else CH.border, RoundedCornerShape(8.dp))
-                            .clickable { type = key }
-                            .padding(10.dp)
-                    ) {
-                        Text(label, color = if (sel) AmberColor else CH.textPrimary, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text("Fielder (required)", color = CH.textSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 200.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    fielders.forEach { p ->
-                        val sel = selected?.id == p.id
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (sel) NeonGreen.copy(alpha = 0.2f) else CH.bg)
-                                .border(1.dp, if (sel) NeonGreen else CH.border, RoundedCornerShape(8.dp))
-                                .clickable { selected = p }
-                                .padding(10.dp)
-                        ) {
-                            Text(p.fullName, color = if (sel) NeonGreen else CH.textPrimary, fontSize = 13.sp)
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { val t = type; val p = selected; if (t != null && p != null) onConfirm(p, t) },
-                enabled = ready
-            ) {
-                Text("Record", color = if (ready) NeonGreen else CH.textSecondary, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = CH.textSecondary) }
-        }
-    )
-}
 @Composable
 private fun SyncIndicator(syncState: SyncState) {
     val (color, label) = when (syncState) {

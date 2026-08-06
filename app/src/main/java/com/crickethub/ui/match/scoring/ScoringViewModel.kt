@@ -9,7 +9,6 @@ import com.crickethub.data.model.InningsInsert
 import com.crickethub.data.model.Match
 import com.crickethub.data.model.Player
 import com.crickethub.data.model.PartnershipInsert
-import com.crickethub.data.model.MissedChanceInsert
 import com.crickethub.data.model.ScoringUiState
 import com.crickethub.data.model.Team
 import com.crickethub.data.model.Tournament
@@ -967,30 +966,6 @@ class ScoringViewModel : ViewModel() {
     }
 
     // ── Undo ──────────────────────────────────────────────────────────────────
-    /** Record a fielding miss (dropped catch / missed run-out / missed stumping). */
-    fun recordMissedChance(player: Player, type: String) {
-        viewModelScope.launch {
-            try {
-                val state = _uiState.value
-                val innings = state.innings ?: return@launch
-                SupabaseClient.client.postgrest["missed_chances"].insert(
-                    MissedChanceInsert(
-                        matchId = state.match?.id,
-                        inningsId = innings.id,
-                        ballId = state.balls.lastOrNull()?.id?.takeIf { it.isNotBlank() },
-                        playerId = player.id,
-                        playerName = player.fullName,
-                        type = type,
-                        overNo = state.currentOver
-                    )
-                )
-                android.util.Log.d("CricketHub", "Missed chance: ${player.fullName} $type")
-            } catch (e: Exception) {
-                android.util.Log.e("CricketHub", "Missed chance error: ${e.message}", e)
-            }
-        }
-    }
-
     fun undoLastBall() {
         viewModelScope.launch {
             val state = _uiState.value

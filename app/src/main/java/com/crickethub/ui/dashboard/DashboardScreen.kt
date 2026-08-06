@@ -1,5 +1,7 @@
 package com.crickethub.ui.dashboard
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import com.crickethub.ui.components.CricketAnimatedBackground
 import androidx.compose.foundation.border
@@ -120,10 +122,9 @@ fun DashboardScreen(
 
                 val matches = try {
                     if (userId != null) {
-                        val m = SupabaseClient.client.postgrest["matches"]
+                        SupabaseClient.client.postgrest["matches"]
                             .select { filter { eq("created_by", userId) } }.decodeList<Match>()
-                        m.ifEmpty { SupabaseClient.client.postgrest["matches"].select().decodeList<Match>() }
-                    } else SupabaseClient.client.postgrest["matches"].select().decodeList<Match>()
+                    } else emptyList<Match>()
                 } catch (_: Exception) { emptyList<Match>() }
                 matchCount = matches.size
                 recentMatches = matches.sortedByDescending { it.createdAt }.take(5)
@@ -235,6 +236,44 @@ fun DashboardScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = NeonGreen.copy(alpha = 0.15f))
                 ) {
                     Text("🔗  Join with Code", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+
+            // Feedback & Rate
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Rate Us
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.crickethub"))
+                            try { context.startActivity(intent) } catch (_: Exception) {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.crickethub")))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AmberColor.copy(alpha = 0.15f))
+                    ) {
+                        Text("⭐  Rate Us", color = AmberColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    // Feedback Email
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:support.crickethub@gmail.com")
+                                putExtra(Intent.EXTRA_SUBJECT, "CricketHub Feedback")
+                            }
+                            try { context.startActivity(intent) } catch (_: Exception) { }
+                        },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonBlue.copy(alpha = 0.15f))
+                    ) {
+                        Text("📧  Feedback", color = NeonBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
             }
 

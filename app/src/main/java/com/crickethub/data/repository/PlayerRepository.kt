@@ -150,7 +150,7 @@ class PlayerRepository {
                 val bsr = if (wickets > 0) legalBalls.toDouble() / wickets else 0.0
                 val wides = bowlingBalls.count { it.extrasType == "wide" }
                 val noBalls = bowlingBalls.count { it.extrasType == "no_ball" }
-                val dotBalls = bowlingBalls.count { it.runsOffBat == 0 && it.extrasRuns == null && it.extrasType == null }
+                val dotBalls = bowlingBalls.count { it.extrasType != "wide" && it.extrasType != "no_ball" && it.runsOffBat == 0 && (it.extrasRuns ?: 0) == 0 }
                 val bowlingInnings = bowlingBalls.groupBy { it.inningsId }
                 val bestBowling = bowlingInnings.values.maxByOrNull { b ->
                     b.count { it.isWicket && it.wicketType !in listOf("run_out", "retired_hurt") }
