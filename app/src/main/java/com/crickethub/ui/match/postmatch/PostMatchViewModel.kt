@@ -313,7 +313,9 @@ class PostMatchViewModel : ViewModel() {
                     // recomputing from innings would overwrite it with "Match tied".
                     val storedResult = match.resultText
                     val decidedExplicitly = !storedResult.isNullOrBlank() &&
-                            match.resultType in listOf("boundary_count", "abandoned", "cancelled", "no_result")
+                            (match.resultType in listOf("boundary_count", "abandoned", "cancelled", "no_result",
+                                "draw", "tied", "innings_victory")
+                                    || match.matchType == "Test")
                     val resultText = if (decidedExplicitly) storedResult else computeResultText(
                         match, innings1, innings2, team1, team2,
                         inn1BattingTeamId, inn1BattingTeamName, inn1BowlingTeamName,

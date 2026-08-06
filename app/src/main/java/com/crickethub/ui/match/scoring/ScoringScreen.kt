@@ -75,14 +75,19 @@ fun ScoringScreen(
     var stumpsDismissedForDay by remember { mutableIntStateOf(-1) }
     val isTestMatch = uiState.match?.matchType == "Test"
 
-    // Auto-prompt stumps when day's overs exhausted (only once per day)
+    // Auto-prompt stumps when day's overs exhausted (only once per day).
+    // Skip during innings/match transitions — the transient state has stale
+    // ball counts that make testOversRemInDay briefly negative.
     if (isTestMatch && uiState.testOversRemInDay <= 0 && uiState.testOversToday > 0
-        && stumpsDismissedForDay != uiState.testDay && !showStumpsPrompt) {
+        && stumpsDismissedForDay != uiState.testDay && !showStumpsPrompt
+        && !uiState.inningsComplete && !uiState.matchComplete) {
         showStumpsPrompt = true
     }
 
-    // Auto-draw when days exceeded
-    if (isTestMatch && uiState.testIsDraw) {
+    // Auto-draw when days exceeded — but NOT during loading/transitions
+    if (isTestMatch && uiState.testIsDraw && !uiState.isLoading
+        && !uiState.inningsComplete && !uiState.matchComplete) {
+        android.util.Log.w("CricketHub", "testIsDraw FIRED: day=${uiState.testDay} maxDays=${uiState.testMaxDays} abandonReason=${uiState.match?.abandonReason}")
         LaunchedEffect(Unit) {
             viewModel.endMatchAsDraw(matchId)
         }
@@ -343,7 +348,8 @@ fun ScoringScreen(
                     ) {
                         val dayOversUp = isTestMatch && uiState.testOversRemInDay <= 0 && uiState.testOversToday > 0
                         ScoringButtons(
-                            isLoading = uiState.isLoading || dayOversUp,
+                            isLoading = uiState.isLoading,
+                            isDayOver = dayOversUp,
                             isFreeHit = isFreeHit,
                             isTestMatch = isTestMatch,
                             onRuns = { runs -> viewModel.recordBall(runsOffBat = runs) },
@@ -753,9 +759,6 @@ fun ScoreHeader(uiState: ScoringUiState, onShare: () -> Unit,
                     }
                     if (innNo == 4 && uiState.target != null) {
                         HeaderStat("Target", "${uiState.target}", AmberColor)
-                        uiState.requiredRunRate?.let {
-                            HeaderStat("RRR", "%.2f".format(it), if (it > uiState.runRate) ErrorRed else NeonGreen)
-                        }
                     }
                 } else if (uiState.isSecondInnings) {
                     uiState.target?.let { HeaderStat("Target", "$it", AmberColor) }
@@ -952,6 +955,7 @@ fun CurrentBowlerRow(
 @Composable
 fun ScoringButtons(
     isLoading: Boolean,
+    isDayOver: Boolean = false,
     isFreeHit: Boolean = false,
     isTestMatch: Boolean = false,
     onRuns: (Int) -> Unit,
@@ -971,7 +975,7 @@ fun ScoringButtons(
                 val bgColor = when (runs) { 4 -> NeonBlue.copy(alpha = 0.8f); 6 -> NeonGreen.copy(alpha = 0.8f); 5 -> PurpleColor.copy(alpha = 0.8f); else -> Color(0xFF262626) }
                 val textColor = when (runs) { 4, 5, 6 -> Color.White; 0 -> Color(0xFFC4C9D4); else -> Color(0xFFF2F2F0) }
                 Button(
-                    onClick = { onRuns(runs) }, enabled = !isLoading,
+                    onClick = { onRuns(runs) }, enabled = !isLoading && !isDayOver,
                     modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = bgColor, contentColor = textColor, disabledContainerColor = bgColor.copy(alpha = 0.4f)),
                     contentPadding = PaddingValues(0.dp)
@@ -980,7 +984,7 @@ fun ScoringButtons(
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = onWicket, enabled = !isLoading && !isFreeHit,
+                onClick = onWicket, enabled = !isLoading && !isDayOver && !isFreeHit,
                 modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isFreeHit) Color(0xFF7F1D1D).copy(alpha = 0.3f) else Color(0xFF7F1D1D),
@@ -988,7 +992,7 @@ fun ScoringButtons(
                 )
             ) { Text(if (isFreeHit) "NO OUT" else "WICKET", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
             Button(
-                onClick = onExtras, enabled = !isLoading,
+                onClick = onExtras, enabled = !isLoading && !isDayOver,
                 modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF78350F), contentColor = Color(0xFFFCD34D))
             ) { Text("EXTRAS", fontWeight = FontWeight.Bold, fontSize = 13.sp) }

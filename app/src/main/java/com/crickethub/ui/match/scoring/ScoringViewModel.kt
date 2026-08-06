@@ -338,7 +338,7 @@ class ScoringViewModel : ViewModel() {
         // PREVIOUS innings and would flash its score/players onto the new innings.
         val cached = if (force) null else getSavedState(matchId)
         if (cached != null && cached.balls.isNotEmpty()) {
-            _uiState.value = cached.copy(isLoading = false, error = null)
+            _uiState.value = cached.copy(isLoading = false, error = null, inningsComplete = false, matchComplete = false)
         }
         if (force) {
             // Mark as loading but keep old data visible so the user doesn't see zeros.
@@ -615,12 +615,47 @@ class ScoringViewModel : ViewModel() {
         }
     }
 
+    // ── Test Match: carry today's overs across innings transitions ─────────────
+    /**
+     * When an innings ends mid-day (declare, all-out, follow-on), the overs
+     * bowled today in that innings must carry over so the NEXT innings still
+     * shows the correct day/session/overs-remaining.
+     *
+     * Writes DAYOVERS:<N> into match.abandonReason and clears DAYSTART
+     * (which pointed at the now-completed innings).
+     */
+    private suspend fun carryDayOvers(matchId: String) {
+        val state = _uiState.value
+        if (!state.isTestMatch) return
+        val oversToday = state.testOversToday
+        val current = state.match ?: return
+        val existing = current.abandonReason ?: ""
+        val parts = existing.split("|").map { it.trim() }.toMutableList()
+        // Remove old DAYOVERS + DAYSTART (DAYSTART pointed at the old innings)
+        parts.removeAll { it.startsWith("DAYOVERS:") || it.startsWith("DAYSTART:") }
+        if (oversToday > 0) parts.add("DAYOVERS:$oversToday")
+        val updated = parts.filter { it.isNotBlank() }.joinToString("|")
+        SupabaseClient.client.postgrest["matches"]
+            .update({ set("abandon_reason", updated) }) { filter { eq("id", matchId) } }
+        // Force the repository to re-read from DB on the next getMatchById call.
+        // Without this, resumeMatch reads the CACHED match (no DAYOVERS) and
+        // overwrites the local state we just updated → day/session resets.
+        matchRepository.invalidateMatchCache(matchId)
+        // Keep local state in sync so the next innings sees the carried value
+        _uiState.update { it.copy(match = current.copy(abandonReason = updated)) }
+        android.util.Log.d("CricketHub", "carryDayOvers: carried $oversToday overs, abandonReason=$updated")
+    }
+
     // ── Next Innings (incl. super over) ───────────────────────────────────────
     fun checkAndStartNextInnings(matchId: String, onMatchComplete: () -> Unit) {
         if (inningsCompleteHandled) return
         inningsCompleteHandled = true
         viewModelScope.launch {
             try {
+                // ── Carry today's overs before the innings transition ──
+                // Must run BEFORE startInnings so the new innings sees DAYOVERS.
+                carryDayOvers(matchId)
+
                 val match = matchRepository.getMatchById(matchId) ?: return@launch
                 val allInnings = scoringRepository.getInningsByMatch(matchId)
                 val completed = allInnings.filter { it.status == "completed" }
@@ -675,12 +710,90 @@ class ScoringViewModel : ViewModel() {
                         val team1Total = (inn1?.totalRuns ?: 0) + (inn3?.totalRuns ?: 0)
                         val team2Total = inn2?.totalRuns ?: 0
                         val targetFor4th = team1Total - team2Total + 1
+
+                        if (targetFor4th <= 0) {
+                            // Team 2 already leads — wins by an innings and X runs.
+                            // No 4th innings needed.
+                            val margin = team2Total - team1Total
+                            val winnerName = try {
+                                SupabaseClient.client.postgrest["teams"]
+                                    .select { filter { eq("id", inn2!!.battingTeamId) } }
+                                    .decodeSingleOrNull<Team>()?.name ?: "Team"
+                            } catch (_: Exception) { "Team" }
+                            val resultText = "$winnerName won by an innings and $margin runs"
+                            try {
+                                SupabaseClient.client.postgrest["matches"].update({
+                                    set("status", "completed")
+                                    set("result_text", resultText)
+                                    set("result_type", "innings_victory")
+                                }) { filter { eq("id", matchId) } }
+                                matchRepository.invalidateMatchCache(matchId)
+                            } catch (e: Exception) {
+                                android.util.Log.w("CricketHub", "innings victory save: ${e.message}")
+                            }
+                            android.util.Log.d("CricketHub", "INNINGS VICTORY: $resultText")
+                            inningsCompleteHandled = false
+                            onMatchComplete()
+                            return@launch
+                        }
+
                         startInnings(4, inn2!!.battingTeamId, inn2.bowlingTeamId, targetFor4th)
                         return@launch
                     }
                 }
                 if (completed.size == 4 && match.matchType == "Test") {
-                    // Test: 4th innings done = match over
+                    // Test: 4th innings done — compute the correct result.
+                    //  1) Target chased → batting team won by X wickets
+                    //  2) All out        → bowling team won by X runs
+                    //  3) Otherwise      → Match Drawn (declared / days ran out)
+                    val inn3 = allInnings.find { it.inningsNo == 3 }
+                    val inn4 = allInnings.find { it.inningsNo == 4 }
+                    val team1Total = (inn1?.totalRuns ?: 0) + (inn3?.totalRuns ?: 0)
+                    val team2Inn2  = inn2?.totalRuns ?: 0
+                    val targetFor4th = team1Total - team2Inn2 + 1
+                    val inn4Runs    = inn4?.totalRuns ?: 0
+                    val inn4Wickets = inn4?.totalWickets ?: 0
+                    val maxWickets  = match.playersPerSide - 1
+
+                    suspend fun teamName(id: String?): String = try {
+                        SupabaseClient.client.postgrest["teams"]
+                            .select { filter { eq("id", id ?: "") } }
+                            .decodeSingleOrNull<com.crickethub.data.model.Team>()?.name ?: "Team"
+                    } catch (_: Exception) { "Team" }
+
+                    val (resultText, resultType) = when {
+                        // Chased: 4th innings team reached the target
+                        inn4Runs >= targetFor4th -> {
+                            val wicketsInHand = maxWickets - inn4Wickets
+                            val name = teamName(inn4?.battingTeamId)
+                            "$name won by $wicketsInHand wickets" to "normal"
+                        }
+                        // All out: 4th innings team bowled out before reaching target
+                        inn4Wickets >= maxWickets -> {
+                            val margin = targetFor4th - inn4Runs - 1
+                            val name = teamName(inn1?.battingTeamId)
+                            "$name won by $margin runs" to "normal"
+                        }
+                        // Scores level but not chased (target needs +1 to win)
+                        inn4Runs == targetFor4th - 1 && inn4Wickets < maxWickets -> {
+                            "Match Tied" to "tied"
+                        }
+                        // Otherwise: declared / time up / days exhausted → Draw
+                        else -> {
+                            "Match Drawn" to "draw"
+                        }
+                    }
+                    try {
+                        SupabaseClient.client.postgrest["matches"].update({
+                            set("status", "completed")
+                            set("result_text", resultText)
+                            set("result_type", resultType)
+                        }) { filter { eq("id", matchId) } }
+                        matchRepository.invalidateMatchCache(matchId)
+                        android.util.Log.d("CricketHub", "TEST RESULT: $resultText (target=$targetFor4th inn4=$inn4Runs/$inn4Wickets)")
+                    } catch (e: Exception) {
+                        android.util.Log.w("CricketHub", "Test result save: ${e.message}")
+                    }
                     inningsCompleteHandled = false
                     onMatchComplete()
                     return@launch
@@ -1293,16 +1406,19 @@ class ScoringViewModel : ViewModel() {
                 val existing = current.abandonReason ?: ""
                 val parts = existing.split("|").map { it.trim() }.toMutableList()
 
-                // Remove old TESTDAY/DAYSTART, compute new day
+                // Remove old TESTDAY/DAYSTART/DAYOVERS, compute new day
                 val oldDay = _uiState.value.testDay
-                parts.removeAll { it.startsWith("TESTDAY:") || it.startsWith("DAYSTART:") }
+                parts.removeAll { it.startsWith("TESTDAY:") || it.startsWith("DAYSTART:") || it.startsWith("DAYOVERS:") }
                 parts.add("TESTDAY:${oldDay + 1}")
                 parts.add("DAYSTART:$innId:$innBalls")
+                // DAYOVERS resets to 0 on a new day (default when absent)
 
                 val updated = parts.filter { it.isNotBlank() }.joinToString("|")
                 SupabaseClient.client.postgrest["matches"]
                     .update({ set("abandon_reason", updated) }) { filter { eq("id", matchId) } }
+                matchRepository.invalidateMatchCache(matchId)
                 _uiState.update { it.copy(match = current.copy(abandonReason = updated)) }
+                android.util.Log.d("CricketHub", "endDay: Day ${oldDay + 1} started, DAYSTART=$innId:$innBalls")
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Stumps failed: ${e.message}") }
             }

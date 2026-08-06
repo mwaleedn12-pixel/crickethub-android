@@ -126,6 +126,16 @@ data class ScoringUiState(
         val parts = m.trim().substringAfter("DAYSTART:").split(":")
         return if (parts.size >= 2) Pair(parts[0], parts[1].toIntOrNull() ?: 0) else null
     }
+    /**
+     * Overs bowled in PREVIOUS innings on the same day. Written by
+     * [ScoringViewModel.carryDayOvers] when an innings transitions mid-day
+     * (declaration, all-out, follow-on). Reset to 0 by [ScoringViewModel.endDay].
+     */
+    val dayOversCarried: Int get() {
+        val notes = match?.abandonReason ?: ""
+        val m = notes.split("|").lastOrNull { it.trim().startsWith("DAYOVERS:") }
+        return m?.substringAfter("DAYOVERS:")?.toIntOrNull() ?: 0
+    }
     val testSession: Int get() {
         if (!isTestMatch) return 1
         val sessLen = testOversPerDay / 3
@@ -135,14 +145,20 @@ data class ScoringUiState(
             else -> 3
         }
     }
+    /**
+     * Total overs bowled TODAY, across all innings. Combines:
+     *  - overs in the current innings (since the last day-start mark, or all if none)
+     *  - overs carried from earlier innings that ended on this same day
+     */
     val testOversToday: Int get() {
         if (!isTestMatch) return 0
         val currentBalls = innings?.totalBalls ?: 0
         val ds = dayStartInfo
+        val carried = dayOversCarried
         return if (ds != null && ds.first == innings?.id) {
-            ((currentBalls - ds.second).coerceAtLeast(0)) / 6
+            ((currentBalls - ds.second).coerceAtLeast(0)) / 6 + carried
         } else {
-            currentBalls / 6
+            currentBalls / 6 + carried
         }
     }
     val testOversRemInDay: Int get() = (testOversPerDay - testOversToday).coerceAtLeast(0)
